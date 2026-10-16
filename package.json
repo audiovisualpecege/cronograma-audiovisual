@@ -18,6 +18,7 @@
     "dev": "npm run dev -w @cronograma/web",
     "build": "npm run build -w @cronograma/web",
     "icons": "tsx scripts/icons.ts",
+    "fixtures": "tsx scripts/fixtures.ts",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit && npm run typecheck --workspaces --if-present",
     "test": "vitest run --project unit:*",

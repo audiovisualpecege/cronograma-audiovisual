@@ -1,0 +1,126 @@
+{
+  "weeks": [
+    {
+      "weekStart": "2026-08-03",
+      "layout": "claude-escala",
+      "sheets": [
+        "Escala"
+      ],
+      "events": [
+        {
+          "date": "2026-08-05",
+          "endDate": "2026-08-16",
+          "start": null,
+          "end": null,
+          "allDay": true,
+          "title": "Férias Carla Modelo",
+          "location": null,
+          "notes": null,
+          "typeLabel": null,
+          "cancelled": false,
+          "externalId": "evt-0003@exemplo.test",
+          "assignments": [],
+          "source": {
+            "sheet": "Escala",
+            "row": 4
+          }
+        }
+      ]
+    },
+    {
+      "weekStart": "2026-08-10",
+      "layout": "claude-escala",
+      "sheets": [
+        "Escala"
+      ],
+      "events": [
+        {
+          "date": "2026-08-10",
+          "endDate": "2026-08-10",
+          "start": "07:00",
+          "end": "14:00",
+          "allDay": false,
+          "title": "Evento de abertura",
+          "location": "Sala 12",
+          "notes": "Preparar a sala",
+          "typeLabel": null,
+          "cancelled": false,
+          "externalId": "evt-0001@exemplo.test",
+          "assignments": [],
+          "source": {
+            "sheet": "Escala",
+            "row": 5
+          }
+        },
+        {
+          "date": "2026-08-10",
+          "endDate": "2026-08-10",
+          "start": "14:00",
+          "end": "16:00",
+          "allDay": false,
+          "title": "GRAVAÇÃO: MBA em Data Science",
+          "location": "Zoom",
+          "notes": "Aula da turma 261",
+          "typeLabel": "AULA MBA",
+          "cancelled": false,
+          "externalId": "evt-0002@exemplo.test",
+          "assignments": [
+            {
+              "role": null,
+              "rawName": "Ana Fictícia"
+            },
+            {
+              "role": null,
+              "rawName": "Bruno Exemplo"
+            }
+          ],
+          "source": {
+            "sheet": "Escala",
+            "row": 6
+          }
+        }
+      ]
+    }
+  ],
+  "skipped": [
+    {
+      "sheet": "Revisar",
+      "row": null,
+      "reason": "aba_resumo",
+      "detail": "Resumo da aba Escala; os eventos são lidos de lá"
+    },
+    {
+      "sheet": "Escala",
+      "row": 7,
+      "reason": "data_invalida",
+      "detail": "evt-0004@exemplo.test | sem data | Sala 3 | Linha sem data | NAO IDENTIFICADO..."
+    },
+    {
+      "sheet": "Profissionais",
+      "row": null,
+      "reason": "aba_cadastro",
+      "detail": "Cadastro de tipos ou de pessoas, não é uma semana"
+    }
+  ],
+  "sheets": [
+    {
+      "name": "Revisar",
+      "layout": null,
+      "weeks": 0,
+      "events": 0
+    },
+    {
+      "name": "Escala",
+      "layout": "claude-escala",
+      "weeks": 2,
+      "events": 3
+    },
+    {
+      "name": "Profissionais",
+      "layout": null,
+      "weeks": 0,
+      "events": 0
+    }
+  ],
+  "message": null
+}

@@ -1,0 +1,164 @@
+{
+  "weeks": [
+    {
+      "weekStart": "2022-08-22",
+      "layout": "oficial-2022-blocos",
+      "sheets": [
+        "22 a 26 de agosto"
+      ],
+      "events": [
+        {
+          "date": "2022-08-22",
+          "endDate": "2022-08-22",
+          "start": "08:00",
+          "end": "12:00",
+          "allDay": false,
+          "title": "Gravação Institucional",
+          "location": "Estúdio Água",
+          "notes": null,
+          "typeLabel": null,
+          "cancelled": false,
+          "externalId": null,
+          "assignments": [
+            {
+              "role": "Responsável",
+              "rawName": "Carla Modelo"
+            },
+            {
+              "role": "Responsável",
+              "rawName": "Diego Teste"
+            }
+          ],
+          "source": {
+            "sheet": "22 a 26 de agosto",
+            "row": 4
+          }
+        },
+        {
+          "date": "2022-08-22",
+          "endDate": "2022-08-22",
+          "start": "14:00",
+          "end": "15:00",
+          "allDay": false,
+          "title": "Reunião Estúdio",
+          "location": "Online",
+          "notes": null,
+          "typeLabel": null,
+          "cancelled": false,
+          "externalId": null,
+          "assignments": [],
+          "source": {
+            "sheet": "22 a 26 de agosto",
+            "row": 5
+          }
+        },
+        {
+          "date": "2022-08-22",
+          "endDate": "2022-08-22",
+          "start": "16:00",
+          "end": "17:00",
+          "allDay": false,
+          "title": "Gravação de curso\nEstudo dirigido",
+          "location": "Estúdio Água",
+          "notes": "Professor chega 15h30",
+          "typeLabel": null,
+          "cancelled": false,
+          "externalId": null,
+          "assignments": [
+            {
+              "role": "Responsável",
+              "rawName": "Elisa Amostra"
+            },
+            {
+              "role": "Responsável",
+              "rawName": "Fábio Simulado"
+            }
+          ],
+          "source": {
+            "sheet": "22 a 26 de agosto",
+            "row": 6
+          }
+        },
+        {
+          "date": "2022-08-23",
+          "endDate": "2022-08-23",
+          "start": "13:00",
+          "end": "17:30",
+          "allDay": false,
+          "title": "Teste de transmissão",
+          "location": "Estúdio Fogo",
+          "notes": null,
+          "typeLabel": null,
+          "cancelled": false,
+          "externalId": null,
+          "assignments": [
+            {
+              "role": "Responsável",
+              "rawName": "Hugo Rascunho"
+            }
+          ],
+          "source": {
+            "sheet": "22 a 26 de agosto",
+            "row": 10
+          }
+        },
+        {
+          "date": "2022-08-23",
+          "endDate": "2022-08-23",
+          "start": "19:00",
+          "end": "23:00",
+          "allDay": false,
+          "title": "MBA em Agronegócio",
+          "location": "ESTÚDIO: Terra + Zoom",
+          "notes": "Traslado com motorista",
+          "typeLabel": null,
+          "cancelled": false,
+          "externalId": null,
+          "assignments": [
+            {
+              "role": "Responsável",
+              "rawName": "Fábio Simulado"
+            },
+            {
+              "role": "Responsável",
+              "rawName": "Gabi Ensaio"
+            }
+          ],
+          "source": {
+            "sheet": "22 a 26 de agosto",
+            "row": 9
+          }
+        }
+      ]
+    }
+  ],
+  "skipped": [
+    {
+      "sheet": "22 a 26 de agosto",
+      "row": 2,
+      "reason": "observacao",
+      "detail": "Férias Gabi Ensaio de 15 a 26/08"
+    },
+    {
+      "sheet": "22 a 26 de agosto",
+      "row": 11,
+      "reason": "observacao",
+      "detail": "ATIVIDADES"
+    },
+    {
+      "sheet": "22 a 26 de agosto",
+      "row": 13,
+      "reason": "celula_mesclada",
+      "detail": "Criação de cenário | https://exemplo.test/cartao | Iara Protótipo"
+    }
+  ],
+  "sheets": [
+    {
+      "name": "22 a 26 de agosto",
+      "layout": "oficial-2022-blocos",
+      "weeks": 1,
+      "events": 5
+    }
+  ],
+  "message": null
+}
