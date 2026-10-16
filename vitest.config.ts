@@ -1,7 +1,7 @@
 import { defineConfig } from 'vitest/config';
 
 // Projetos de teste do monorepo. `npm test` roda os de unidade (unit:*);
-// `npm run test:integration` roda os *.int.test.ts, que exigem o Supabase local.
+// `npm run test:integration` roda tests/integration e os *.int.test.ts, que exigem o Supabase local.
 const unitExclude = ['**/node_modules/**', '**/dist/**', '**/*.int.test.*'];
 
 export default defineConfig({
@@ -55,11 +55,21 @@ export default defineConfig({
         },
       },
       {
+        // Banco compartilhado: um arquivo por vez, semente nova antes de cada teste.
         test: {
           name: 'integration',
-          include: ['packages/**/*.int.test.ts', 'apps/**/*.int.test.ts', 'supabase/**/*.int.test.ts'],
+          include: [
+            'tests/integration/**/*.test.ts',
+            'packages/**/*.int.test.ts',
+            'apps/**/*.int.test.ts',
+            'supabase/**/*.int.test.ts',
+          ],
           exclude: ['**/node_modules/**'],
           environment: 'node',
+          globalSetup: ['./tests/integration/helpers/global-setup.ts'],
+          fileParallelism: false,
+          testTimeout: 30_000,
+          hookTimeout: 60_000,
         },
       },
     ],
