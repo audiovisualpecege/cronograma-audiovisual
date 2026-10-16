@@ -1,0 +1,64 @@
+:root{
+/* Paleta oficial (Paleta-Chiaro.png) */
+--chiaro-noite:#070010;          /* 01 */
+--chiaro-ametista:#402B6D;       /* 02 */
+--chiaro-violeta:#672FA2;        /* 03 — cor do "O" no logotipo */
+--chiaro-lavanda:#8C4EDB;        /* 04 */
+--chiaro-pessego:#FACE95;        /* 05 */
+--chiaro-areia:#F7E1C4;          /* 06 */
+/* Neutros (logotipo + páginas claras do mídia kit) */
+--chiaro-grafite:#292B33;        /* tinta do logotipo */
+--chiaro-nevoa:#E6E6E6;          /* fundo das páginas claras do mídia kit */
+--chiaro-branco:#FFFFFF;
+--neutral-50:#F6F5F8;--neutral-100:#ECEBF0;--neutral-200:#DCDAE3;--neutral-300:#BDB9C9;--neutral-400:#8F8AA0;--neutral-500:#666178;--neutral-600:#47435A;--neutral-700:#2F2C3D;--neutral-800:#1A1726;--neutral-900:#0E0A18;
+/* Escala violeta derivada */
+--violeta-50:#F4EEFC;--violeta-100:#E6D9F8;--violeta-200:#CDB2F0;--violeta-300:#B08AE8;--violeta-400:#8C4EDB;--violeta-500:#7A3CC2;--violeta-600:#672FA2;--violeta-700:#522685;--violeta-800:#402B6D;--violeta-900:#24163F;
+/* Gradiente oficial (Chiaro-Gradiente.png) */
+--gradient-chiaro:linear-gradient(90deg,#8C4EDB 0%,#672FA2 50%,#2E1F5B 100%); /* @kind color */
+--gradient-noite:radial-gradient(120% 90% at 30% 0%,#2A1450 0%,#120626 45%,#070010 100%); /* @kind color */
+--gradient-protecao:linear-gradient(180deg,rgba(7,0,16,0) 0%,rgba(7,0,16,.55) 60%,rgba(7,0,16,.9) 100%); /* @kind color */
+/* Semânticas */
+--success:#2E9B6B;--warning:#E8A93B;--danger:#D2425A;--info:#8C4EDB;
+/* Aliases de superfície e texto — tema claro */
+--surface-page:var(--chiaro-nevoa);
+--surface-card:var(--chiaro-branco);
+--surface-raised:var(--chiaro-branco);
+--surface-sunken:var(--neutral-100);
+--surface-inverse:var(--chiaro-noite);
+--surface-brand:var(--chiaro-violeta);
+--surface-warm:var(--chiaro-areia);
+--text-primary:var(--chiaro-grafite);
+--text-secondary:var(--neutral-500);
+--text-muted:var(--neutral-400);
+--text-inverse:var(--chiaro-branco);
+--text-brand:var(--chiaro-violeta);
+--text-on-brand:var(--chiaro-branco);
+--border-subtle:var(--neutral-200);
+--border-strong:var(--neutral-300);
+--border-brand:var(--chiaro-violeta);
+--focus-ring:0 0 0 3px rgba(140,78,219,.45);
+--accent:var(--chiaro-violeta);
+--accent-hover:var(--violeta-700);
+--accent-press:var(--chiaro-ametista);
+--accent-soft:var(--violeta-50);
+--highlight:var(--chiaro-pessego);
+}
+[data-theme="noite"]{
+--surface-page:var(--chiaro-noite);
+--surface-card:#140A26;
+--surface-raised:#1E1236;
+--surface-sunken:#05000C;
+--surface-inverse:var(--chiaro-branco);
+--text-primary:#F5F2FA;
+--text-secondary:#B9B1CC;
+--text-muted:#857C9C;
+--text-inverse:var(--chiaro-noite);
+--text-brand:var(--chiaro-lavanda);
+--border-subtle:rgba(255,255,255,.1);
+--border-strong:rgba(255,255,255,.22);
+--border-brand:var(--chiaro-lavanda);
+--accent:var(--chiaro-lavanda);
+--accent-hover:#9F68E3;
+--accent-press:var(--chiaro-violeta);
+--accent-soft:rgba(140,78,219,.16);
+}

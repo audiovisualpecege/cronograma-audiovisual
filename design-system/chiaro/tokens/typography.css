@@ -1,0 +1,16 @@
+:root{
+--font-display:"Altivo","Archivo",system-ui,sans-serif;
+--font-body:"Archivo","Altivo",system-ui,sans-serif;
+--font-mono:ui-monospace,"SF Mono",Menlo,monospace;
+--weight-thin:100;--weight-extralight:200;--weight-light:300;--weight-regular:400;--weight-medium:500;--weight-bold:700;--weight-black:800;--weight-ultra:900;
+--text-display-xl:clamp(56px,7vw,112px);
+--text-display-l:clamp(44px,5vw,80px);
+--text-h1:48px;--text-h2:36px;--text-h3:28px;--text-h4:22px;
+--text-body-l:18px;--text-body:16px;--text-body-s:14px;--text-caption:12px;--text-overline:11px;
+--leading-tight:.92;--leading-snug:1.15;--leading-normal:1.5;--leading-relaxed:1.65;
+--tracking-tight:-.01em;--tracking-normal:0;--tracking-wide:.08em;--tracking-filmes:.42em;
+/* Aliases semânticos */
+--type-title-light:var(--weight-light);   /* "ESTÚDIO" */
+--type-title-bold:var(--weight-black);    /* "MIRANTE" */
+--type-overline:var(--weight-black);      /* "NOSSOS SERVIÇOS" */
+}

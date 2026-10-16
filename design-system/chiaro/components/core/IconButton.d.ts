@@ -1,0 +1,3 @@
+/** Circular icon-only button. */
+export interface IconButtonProps { /** Solar icon name, kebab-case */ icon: string; /** Solar weight — "bold" for playback controls, "linear" otherwise */ weight?: 'linear'|'bold'|'bold-duotone'; /** Accessible label (required) */ label: string; variant?: 'ghost'|'solid'|'outline'|'glass'; size?: number; disabled?: boolean; onClick?: (e:any)=>void; style?: React.CSSProperties; }
+export declare function IconButton(props: IconButtonProps): JSX.Element;

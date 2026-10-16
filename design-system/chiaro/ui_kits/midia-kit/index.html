@@ -1,0 +1,60 @@
+<!-- @dsCard group="Mídia Kit" viewport="1280x720" name="Mídia Kit interativo" subtitle="Recriação navegável do mídia kit — ← → para navegar" -->
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>Chiaro Filmes — Mídia Kit</title><link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>html,body{margin:0;height:100%;background:#070010;overflow:hidden}#root{height:100%}</style></head><body><div id="root"></div>
+<script type="text/babel" src="Slides.jsx"></script>
+<script type="text/babel">
+const { IconButton, Dialog, Button, Toast } = window.ChiaroFilmesDesignSystem_7fe4c8;
+const PAGES = [
+  ['Capa', () => <Capa />],
+  ['Quem somos', () => <QuemSomos />],
+  ['Produção externa', () => <Servico image="producao-externa.jpg" cols={['Nossa equipe <b>se desloca até a locação escolhida</b> para realizar a captação de conteúdo para uma ampla variedade de projetos audiovisuais.','<b>Oferecemos soluções sob medida</b> para produções de vídeos institucionais, publicitários, documentários e mais.','Além disso, também <b>atuamos na cobertura completa de eventos</b>, garantindo que cada momento seja registrado com qualidade e precisão.']} />],
+  ['Transmissões', () => <Servico image="transmissoes.jpg" cols={['Oferecemos <b>soluções completas para transmissões ao vivo</b> com alta qualidade, garantindo que seu conteúdo alcance o público em tempo real.','Nosso estúdio é <b>equipado com tecnologia de ponta para gravações</b>, proporcionando o ambiente ideal para cursos on-demand, entrevistas, webinars, videocast e','outros tipos de produção audiovisual, seja ao vivo ou gravado.']} />],
+  ['Camarim', () => <Espaco light="Camarim" text="Com 32m², nosso camarim é um ambiente acolhedor, confortável, oferecendo o melhor suporte e estrutura para os convidados, com copa equipada com frigobar, cafeteira Nespresso e micro-ondas, sala de estar com sofás, poltronas e mesa para refeições, além de banheiros dedicados com chuveiros." images={['camarim-1.jpg','camarim-2.jpg']} />],
+  ['Estúdio Mirante', () => <Espaco light="Estúdio" bold="Mirante" text="O Estúdio Mirante, com aproximadamente 140m², oferece um espaço versátil para a montagem de diferentes cenários personalizados de acordo com as necessidades do cliente." images={['estudio-mirante-1.jpg']} />],
+  ['Estúdio Água', () => <Espaco light="Estúdio" bold="Água" text="O Estúdio Água, com aproximadamente 42m², é ideal para gravação ou transmissão de cursos e treinamentos, possui cabine de corte, Chroma Key para projeção de materiais, púlpito para o apresentador e quadro branco para anotações." images={['estudio-agua-1.jpg','estudio-agua-2.jpg']} />],
+  ['Estúdio Fogo', () => <Espaco light="Estúdio" bold="Fogo" text="O Estúdio Fogo, com aproximadamente 42m², é ideal para gravação ou transmissão de cursos e treinamentos, possui cabine de corte, Chroma Key para projeção de materiais, púlpito para o apresentador e quadro branco para anotações." images={['estudio-fogo-1.jpg','estudio-fogo-2.jpg']} />],
+  ['Estúdio Terra', () => <Espaco light="Estúdio" bold="Terra" text="O Estúdio Terra, com aproximadamente 40m², é ideal para gravação ou transmissão de cursos e treinamentos, possui cabine de corte, Chroma Key para projeção de materiais, púlpito para o apresentador e quadro branco para anotações." images={['estudio-terra-1.jpg','estudio-terra-2.jpg']} />],
+  ['Estúdio Ar', () => <Espaco light="Estúdio" bold="Ar" text="O Estúdio Ar, com aproximadamente 40m², possui uma cenografia modular, moderna e versátil, com TV 85 pol The Frame, quadro branco ou lousa digital, comportando diversos formatos desde cursos e treinamentos até entrevistas e eventos." images={['estudio-ar-1.jpg','estudio-ar-2.jpg']} />],
+  ['Nossas produções', (p) => <Producoes onPlay={p.onPlay} />],
+  ['Nossos clientes', () => <Clientes />],
+  ['Contato', () => <Contato />],
+];
+function App() {
+  const [i, setI] = React.useState(() => +(localStorage.getItem('chiaro-mk-page') || 0));
+  const [scale, setScale] = React.useState(1);
+  const [video, setVideo] = React.useState(null);
+  const go = d => setI(x => Math.max(0, Math.min(PAGES.length - 1, x + d)));
+  React.useEffect(() => { localStorage.setItem('chiaro-mk-page', i); }, [i]);
+  React.useEffect(() => {
+    const fit = () => setScale(Math.min(window.innerWidth / 1920, (window.innerHeight - 64) / 1080));
+    fit(); window.addEventListener('resize', fit);
+    const k = e => { if (e.key === 'ArrowRight') go(1); if (e.key === 'ArrowLeft') go(-1); };
+    window.addEventListener('keydown', k);
+    return () => { window.removeEventListener('resize', fit); window.removeEventListener('keydown', k); };
+  }, []);
+  const [label, render] = PAGES[i];
+  return <div style={{ height:'100%', display:'flex', flexDirection:'column', alignItems:'center' }}>
+    <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', width:'100%' }}>
+      <div style={{ width:1920 * scale, height:1080 * scale, position:'relative' }}>
+        <div data-screen-label={String(i + 1).padStart(2, '0') + ' ' + label} style={{ width:1920, height:1080, position:'absolute', top:0, left:0, transform:`scale(${scale})`, transformOrigin:'0 0', overflow:'hidden', borderRadius:18 * scale > 6 ? 18 : 6 }}>
+          {render({ onPlay: setVideo })}
+        </div>
+      </div>
+    </div>
+    <div style={{ height:64, display:'flex', alignItems:'center', gap:14, color:'#B9B1CC', font:'500 13px var(--font-body)' }}>
+      <IconButton icon="alt-arrow-left"label="Anterior" variant="glass" size={38} onClick={() => go(-1)} disabled={i === 0} />
+      <div style={{ display:'flex', gap:6 }}>{PAGES.map((p, k) => <span key={k} title={p[0]} onClick={() => setI(k)} style={{ width:k === i ? 22 : 8, height:8, borderRadius:8, background:k === i ? 'var(--chiaro-lavanda)' : 'rgba(255,255,255,.25)', cursor:'pointer', transition:'all var(--dur-base) var(--ease-cine)' }} />)}</div>
+      <IconButton icon="alt-arrow-right"label="Próxima" variant="glass" size={38} onClick={() => go(1)} disabled={i === PAGES.length - 1} />
+      <span style={{ minWidth:150 }}>{String(i + 1).padStart(2, '0')} · {label}</span>
+    </div>
+    <Dialog open={!!video} onClose={() => setVideo(null)} title={video} width={720} footer={<Button onClick={() => setVideo(null)}>Fechar</Button>}>
+      <div style={{ aspectRatio:'16/9', borderRadius:10, background:'var(--gradient-noite)', display:'flex', alignItems:'center', justifyContent:'center', color:'#B9B1CC' }}>Player de vídeo — link do portfólio não incluso nos arquivos fornecidos.</div>
+    </Dialog>
+  </div>;
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script></body></html>

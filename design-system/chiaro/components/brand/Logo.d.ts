@@ -1,0 +1,3 @@
+/** Official Chiaro Filmes logo (PNG from brand files). */
+export interface LogoProps { variant?: 'box'|'boxHorizontal'|'chiaro'|'filmes'|'filmesHorizontal'|'icon'; /** white version for dark backgrounds */ inverse?: boolean; height?: number; /** path prefix to the design-system root, e.g. "../../" */ base?: string; style?: React.CSSProperties; }
+export declare function Logo(props: LogoProps): JSX.Element;

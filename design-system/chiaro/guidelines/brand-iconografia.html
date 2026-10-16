@@ -1,0 +1,41 @@
+<!-- @dsCard group="Brand" viewport="700x300" name="Iconografia" subtitle="Solar Icons — linear, bold e bold duotone" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../styles.css"><style>
+body{margin:0;padding:20px;font-family:var(--font-body);color:var(--text-primary);background:#fff}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.col{border-radius:var(--radius-md);padding:14px;display:flex;flex-direction:column;gap:12px}
+.light{background:var(--chiaro-nevoa);color:var(--chiaro-violeta)}
+.dark{background:var(--chiaro-noite);color:#fff}
+.row{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.ic{display:inline-block;width:24px;height:24px;background:currentColor;-webkit-mask:var(--u) center/contain no-repeat;mask:var(--u) center/contain no-repeat}
+.col .row:has(.disc){gap:8px;flex-wrap:nowrap}
+.disc{width:40px;height:40px;border-radius:999px;background:rgba(140,78,219,.22);display:inline-flex;align-items:center;justify-content:center;color:var(--chiaro-pessego)}
+.disc .ic{width:22px;height:22px}
+.play{width:44px;height:44px;border-radius:999px;background:var(--chiaro-lavanda);display:inline-flex;align-items:center;justify-content:center;color:#fff}
+.play .ic{width:20px;height:20px}
+.t{font:800 11px var(--font-display);letter-spacing:.08em;text-transform:uppercase}
+.d{font:400 11px/1.4 var(--font-body);opacity:.75}
+.mono{font-family:var(--font-mono);font-size:11px;color:var(--text-secondary)}
+.foot{display:flex;justify-content:space-between;margin-top:12px;gap:12px;flex-wrap:wrap}
+</style></head><body>
+<div class="grid">
+  <div class="col light"><div class="t">Linear · padrão</div>
+    <div class="row" data-w="linear" data-n="alt-arrow-left alt-arrow-right close magnifier letter map-point"></div>
+    <div class="d">UI funcional: navegação, formulários, botões, ícone ao lado de texto.</div></div>
+  <div class="col dark"><div class="t">Bold</div>
+    <div class="row"><span class="play" data-w="bold" data-n="play"></span><span class="play" data-w="bold" data-n="pause"></span><span data-w="bold" data-n="heart check-circle" class="row" style="color:var(--chiaro-pessego)"></span></div>
+    <div class="d">Controles de mídia, estados ativos, ícones ≤16px em disco colorido.</div></div>
+  <div class="col dark"><div class="t">Bold duotone</div>
+    <div class="row"><span class="disc" data-w="bold-duotone" data-n="clapperboard"></span><span class="disc" data-w="bold-duotone" data-n="stream"></span><span class="disc" data-w="bold-duotone" data-n="videocamera-record"></span><span class="disc" data-w="bold-duotone" data-n="confetti"></span></div>
+    <div class="d">Destaque ≥20px: serviços e canais de contato. Monocromático.</div></div>
+</div>
+<div class="foot"><span class="mono">@solar-icons/static@2.3.2 · &lt;Icon name="alt-arrow-right" weight="linear" /&gt;</span><span class="mono">16 · 20 · 24 · 32px · sem broken / line-duotone / outline</span></div>
+<script>
+var CDN='https://cdn.jsdelivr.net/npm/@solar-icons/static@2.3.2/dist/icons/';
+document.querySelectorAll('[data-n]').forEach(function(el){
+  el.dataset.n.split(' ').forEach(function(n){
+    var s=document.createElement('span');s.className='ic';s.setAttribute('aria-hidden','true');
+    s.style.setProperty('--u','url('+CDN+el.dataset.w+'/'+n+'.svg)');el.appendChild(s);
+  });
+});
+</script>
+</body></html>

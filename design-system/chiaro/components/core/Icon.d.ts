@@ -1,0 +1,3 @@
+/** Solar Icons glyph (solar-icons.vercel.app) rendered via CSS mask; inherits currentColor. Chiaro's official UI icon set. */
+export interface IconProps { /** Solar icon name, kebab-case (e.g. "play", "alt-arrow-right", "map-point") */ name: string; /** linear = default UI · bold = active/playback/small badges · bold-duotone = featured icons ≥24px */ weight?: 'linear'|'bold'|'bold-duotone'; size?: number; color?: string; style?: React.CSSProperties; }
+export declare function Icon(props: IconProps): JSX.Element;
