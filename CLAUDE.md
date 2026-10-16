@@ -60,3 +60,12 @@ Todo app, extensão ou programa com interface tem versão, e ela aparece na inte
   arquivo de versão no build, nunca digitada à mão numa tela.
 - Registre cada versão em `CHANGELOG.md`, com a data e o que mudou, nas palavras de quem usa.
 - Sem interface (um script, um serviço), basta o número no arquivo de projeto e o `CHANGELOG.md`.
+
+## GitHub
+Se o produto precisar de algo no GitHub (repositório, release com o instalador, atualização automática,
+página), publique na conta `audiovisualpecege`, nunca noutra. É regra, não se pergunta.
+- Crie o repositório como `audiovisualpecege/<nome>` (`gh repo create audiovisualpecege/<nome>`), e todo link do produto
+  para o GitHub (download, atualização, página) aponta para `github.com/audiovisualpecege/`.
+- O `gh` desta sessão já entra como `audiovisualpecege`: não troque de conta (`gh auth switch`) nem use outro token.
+  Se o `gh` disser que não tem acesso, encerre dizendo isso em vez de publicar noutra conta.
+- O GitHub não substitui a entrega pelo Task Forge: o que a equipe instala continua listado em `_instaladores.txt`.
