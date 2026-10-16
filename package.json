@@ -1,0 +1,42 @@
+{
+  "name": "cronograma-audiovisual",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Plataforma de cronograma e escala da equipe de audiovisual. Um produto Chiaro Filmes.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "packages/core",
+    "apps/web",
+    "apps/worker",
+    "apps/desktop"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @cronograma/web",
+    "build": "npm run build -w @cronograma/web",
+    "icons": "tsx scripts/icons.ts",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit && npm run typecheck --workspaces --if-present",
+    "test": "vitest run --project unit:*",
+    "test:integration": "vitest run --project integration --passWithNoTests",
+    "test:e2e": "playwright test --pass-with-no-tests"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^26.6.5",
+    "@vitest/coverage-v8": "^5.0.5",
+    "eslint": "^10.13.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0",
+    "png-to-ico": "^3.0.2",
+    "sharp": "^0.35.5",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.2",
+    "vitest": "^5.0.5"
+  }
+}

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>Cronograma Audiovisual</title>
+  <!-- Variante do icon.svg para 16 e 32 px: traço mais grosso, uma faixa na claquete
+       e a grade reduzida a uma única célula Pêssego, a pessoa escalada. -->
+  <defs>
+    <linearGradient id="chiaro-gradient" x1="0" y1="0" x2="512" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8C4EDB"/>
+      <stop offset="0.5" stop-color="#672FA2"/>
+      <stop offset="1" stop-color="#2E1F5B"/>
+    </linearGradient>
+  </defs>
+  <rect id="bg" width="512" height="512" rx="120" fill="url(#chiaro-gradient)"/>
+  <g id="glyph">
+    <rect x="96" y="96" width="320" height="336" rx="64" fill="none" stroke="#FFFFFF" stroke-width="56"/>
+    <path d="M96 208V160a64 64 0 0 1 64-64h192a64 64 0 0 1 64 64v48Z" fill="#FFFFFF"/>
+    <path d="M232 96h64l-48 112h-64Z" fill="#672FA2"/>
+    <rect x="168" y="256" width="176" height="120" rx="32" fill="#FACE95"/>
+  </g>
+</svg>

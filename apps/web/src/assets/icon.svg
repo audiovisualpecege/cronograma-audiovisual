@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>Cronograma Audiovisual</title>
+  <!-- Ícone próprio do produto: folha de calendário com topo de claquete e grade da escala,
+       com a pessoa escalada em Pêssego, sobre o gradiente oficial da Chiaro (Lavanda, Violeta, Ametista). -->
+  <defs>
+    <linearGradient id="chiaro-gradient" x1="0" y1="0" x2="512" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8C4EDB"/>
+      <stop offset="0.5" stop-color="#672FA2"/>
+      <stop offset="1" stop-color="#2E1F5B"/>
+    </linearGradient>
+  </defs>
+  <rect id="bg" width="512" height="512" rx="120" fill="url(#chiaro-gradient)"/>
+  <g id="glyph">
+    <rect x="104" y="96" width="304" height="328" rx="48" fill="none" stroke="#FFFFFF" stroke-width="28"/>
+    <path d="M104 188V144a48 48 0 0 1 48-48h208a48 48 0 0 1 48 48v44Z" fill="#FFFFFF"/>
+    <path d="M196 96h44l-40 92h-44Z M300 96h44l-40 92h-44Z" fill="#672FA2"/>
+    <rect x="140" y="212" width="104" height="80" rx="20" fill="#FFFFFF"/>
+    <rect x="268" y="212" width="104" height="80" rx="20" fill="#FFFFFF"/>
+    <rect x="140" y="316" width="104" height="80" rx="20" fill="#FFFFFF"/>
+    <rect x="268" y="316" width="104" height="80" rx="20" fill="#FACE95"/>
+  </g>
+</svg>
