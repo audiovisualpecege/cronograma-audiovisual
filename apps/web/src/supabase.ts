@@ -57,11 +57,16 @@ export interface Remote {
   /** Avisos do Realtime; `onLive` diz quando o canal está ouvindo (ou deixou de ouvir). */
   subscribe(tables: readonly TableName[], onChange: (table: TableName) => void, onLive?: (live: boolean) => void): () => void;
   rpc<T>(fn: string, args: Record<string, unknown>): Promise<T>;
+  /** Lê uma view inteira, em páginas (history_facts, que não entra na cópia local). Precisa de internet. */
+  readView<T>(view: string, columns: string, order?: string[]): Promise<T[]>;
   /** Fecha o Realtime e a renovação da sessão (a sessão guardada continua). */
   close(): Promise<void>;
 }
 
 export const AUTH_STORAGE_KEY = 'cronograma-auth';
+
+// O PostgREST do Supabase devolve no máximo 1.000 linhas por pedido.
+const VIEW_PAGE = 1000;
 
 export interface RemoteOptions {
   url: string;
@@ -230,6 +235,20 @@ export function createSupabaseRemote(options: RemoteOptions): Remote {
       const { data, error } = await client.rpc(fn, args);
       if (error) failure(error);
       return data as T;
+    },
+
+    async readView<T>(view: string, columns: string, order: string[] = []) {
+      const out: T[] = [];
+      for (let from = 0; ; from += VIEW_PAGE) {
+        let query = client.from(view).select(columns);
+        // Ordem fixa para as páginas não repetirem nem pularem linhas.
+        for (const col of order) query = query.order(col, { ascending: true, nullsFirst: true });
+        const { data, error } = await query.range(from, from + VIEW_PAGE - 1);
+        if (error) failure(error);
+        const rows = (data ?? []) as T[];
+        out.push(...rows);
+        if (rows.length < VIEW_PAGE) return out;
+      }
     },
 
     async close() {

@@ -2,6 +2,7 @@
 
 export type OpKind =
   | 'person.upsert' | 'person.deactivate' | 'person.reactivate' | 'absence.upsert' | 'absence.archive'
+  | 'sector.upsert' | 'sector.archive' | 'calendar_source.upsert'
   | 'job_role.upsert' | 'job_role.archive' | 'service_type.upsert' | 'service_type.archive'
   | 'event.update_extras' | 'event.internal_upsert' | 'event.internal_cancel' | 'event.mark_reviewed'
   | 'event.resolve_duplicate' | 'week.build' | 'slot.add' | 'slot.remove'
@@ -37,9 +38,10 @@ export const ADMIN_TABLES = [
 
 export type TableName = (typeof ADMIN_TABLES)[number];
 
-/** Tabelas com aviso pelo Realtime (migração 0008); o aviso só dispara a leitura incremental. */
+/** Tabelas com aviso pelo Realtime (migrações 0008 e 0010); o aviso só dispara a leitura incremental. */
 export const REALTIME_TABLES: readonly TableName[] = [
   'notifications', 'events', 'weeks', 'published_assignments', 'assignments', 'slots', 'jobs',
+  'calendar_sources', 'settings',
 ];
 
 /** Onde a mudança aparece na cópia local enquanto a operação espera envio. */

@@ -23,6 +23,10 @@ export class FakeRemote implements Remote {
   readCalls: { ids: string[]; readAt: string }[] = [];
   resetCalls: { email: string; redirectTo: string }[] = [];
   rpcCalls: { fn: string; args: Record<string, unknown> }[] = [];
+  /** Resposta das RPCs; o padrão devolve um objeto vazio. */
+  rpcHandler: (fn: string, args: Record<string, unknown>) => unknown = () => ({});
+  views: Record<string, object[]> = {};
+  viewCalls: string[] = [];
   applyHandler: (ops: Op[]) => OpResult[] | Promise<OpResult[]> = (ops) =>
     ops.map((op) => ({ opId: op.opId, status: 'applied', version: (op.baseVersion ?? 0) + 1 }));
   private realtime = new Map<TableName, (table: TableName) => void>();
@@ -121,7 +125,13 @@ export class FakeRemote implements Remote {
   async rpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
     this.network();
     this.rpcCalls.push({ fn, args });
-    return {} as T;
+    return (await this.rpcHandler(fn, args)) as T;
+  }
+
+  async readView<T>(view: string): Promise<T[]> {
+    this.network();
+    this.viewCalls.push(view);
+    return (this.views[view] ?? []) as T[];
   }
 
   async close() {

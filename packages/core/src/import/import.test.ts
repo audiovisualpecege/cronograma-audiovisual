@@ -269,3 +269,11 @@ describe.runIf(existsSync(oficial) && existsSync(claude))('anexos da ideia', () 
     expect(r.weeks.reduce((n, w) => n + w.events.length, 0)).toBe(137);
   });
 });
+
+describe('progresso da leitura (US-007 EC-5)', () => {
+  it('readWorkbook avisa cada aba antes de ler, na ordem do arquivo', () => {
+    const seen: string[] = [];
+    readWorkbook(fixture('oficial-2026.xlsx'), { now, onSheet: (s) => seen.push(`${s.index + 1}/${s.total} ${s.name}`) });
+    expect(seen).toEqual(['1/3 05 - 11 de OUTUBRO-26', '2/3 Legenda', '3/3 Planilha1']);
+  });
+});

@@ -145,8 +145,14 @@ function isZip(bytes: Uint8Array): boolean {
   return bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04;
 }
 
+export interface ReadOptions {
+  now?: Date;
+  /** Chamado antes de cada aba, para mostrar o progresso (US-007 EC-5). */
+  onSheet?: (sheet: { name: string; index: number; total: number }) => void;
+}
+
 /** Abre um .xlsx e lê todas as abas. Arquivo que não é .xlsx, corrompido ou com senha é recusado. */
-export function readWorkbook(data: ArrayBuffer | Uint8Array, opts: { now?: Date } = {}): WorkbookRead {
+export function readWorkbook(data: ArrayBuffer | Uint8Array, opts: ReadOptions = {}): WorkbookRead {
   const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
   let wb: XLSX.WorkBook;
   try {
@@ -160,6 +166,10 @@ export function readWorkbook(data: ArrayBuffer | Uint8Array, opts: { now?: Date 
   if (!isZip(bytes)) {
     throw new ImportFileError('arquivo_invalido', 'O arquivo não é uma planilha .xlsx. Salve como .xlsx no Excel e envie de novo.');
   }
-  const grids = wb.SheetNames.map((n) => gridFromSheet(n, wb.Sheets[n] as XLSX.WorkSheet));
-  return parseSheets(grids, opts);
+  const total = wb.SheetNames.length;
+  const grids = wb.SheetNames.map((n, index) => {
+    opts.onSheet?.({ name: n, index, total });
+    return gridFromSheet(n, wb.Sheets[n] as XLSX.WorkSheet);
+  });
+  return parseSheets(grids, { now: opts.now });
 }
