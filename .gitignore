@@ -11,3 +11,6 @@ playwright-report/
 *.tsbuildinfo
 .env
 segredos/
+
+# Instaladores do programa de desktop
+apps/desktop/release/

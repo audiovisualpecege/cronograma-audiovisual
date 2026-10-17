@@ -2,7 +2,20 @@
   "name": "@cronograma/desktop",
   "private": true,
   "type": "module",
+  "description": "Cronograma Audiovisual para Windows e Mac. Um produto Chiaro Filmes.",
+  "author": "Chiaro Filmes",
+  "main": "dist/main.cjs",
   "scripts": {
+    "build": "tsx build.ts",
+    "start": "electron .",
+    "dist": "tsx pack.ts",
+    "dist:win": "tsx pack.ts --win",
+    "dist:mac": "tsx pack.ts --mac",
     "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "electron": "^44.8.0",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2"
   }
 }

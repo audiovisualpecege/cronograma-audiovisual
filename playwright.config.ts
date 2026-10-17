@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 import { E2E_VAPID_PUBLIC_KEY, e2eEnv } from './tests/e2e/env.ts';
 
 // Ponta a ponta contra `vite preview` e o Supabase local (TechSpec, Testing Approach): projeto celular
-// (Pixel 7) e desktop (1440x900). O Electron entra na tarefa 9.
+// (Pixel 7) e desktop (1440x900), mais o programa de Windows e Mac pelo `_electron` (projeto electron).
 const env = e2eEnv();
 const PREVIEW_URL = 'http://127.0.0.1:4173/cronograma-audiovisual/';
 
@@ -23,8 +23,9 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   projects: [
-    { name: 'celular', use: { ...devices['Pixel 7'] } },
-    { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
+    { name: 'celular', testIgnore: 'electron.spec.ts', use: { ...devices['Pixel 7'] } },
+    { name: 'desktop', testIgnore: 'electron.spec.ts', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
+    { name: 'electron', testMatch: 'electron.spec.ts' },
   ],
   webServer: {
     command: 'npm run build -w @cronograma/web && npm run preview -w @cronograma/web -- --host 127.0.0.1 --port 4173 --strictPort',

@@ -13,6 +13,7 @@ import {
   Widget2Icon,
   Folder2Icon,
   TuningIcon,
+  InfoCircleIcon,
 } from '@solar-icons/react/linear';
 import type { Icon } from '@solar-icons/react/lib/types';
 import type { Profile } from '../supabase';
@@ -29,6 +30,7 @@ const TEAM: NavItem[] = [
   { to: '/avisos', label: 'Avisos', icon: BellIcon },
   { to: '/agenda-pessoal', label: 'Agenda pessoal', icon: CalendarAddIcon },
   { to: '/preferencias', label: 'Preferências', icon: TuningIcon },
+  { to: '/sobre', label: 'Sobre', icon: InfoCircleIcon },
 ];
 
 const ADMIN: NavItem[] = [
@@ -46,6 +48,7 @@ const ADMIN: NavItem[] = [
   { to: '/admin/configuracao', label: 'Configuração', icon: SettingsIcon },
   { to: '/agenda-pessoal', label: 'Agenda pessoal', icon: CalendarAddIcon },
   { to: '/preferencias', label: 'Preferências', icon: TuningIcon },
+  { to: '/sobre', label: 'Sobre', icon: InfoCircleIcon },
 ];
 
 export function navItems(profile: Profile): NavItem[] {

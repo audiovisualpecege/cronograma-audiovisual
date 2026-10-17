@@ -1,0 +1,48 @@
+# Instaladores do Cronograma Audiovisual (ADR-008): NSIS no Windows e .dmg no Mac, sem assinatura de código.
+# A versão vem do package.json da raiz por extraMetadata.version, passada pelo pack.ts; não escreva número aqui.
+# Uso: npm run dist -w @cronograma/desktop (ou dist:win / dist:mac)
+appId: br.com.chiarofilmes.cronograma-audiovisual
+productName: Cronograma Audiovisual
+copyright: Um produto Chiaro Filmes
+directories:
+  # dist/ é montada pelo build.ts, com o package.json que traz a versão da raiz.
+  app: dist
+  output: release
+  buildResources: build
+files:
+  - '**/*'
+asar: true
+npmRebuild: false
+# Ícone próprio do produto (scripts/icons.ts), nunca o da Chiaro.
+win:
+  icon: build/icon.ico
+  signAndEditExecutable: true
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: cronograma-audiovisual-${version}-windows.${ext}
+# Instalação de um clique, por usuário: sem as páginas claras do assistente do NSIS, só a barra de progresso.
+nsis:
+  oneClick: true
+  perMachine: false
+  runAfterFinish: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: Cronograma Audiovisual
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  uninstallDisplayName: Cronograma Audiovisual
+mac:
+  # O electron-builder faz o .icns a partir do PNG 1024.
+  icon: build/icon.png
+  category: public.app-category.productivity
+  identity: null
+  target:
+    - target: dmg
+      arch: [universal]
+  artifactName: cronograma-audiovisual-${version}-mac.${ext}
+dmg:
+  title: Cronograma Audiovisual ${version}
+  # Janela do .dmg no fundo Noite, sem tela clara.
+  backgroundColor: '#070010'
+publish: null

@@ -1,0 +1,48 @@
+name: Instaladores do desktop
+
+# Gera os instaladores sem assinatura do programa de Windows (NSIS) e Mac (.dmg) com o latest.json, para copiar
+# para a pasta central da rede (docs/como-usar.md, "Publicar uma versão nova"). O .dmg só sai num Mac, por isso
+# cada sistema roda na sua máquina. A URL e a chave pública do Supabase vêm das variáveis do repositório.
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  instaladores:
+    if: github.repository_owner == 'audiovisualpecege'
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            alvo: --win
+            nome: windows
+          - os: macos-latest
+            alvo: --mac
+            nome: mac
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Instalador ${{ matrix.nome }}
+        run: npm run dist -w @cronograma/desktop -- ${{ matrix.alvo }}
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          VITE_VAPID_PUBLIC_KEY: ${{ vars.VITE_VAPID_PUBLIC_KEY }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: instalador-${{ matrix.nome }}
+          path: |
+            apps/desktop/release/*.exe
+            apps/desktop/release/*.dmg
+            apps/desktop/release/latest.json
+          if-no-files-found: error

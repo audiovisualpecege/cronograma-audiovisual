@@ -1529,3 +1529,84 @@ body {
   color: var(--text-secondary);
   font-size: var(--text-body-s);
 }
+
+/* ---------------------------------------------------------------------------------------------
+   Programa de Windows e Mac e tela Sobre (tarefa 9). Tudo no tema Noite. */
+
+.update-banner {
+  position: fixed;
+  top: var(--space-4);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 96;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: min(560px, calc(100vw - 2 * var(--space-4)));
+  box-sizing: border-box;
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  border: 1px solid var(--border-brand);
+  border-radius: var(--radius-lg);
+  background: var(--chiaro-noite);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-lg);
+}
+
+.update-banner-icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--text-on-brand);
+}
+
+.update-banner-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--text-body-s);
+  color: var(--text-secondary);
+}
+
+.update-banner-text strong {
+  color: var(--text-primary);
+  font: var(--weight-bold) var(--text-body) var(--font-display);
+}
+
+.about-product {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+
+.about-product img {
+  flex: none;
+  border-radius: var(--radius-lg);
+}
+
+.about-version {
+  display: block;
+  margin-top: var(--space-2);
+}
+
+.about-signature {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-5) 0 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+.about-signature img {
+  display: block;
+  height: 20px;
+  width: auto;
+}

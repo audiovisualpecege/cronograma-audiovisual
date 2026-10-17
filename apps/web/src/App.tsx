@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { MeProvider } from './auth/me';
 import { SessionProvider, useSession } from './auth/session';
+import { UpdateBanner } from './desktop/UpdateBanner';
 import { UpdateNotice } from './install/UpdateNotice';
 import { AppShell } from './layout/AppShell';
 import { NoPermission } from './layout/NoPermission';
@@ -17,6 +18,7 @@ export function App({ remote, routes = ROUTES }: { remote: Remote; routes?: read
     <SessionProvider remote={remote}>
       <AppRoutes routes={routes} />
       <UpdateNotice />
+      <UpdateBanner />
     </SessionProvider>
   );
 }

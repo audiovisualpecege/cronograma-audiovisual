@@ -19,6 +19,7 @@ import { PreferencesPage } from './preferences/PreferencesPage';
 import { IcalPage } from './ical/IcalPage';
 import { EventPage } from './event/EventPage';
 import { WeekPage } from './week/WeekPage';
+import { AboutPage } from './about/AboutPage';
 
 export const ROUTES: readonly RouteDef[] = [
   { path: '/entrar', access: 'public', title: 'Entrar', component: LoginPage },
@@ -33,6 +34,7 @@ export const ROUTES: readonly RouteDef[] = [
   { path: '/preferencias', access: 'any', title: 'Preferências', component: PreferencesPage },
   { path: '/agenda-pessoal', access: 'any', title: 'Agenda pessoal', component: IcalPage },
   { path: '/evento/:id', access: 'any', title: 'Evento', component: EventPage },
+  { path: '/sobre', access: 'any', title: 'Sobre', component: () => <AboutPage /> },
 
   { path: '/painel', access: 'admin', title: 'Painel', component: DashboardPage },
   { path: '/semana', access: 'admin', title: 'Semana', component: WeekPage },

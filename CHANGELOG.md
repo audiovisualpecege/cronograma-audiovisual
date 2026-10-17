@@ -3,7 +3,7 @@
 Cada versão nova entra no topo, com a data e o que mudou para quem usa.
 PATCH para um conserto, MINOR para algo novo, MAJOR quando o jeito de usar muda.
 
-## 1.0.0 (16/10/2026)
+## 1.0.0 (17/10/2026)
 
 - Primeira versão do Cronograma Audiovisual: a base do app, com o ícone próprio, o visual escuro da Chiaro Filmes
   e o número da versão no rodapé.
@@ -58,3 +58,12 @@ PATCH para um conserto, MINOR para algo novo, MAJOR quando o jeito de usar muda.
 - App instalável no celular, com as instruções do navegador em uso (inclusive o iPhone), abertura em tela cheia
   no tema escuro e funcionamento sem internet; depois de uma atualização, aparece "Atualizado para vX.Y.Z".
 - Publicação do app web em audiovisualpecege.github.io/cronograma-audiovisual.
+- Programa para Windows e Mac, instalado pela pasta central da rede, com a mesma interface e o mesmo login do app
+  web, no tema escuro, com o ícone próprio no atalho, na barra de tarefas e no Dock, e as notificações do sistema
+  para os avisos novos.
+- Aviso de versão nova no programa: ao abrir, se a pasta central tem versão mais nova, aparece "Instalar vX.Y.Z",
+  que abre o instalador; fora da rede da empresa, nada aparece. A pasta muda na tela Sobre, com o endereço do
+  Windows ou do Mac.
+- Tela Sobre com a versão em uso.
+- Guia "Como usar" com a configuração inicial, a instalação no celular, no PC e no Mac, a liberação do programa na
+  primeira abertura e a publicação de versões novas.

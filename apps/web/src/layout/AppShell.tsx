@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import productIcon from '../assets/icon.svg';
+import { DesktopNotifier } from '../desktop/DesktopNotifier';
 import { Bell } from '../notifications/Bell';
 import { PushReminder } from '../push/PushSettings';
 import type { Me } from '../supabase';
@@ -29,6 +30,7 @@ export function AppShell({ me, path, title, children }: { me: Me; path: string; 
       </div>
       <BottomNav me={me} path={path} />
       <RejectionToasts />
+      <DesktopNotifier />
     </div>
   );
 }

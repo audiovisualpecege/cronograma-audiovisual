@@ -1,0 +1,9 @@
+# Instaladores do Cronograma Audiovisual v1.0.0 (um produto Chiaro Filmes)
+# Gerados por `npm run dist:win -w @cronograma/desktop` (PC) e `npm run dist:mac -w @cronograma/desktop` (Mac), ou pelo
+# workflow "Instaladores do desktop" no GitHub (audiovisualpecege/cronograma-audiovisual). Saem em apps/desktop/release/
+# e vão para a pasta central da rede \172.16.52.30\instaladores\cronograma-audiovisual, com o latest.json por último.
+# Sem assinatura de código: a liberação na primeira abertura está em docs/como-usar.md, etapa 10.
+apps/desktop/release/cronograma-audiovisual-1.0.0-windows.exe | Windows 10 e 11 (64 bits), instalador NSIS
+apps/desktop/release/cronograma-audiovisual-1.0.0-mac.dmg | macOS (Apple Silicon e Intel), imagem de disco
+apps/desktop/release/latest.json | versão atual, lida pelo programa para o aviso de versão nova
+https://audiovisualpecege.github.io/cronograma-audiovisual/ | Android e iPhone: app web instalável (docs/como-usar.md, etapa 8)
