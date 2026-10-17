@@ -1,0 +1,88 @@
+{
+  "kind": "calendar#events",
+  "etag": "\"p33c9ndq8rq2pk0o\"",
+  "summary": "pecegeworks",
+  "description": "",
+  "updated": "2026-10-21T14:58:12.104Z",
+  "timeZone": "America/Sao_Paulo",
+  "accessRole": "reader",
+  "defaultReminders": [],
+  "items": [
+    {
+      "kind": "calendar#event",
+      "etag": "\"321202610260\"",
+      "id": "r7k2_20261026T120000Z",
+      "status": "confirmed",
+      "htmlLink": "https://www.google.com/calendar/event?eid=cjdrMl8yMDI2MTAyNlQxMjAwMDBaIHBlY2VnZXdvcmtzQGdtYWlsLmNvbQ",
+      "created": "2026-09-30T13:02:11.000Z",
+      "updated": "2026-10-15T18:40:03.512Z",
+      "summary": "Gravação aula Inglês",
+      "location": "Estúdio 3",
+      "creator": {
+        "email": "pecegeworks@gmail.com",
+        "self": true
+      },
+      "organizer": {
+        "email": "pecegeworks@gmail.com",
+        "self": true
+      },
+      "start": {
+        "dateTime": "2026-10-26T09:00:00-03:00",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "end": {
+        "dateTime": "2026-10-26T10:00:00-03:00",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "iCalUID": "r7k2_20261026T120000Z@google.com",
+      "sequence": 0,
+      "reminders": {
+        "useDefault": true
+      },
+      "eventType": "default",
+      "recurringEventId": "r7k2",
+      "originalStartTime": {
+        "dateTime": "2026-10-26T09:00:00-03:00",
+        "timeZone": "America/Sao_Paulo"
+      }
+    },
+    {
+      "kind": "calendar#event",
+      "etag": "\"321202610280\"",
+      "id": "r7k2_20261028T120000Z",
+      "status": "confirmed",
+      "htmlLink": "https://www.google.com/calendar/event?eid=cjdrMl8yMDI2MTAyOFQxMjAwMDBaIHBlY2VnZXdvcmtzQGdtYWlsLmNvbQ",
+      "created": "2026-09-30T13:02:11.000Z",
+      "updated": "2026-10-15T18:40:03.512Z",
+      "summary": "Gravação aula Inglês",
+      "location": "Estúdio 3",
+      "creator": {
+        "email": "pecegeworks@gmail.com",
+        "self": true
+      },
+      "organizer": {
+        "email": "pecegeworks@gmail.com",
+        "self": true
+      },
+      "start": {
+        "dateTime": "2026-10-28T09:00:00-03:00",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "end": {
+        "dateTime": "2026-10-28T10:00:00-03:00",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "iCalUID": "r7k2_20261028T120000Z@google.com",
+      "sequence": 0,
+      "reminders": {
+        "useDefault": true
+      },
+      "eventType": "default",
+      "recurringEventId": "r7k2",
+      "originalStartTime": {
+        "dateTime": "2026-10-28T09:00:00-03:00",
+        "timeZone": "America/Sao_Paulo"
+      }
+    }
+  ]
+}

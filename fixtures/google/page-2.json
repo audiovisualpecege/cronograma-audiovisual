@@ -1,0 +1,111 @@
+{
+  "kind": "calendar#events",
+  "etag": "\"p33c9ndq8rq2pk0o\"",
+  "summary": "pecegeworks",
+  "description": "",
+  "updated": "2026-10-21T14:58:12.104Z",
+  "timeZone": "America/Sao_Paulo",
+  "accessRole": "reader",
+  "defaultReminders": [],
+  "items": [
+    {
+      "kind": "calendar#event",
+      "etag": "\"34202610301\"",
+      "id": "g-b5",
+      "status": "confirmed",
+      "htmlLink": "https://www.google.com/calendar/event?eid=Zy1iNSBwZWNlZ2V3b3Jrc0BnbWFpbC5jb20",
+      "created": "2026-09-30T13:02:11.000Z",
+      "updated": "2026-10-15T18:40:03.512Z",
+      "summary": "Visita técnica",
+      "location": "Fazenda escola",
+      "creator": {
+        "email": "pecegeworks@gmail.com",
+        "self": true
+      },
+      "organizer": {
+        "email": "pecegeworks@gmail.com",
+        "self": true
+      },
+      "start": {
+        "dateTime": "2026-10-30T14:00:00-03:00",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "end": {
+        "dateTime": "2026-10-30T16:00:00-03:00",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "iCalUID": "g-b5@google.com",
+      "sequence": 0,
+      "reminders": {
+        "useDefault": true
+      },
+      "eventType": "default"
+    },
+    {
+      "kind": "calendar#event",
+      "etag": "\"34202610291\"",
+      "id": "g-b6",
+      "status": "confirmed",
+      "htmlLink": "https://www.google.com/calendar/event?eid=Zy1iNiBwZWNlZ2V3b3Jrc0BnbWFpbC5jb20",
+      "created": "2026-09-30T13:02:11.000Z",
+      "updated": "2026-10-15T18:40:03.512Z",
+      "summary": "Gravação aula Geografia",
+      "location": "Estúdio 2",
+      "creator": {
+        "email": "pecegeworks@gmail.com",
+        "self": true
+      },
+      "organizer": {
+        "email": "pecegeworks@gmail.com",
+        "self": true
+      },
+      "start": {
+        "dateTime": "2026-10-29T14:00:00-03:00",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "end": {
+        "dateTime": "2026-10-29T17:00:00-03:00",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "iCalUID": "g-b6@google.com",
+      "sequence": 0,
+      "reminders": {
+        "useDefault": true
+      },
+      "eventType": "default"
+    },
+    {
+      "kind": "calendar#event",
+      "etag": "\"34202610301\"",
+      "id": "g-b7",
+      "status": "confirmed",
+      "htmlLink": "https://www.google.com/calendar/event?eid=Zy1iNyBwZWNlZ2V3b3Jrc0BnbWFpbC5jb20",
+      "created": "2026-09-30T13:02:11.000Z",
+      "updated": "2026-10-15T18:40:03.512Z",
+      "summary": "Live de lançamento do curso",
+      "location": "Auditório",
+      "creator": {
+        "email": "pecegeworks@gmail.com",
+        "self": true
+      },
+      "organizer": {
+        "email": "pecegeworks@gmail.com",
+        "self": true
+      },
+      "start": {
+        "dateTime": "2026-10-30T19:00:00-03:00",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "end": {
+        "dateTime": "2026-10-30T21:00:00-03:00",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "iCalUID": "g-b7@google.com",
+      "sequence": 0,
+      "reminders": {
+        "useDefault": true
+      },
+      "eventType": "default"
+    }
+  ]
+}

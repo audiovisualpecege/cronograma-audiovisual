@@ -1,0 +1,12 @@
+{
+  "kind": "calendar#calendar",
+  "etag": "\"zJpEXdIVoM2VmIOIbFvrhR5lN1I\"",
+  "id": "pecegeworks@gmail.com",
+  "summary": "pecegeworks",
+  "timeZone": "America/Sao_Paulo",
+  "conferenceProperties": {
+    "allowedConferenceSolutionTypes": [
+      "hangoutsMeet"
+    ]
+  }
+}

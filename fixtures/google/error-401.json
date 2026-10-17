@@ -1,0 +1,14 @@
+{
+  "error": {
+    "errors": [
+      {
+        "domain": "global",
+        "reason": "authError",
+        "message": "Request had invalid authentication credentials."
+      }
+    ],
+    "code": 401,
+    "message": "Request had invalid authentication credentials.",
+    "status": "UNAUTHENTICATED"
+  }
+}

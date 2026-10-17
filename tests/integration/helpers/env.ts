@@ -6,6 +6,8 @@ export interface SupabaseEnv {
   dbUrl: string;
   publishableKey: string;
   serviceRoleKey: string;
+  /** Caixa de e-mail local do Auth (Mailpit, antigo Inbucket). */
+  mailUrl: string;
 }
 
 export function readSupabaseEnv(): SupabaseEnv {
@@ -14,8 +16,9 @@ export function readSupabaseEnv(): SupabaseEnv {
     dbUrl: process.env.SUPABASE_DB_URL,
     publishableKey: process.env.SUPABASE_ANON_KEY,
     serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    mailUrl: process.env.MAILPIT_URL ?? process.env.INBUCKET_URL,
   };
-  if (fromEnv.apiUrl && fromEnv.dbUrl && fromEnv.publishableKey && fromEnv.serviceRoleKey) {
+  if (fromEnv.apiUrl && fromEnv.dbUrl && fromEnv.publishableKey && fromEnv.serviceRoleKey && fromEnv.mailUrl) {
     return fromEnv as SupabaseEnv;
   }
   let raw: string;
@@ -30,5 +33,6 @@ export function readSupabaseEnv(): SupabaseEnv {
     dbUrl: status.DB_URL as string,
     publishableKey: (status.PUBLISHABLE_KEY ?? status.ANON_KEY) as string,
     serviceRoleKey: status.SERVICE_ROLE_KEY as string,
+    mailUrl: (status.MAILPIT_URL ?? status.INBUCKET_URL) as string,
   };
 }

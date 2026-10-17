@@ -18,3 +18,35 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
+
+  # Imagem do serviço de fundo para o Docker do NAS, publicada no GHCR da conta audiovisualpecege
+  # com a versão do package.json da raiz e com latest.
+  imagem-worker:
+    needs: lint-e-testes
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository_owner == 'audiovisualpecege'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - id: versao
+        run: echo "versao=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/worker/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/audiovisualpecege/cronograma-audiovisual-worker:${{ steps.versao.outputs.versao }}
+            ghcr.io/audiovisualpecege/cronograma-audiovisual-worker:latest
+          labels: |
+            org.opencontainers.image.source=https://github.com/audiovisualpecege/cronograma-audiovisual
+            org.opencontainers.image.description=Serviço de fundo do Cronograma Audiovisual (Chiaro Filmes)
+            org.opencontainers.image.version=${{ steps.versao.outputs.versao }}

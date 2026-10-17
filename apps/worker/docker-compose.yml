@@ -1,0 +1,23 @@
+# Serviço de fundo no Docker do NAS. Na pasta deste arquivo, com o .env preenchido (copie de .env.example)
+# e o JSON da conta de serviço do Google em ./segredos/google-service-account.json:
+#   docker compose pull && docker compose up -d
+# Para construir a imagem a partir do código em vez de baixar do GHCR: docker compose up -d --build
+# Não publica porta nenhuma: o worker só faz conexões de saída (ADR-006).
+services:
+  worker:
+    image: ghcr.io/audiovisualpecege/cronograma-audiovisual-worker:latest
+    build:
+      context: ../..
+      dockerfile: apps/worker/Dockerfile
+    container_name: cronograma-audiovisual-worker
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      GOOGLE_SERVICE_ACCOUNT_FILE: /run/segredos/google-service-account.json
+    volumes:
+      - ./segredos:/run/segredos:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '5'

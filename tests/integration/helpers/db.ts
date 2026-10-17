@@ -18,6 +18,18 @@ export async function withDb<T>(dbUrl: string, fn: (client: pg.Client) => Promis
   }
 }
 
+/**
+ * Grava a semente. O TRUNCATE pode cair em deadlock com o Realtime, que lê o WAL e consulta as tabelas
+ * publicadas logo depois de uma assinatura; nesse caso (40P01) a semente é gravada de novo.
+ */
 export async function resetDatabase(dbUrl: string): Promise<void> {
-  await withDb(dbUrl, (c) => c.query(SEED).then(() => undefined));
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await withDb(dbUrl, (c) => c.query(SEED).then(() => undefined));
+      return;
+    } catch (e) {
+      if ((e as { code?: string }).code !== '40P01' || attempt >= 5) throw e;
+      await new Promise((r) => setTimeout(r, 200 * attempt));
+    }
+  }
 }

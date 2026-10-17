@@ -1,0 +1,146 @@
+{
+  "kind": "calendar#events",
+  "etag": "\"p33c9ndq8rq2pk0o\"",
+  "summary": "pecegeworks",
+  "description": "",
+  "updated": "2026-10-21T14:58:12.104Z",
+  "timeZone": "America/Sao_Paulo",
+  "accessRole": "reader",
+  "defaultReminders": [],
+  "items": [
+    {
+      "kind": "calendar#event",
+      "etag": "\"34202610140\"",
+      "id": "g-e0",
+      "status": "confirmed",
+      "htmlLink": "https://www.google.com/calendar/event?eid=Zy1lMCBwZWNlZ2V3b3Jrc0BnbWFpbC5jb20",
+      "created": "2026-09-30T13:02:11.000Z",
+      "updated": "2026-10-15T18:40:03.512Z",
+      "summary": "Gravação aula Estatística",
+      "location": "Estúdio 1",
+      "creator": {
+        "email": "pecegeworks@gmail.com",
+        "self": true
+      },
+      "organizer": {
+        "email": "pecegeworks@gmail.com",
+        "self": true
+      },
+      "start": {
+        "dateTime": "2026-10-14T09:00:00-03:00",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "end": {
+        "dateTime": "2026-10-14T12:00:00-03:00",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "iCalUID": "g-e0@google.com",
+      "sequence": 0,
+      "reminders": {
+        "useDefault": true
+      },
+      "eventType": "default"
+    },
+    {
+      "kind": "calendar#event",
+      "etag": "\"34202610221\"",
+      "id": "g-e1",
+      "status": "confirmed",
+      "htmlLink": "https://www.google.com/calendar/event?eid=Zy1lMSBwZWNlZ2V3b3Jrc0BnbWFpbC5jb20",
+      "created": "2026-09-30T13:02:11.000Z",
+      "updated": "2026-10-15T18:40:03.512Z",
+      "summary": "Gravação aula Matemática",
+      "location": "Estúdio 1",
+      "creator": {
+        "email": "pecegeworks@gmail.com",
+        "self": true
+      },
+      "organizer": {
+        "email": "pecegeworks@gmail.com",
+        "self": true
+      },
+      "start": {
+        "dateTime": "2026-10-22T14:00:00-03:00",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "end": {
+        "dateTime": "2026-10-22T17:00:00-03:00",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "iCalUID": "g-e1@google.com",
+      "sequence": 0,
+      "reminders": {
+        "useDefault": true
+      },
+      "eventType": "default"
+    },
+    {
+      "kind": "calendar#event",
+      "etag": "\"34202610260\"",
+      "id": "g-b1",
+      "status": "confirmed",
+      "htmlLink": "https://www.google.com/calendar/event?eid=Zy1iMSBwZWNlZ2V3b3Jrc0BnbWFpbC5jb20",
+      "created": "2026-09-30T13:02:11.000Z",
+      "updated": "2026-10-15T18:40:03.512Z",
+      "summary": "Gravação aula Biologia",
+      "location": "Estúdio 1",
+      "creator": {
+        "email": "pecegeworks@gmail.com",
+        "self": true
+      },
+      "organizer": {
+        "email": "pecegeworks@gmail.com",
+        "self": true
+      },
+      "start": {
+        "dateTime": "2026-10-26T09:00:00-03:00",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "end": {
+        "dateTime": "2026-10-26T12:00:00-03:00",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "iCalUID": "g-b1@google.com",
+      "sequence": 0,
+      "reminders": {
+        "useDefault": true
+      },
+      "eventType": "default"
+    },
+    {
+      "kind": "calendar#event",
+      "etag": "\"34202610271\"",
+      "id": "g-b2",
+      "status": "confirmed",
+      "htmlLink": "https://www.google.com/calendar/event?eid=Zy1iMiBwZWNlZ2V3b3Jrc0BnbWFpbC5jb20",
+      "created": "2026-09-30T13:02:11.000Z",
+      "updated": "2026-10-15T18:40:03.512Z",
+      "summary": "Gravação aula Química",
+      "location": "Estúdio 2",
+      "creator": {
+        "email": "pecegeworks@gmail.com",
+        "self": true
+      },
+      "organizer": {
+        "email": "pecegeworks@gmail.com",
+        "self": true
+      },
+      "start": {
+        "dateTime": "2026-10-27T14:00:00-03:00",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "end": {
+        "dateTime": "2026-10-27T17:00:00-03:00",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "iCalUID": "g-b2@google.com",
+      "sequence": 0,
+      "reminders": {
+        "useDefault": true
+      },
+      "eventType": "default",
+      "colorId": "5"
+    }
+  ],
+  "nextPageToken": "CigKGjBxb2xhNWE3OGdmaGg0c2JlY2dqZXJhczd1GAEggICA0ZPw1hsaDwgAEgAYuJ"
+}

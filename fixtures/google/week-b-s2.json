@@ -1,0 +1,144 @@
+{
+  "kind": "calendar#events",
+  "etag": "\"p33c9ndq8rq2pk0o\"",
+  "summary": "audiovisualpecege",
+  "description": "",
+  "updated": "2026-10-21T14:58:12.104Z",
+  "timeZone": "America/Sao_Paulo",
+  "accessRole": "reader",
+  "defaultReminders": [],
+  "items": [
+    {
+      "kind": "calendar#event",
+      "etag": "\"34202610230\"",
+      "id": "g-e2",
+      "status": "confirmed",
+      "htmlLink": "https://www.google.com/calendar/event?eid=Zy1lMiBhdWRpb3Zpc3VhbHBlY2VnZUBnbWFpbC5jb20",
+      "created": "2026-09-30T13:02:11.000Z",
+      "updated": "2026-10-15T18:40:03.512Z",
+      "summary": "Congresso de Agronegócio",
+      "location": "Centro de Convenções",
+      "creator": {
+        "email": "audiovisualpecege@gmail.com",
+        "self": true
+      },
+      "organizer": {
+        "email": "audiovisualpecege@gmail.com",
+        "self": true
+      },
+      "start": {
+        "dateTime": "2026-10-23T08:00:00-03:00",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "end": {
+        "dateTime": "2026-10-23T12:00:00-03:00",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "iCalUID": "g-e2@google.com",
+      "sequence": 0,
+      "reminders": {
+        "useDefault": true
+      },
+      "eventType": "default"
+    },
+    {
+      "kind": "calendar#event",
+      "etag": "\"34202610201\"",
+      "id": "g-e3",
+      "status": "confirmed",
+      "htmlLink": "https://www.google.com/calendar/event?eid=Zy1lMyBhdWRpb3Zpc3VhbHBlY2VnZUBnbWFpbC5jb20",
+      "created": "2026-09-30T13:02:11.000Z",
+      "updated": "2026-10-15T18:40:03.512Z",
+      "summary": "Reunião de pauta",
+      "location": "Sala 3",
+      "creator": {
+        "email": "audiovisualpecege@gmail.com",
+        "self": true
+      },
+      "organizer": {
+        "email": "audiovisualpecege@gmail.com",
+        "self": true
+      },
+      "start": {
+        "dateTime": "2026-10-20T10:00:00-03:00",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "end": {
+        "dateTime": "2026-10-20T11:00:00-03:00",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "iCalUID": "g-e3@google.com",
+      "sequence": 0,
+      "reminders": {
+        "useDefault": true
+      },
+      "eventType": "default"
+    },
+    {
+      "kind": "calendar#event",
+      "etag": "\"34202610280\"",
+      "id": "g-b3",
+      "status": "confirmed",
+      "htmlLink": "https://www.google.com/calendar/event?eid=Zy1iMyBhdWRpb3Zpc3VhbHBlY2VnZUBnbWFpbC5jb20",
+      "created": "2026-09-30T13:02:11.000Z",
+      "updated": "2026-10-15T18:40:03.512Z",
+      "summary": "Gravação aula Física",
+      "location": "Estúdio 1",
+      "creator": {
+        "email": "audiovisualpecege@gmail.com",
+        "self": true
+      },
+      "organizer": {
+        "email": "audiovisualpecege@gmail.com",
+        "self": true
+      },
+      "start": {
+        "dateTime": "2026-10-28T09:00:00-03:00",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "end": {
+        "dateTime": "2026-10-28T12:00:00-03:00",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "iCalUID": "g-b3@google.com",
+      "sequence": 0,
+      "reminders": {
+        "useDefault": true
+      },
+      "eventType": "default"
+    },
+    {
+      "kind": "calendar#event",
+      "etag": "\"34202610291\"",
+      "id": "g-b4",
+      "status": "confirmed",
+      "htmlLink": "https://www.google.com/calendar/event?eid=Zy1iNCBhdWRpb3Zpc3VhbHBlY2VnZUBnbWFpbC5jb20",
+      "created": "2026-09-30T13:02:11.000Z",
+      "updated": "2026-10-15T18:40:03.512Z",
+      "summary": "Reunião de planejamento",
+      "location": "Sala 3",
+      "creator": {
+        "email": "audiovisualpecege@gmail.com",
+        "self": true
+      },
+      "organizer": {
+        "email": "audiovisualpecege@gmail.com",
+        "self": true
+      },
+      "start": {
+        "dateTime": "2026-10-29T10:00:00-03:00",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "end": {
+        "dateTime": "2026-10-29T11:00:00-03:00",
+        "timeZone": "America/Sao_Paulo"
+      },
+      "iCalUID": "g-b4@google.com",
+      "sequence": 0,
+      "reminders": {
+        "useDefault": true
+      },
+      "eventType": "default"
+    }
+  ]
+}

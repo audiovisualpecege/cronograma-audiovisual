@@ -1,0 +1,33 @@
+{
+  "kind": "calendar#event",
+  "etag": "\"34202610281\"",
+  "id": "g-e1",
+  "status": "confirmed",
+  "htmlLink": "https://www.google.com/calendar/event?eid=Zy1lMSBwZWNlZ2V3b3Jrc0BnbWFpbC5jb20",
+  "created": "2026-09-30T13:02:11.000Z",
+  "updated": "2026-10-15T18:40:03.512Z",
+  "summary": "Gravação aula Matemática",
+  "location": "Estúdio 1",
+  "creator": {
+    "email": "pecegeworks@gmail.com",
+    "self": true
+  },
+  "organizer": {
+    "email": "pecegeworks@gmail.com",
+    "self": true
+  },
+  "start": {
+    "dateTime": "2026-10-28T14:00:00-03:00",
+    "timeZone": "America/Sao_Paulo"
+  },
+  "end": {
+    "dateTime": "2026-10-28T17:00:00-03:00",
+    "timeZone": "America/Sao_Paulo"
+  },
+  "iCalUID": "g-e1@google.com",
+  "sequence": 2,
+  "reminders": {
+    "useDefault": true
+  },
+  "eventType": "default"
+}

@@ -1,0 +1,23 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "[{\"id\":\"E1\",\"type\":\"T3\",\"certainty\":\"media\"}]"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "index": 0
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 1843,
+    "candidatesTokenCount": 212,
+    "totalTokenCount": 2055
+  },
+  "modelVersion": "gemini-2.5-flash",
+  "responseId": "mWb3aMfYKZOg1MkP7dKrgQc"
+}
