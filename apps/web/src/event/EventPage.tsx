@@ -1,6 +1,6 @@
 import { buildHistoryIndex, isWeekPast, localDate, localTime, NOTES_MAX, zonedTime } from '@cronograma/core';
 import { useMemo, useState, type FormEvent } from 'react';
-import { toFact, useTable, type CalendarSourceRow, type ChangeOriginal, type EventRow } from '../data/catalog';
+import { toFact, useTable, type CalendarSourceRow, type EventRow } from '../data/catalog';
 import { useHistory } from '../data/history';
 import { VALIDATION_MESSAGES } from '../data/messages';
 import { PageTitle } from '../layout/PageTitle';
@@ -15,31 +15,15 @@ import { scheduleModel } from '../week/schedule';
 import { EventSeals } from '../week/ScheduleList';
 import { SlotLine } from '../week/SlotLine';
 import { sendAndRefresh, useNow, useWeekRows } from '../week/useWeek';
+import { changeLines } from './changes';
 import { InternalEventForm } from './InternalEventForm';
+import { publishedWeek } from '../team/model';
+import { useTeamRows } from '../team/useTeamWeek';
+import { Seal } from '../week/Seal';
+
+export { changeLines };
 
 export const FIX_IN_CALENDAR = 'Corrija na Google Agenda';
-
-function spanOf(c: ChangeOriginal): string {
-  if (!c.startsAt || !c.endsAt) return '';
-  const start = new Date(c.startsAt);
-  return `${dayMonth(localDate(start))} ${eventSpan({ starts_at: c.startsAt, ends_at: c.endsAt, all_day: Boolean(c.allDay) })}`;
-}
-
-/** Antes e depois da mudança vinda da agenda (US-011 AC-2), só com os campos que mudaram. */
-export function changeLines(e: EventRow): { label: string; before: string; after: string }[] {
-  const c = e.change_original;
-  if (!c) return [];
-  const now: ChangeOriginal = { title: e.title, location: e.location, description: e.description, startsAt: e.starts_at, endsAt: e.ends_at, allDay: e.all_day };
-  const fields: [string, (x: ChangeOriginal) => string][] = [
-    ['Título', (x) => x.title ?? ''],
-    ['Horário', spanOf],
-    ['Local', (x) => x.location ?? ''],
-    ['Descrição', (x) => x.description ?? ''],
-  ];
-  const lines = fields.map(([label, get]) => ({ label, before: get(c) || 'vazio', after: get(now) || 'vazio' }));
-  const changed = lines.filter((l) => l.before !== l.after);
-  return changed.length > 0 ? changed : lines;
-}
 
 /** Tela do evento: dados da agenda só leitura, dados extras, pendências, duplicados e vagas (US-011, US-012). */
 export function EventPage({ params }: RouteProps) {
@@ -82,7 +66,7 @@ export function EventPage({ params }: RouteProps) {
         )}
       </div>
       <div className="tag-row" style={{ marginBottom: 'var(--space-4)' }}>
-        <EventSeals event={event} today={localDate(now)} />
+        <EventSeals event={event} today={localDate(now)} team={!admin} />
       </div>
       <div className="event-columns">
         <div className="event-main">
@@ -90,14 +74,7 @@ export function EventPage({ params }: RouteProps) {
           {admin && event.review_pending && <ReviewCard event={event} />}
           {admin && event.duplicate_group && <DuplicateCard event={event} sources={sources} />}
           {admin && rows && <ExtrasCard key={event.id} event={event} rows={rows} editable={editable} />}
-          {!admin && event.notes && (
-            <Card variant="raised" padding={20}>
-              <h2 className="section-title">Observações</h2>
-              <p className="form-text" style={{ whiteSpace: 'pre-wrap', margin: 0 }}>
-                {event.notes}
-              </p>
-            </Card>
-          )}
+          {!admin && <TeamCrewCard event={event} />}
         </div>
         {admin && rows && (
           <aside className="event-side">
@@ -106,6 +83,45 @@ export function EventPage({ params }: RouteProps) {
         )}
       </div>
     </section>
+  );
+}
+
+/** Equipe: observações e quem está escalado, da fotografia publicada (ADR-011), sem nada para editar. */
+function TeamCrewCard({ event }: { event: EventRow }) {
+  const rows = useTeamRows(event.week_start);
+  const activity = useMemo(() => (rows ? publishedWeek(rows).activities.find((a) => a.event.id === event.id) : undefined), [rows, event.id]);
+  const notes = activity?.notes ?? event.notes;
+  return (
+    <>
+      {notes && (
+        <Card variant="raised" padding={20}>
+          <section aria-labelledby="obs-title">
+            <h2 id="obs-title" className="section-title">
+              Observações
+            </h2>
+            <p className="form-text" style={{ whiteSpace: 'pre-wrap', margin: 0 }}>
+              {notes}
+            </p>
+          </section>
+        </Card>
+      )}
+      {activity && (
+        <Card variant="raised" padding={20}>
+          <section aria-labelledby="escalados-title">
+            <h2 id="escalados-title" className="section-title">
+              Escalados
+            </h2>
+            <ul className="plain-list" aria-label="Escalados">
+              {activity.crew.map((c, i) => (
+                <li key={`${c.roleId}:${c.personId ?? i}`}>
+                  <span className="slot-role">{c.roleName}</span> {c.personName ?? <Seal kind="soft">a definir</Seal>}
+                </li>
+              ))}
+            </ul>
+          </section>
+        </Card>
+      )}
+    </>
   );
 }
 

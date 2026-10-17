@@ -5,6 +5,9 @@ import type { Op, OpResult, Row, TableName } from '../src/sync/types';
 export const ADMIN_ME: Me = { personId: 'd0000000-0000-4000-8000-000000000001', name: 'Pessoa Exemplo 01', profile: 'admin' };
 export const TEAM_ME: Me = { personId: 'd0000000-0000-4000-8000-000000000010', name: 'Pessoa Exemplo 10', profile: 'team' };
 
+/** Endereço do projeto Supabase falso. */
+export const FAKE_URL = 'https://projeto.supabase.test';
+
 export interface PullCall {
   table: TableName;
   cursor: string | null;
@@ -132,6 +135,10 @@ export class FakeRemote implements Remote {
     this.network();
     this.viewCalls.push(view);
     return (this.views[view] ?? []) as T[];
+  }
+
+  publicUrl(path: string) {
+    return `${FAKE_URL}${path}`;
   }
 
   async close() {

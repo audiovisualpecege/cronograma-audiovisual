@@ -2,6 +2,9 @@
 import { execSync } from 'node:child_process';
 import { readSupabaseEnv, type SupabaseEnv } from '../integration/helpers/env.ts';
 
+/** Chave pública VAPID usada só no build dos testes de ponta a ponta. */
+export const E2E_VAPID_PUBLIC_KEY = 'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U';
+
 export interface E2eEnv extends SupabaseEnv {
   mailUrl: string;
 }

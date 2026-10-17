@@ -1,0 +1,53 @@
+name: GitHub Pages
+
+# Publica o app web (PWA) em https://audiovisualpecege.github.io/cronograma-audiovisual/ a cada push na main
+# (ADR-008). A URL e a chave pública do Supabase e a chave pública VAPID entram no build pelas variáveis do
+# repositório; nada secreto vai no build: a proteção dos dados é a RLS.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.repository_owner == 'audiovisualpecege'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Confere a chave pública do Supabase nas variáveis do repositório
+        run: test -n "${{ vars.VITE_SUPABASE_URL }}" && test -n "${{ vars.VITE_SUPABASE_ANON_KEY }}"
+      - name: Build do app web
+        run: npm run build
+        env:
+          VITE_BASE: /cronograma-audiovisual/
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          VITE_VAPID_PUBLIC_KEY: ${{ vars.VITE_VAPID_PUBLIC_KEY }}
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

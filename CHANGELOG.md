@@ -42,3 +42,19 @@ PATCH para um conserto, MINOR para algo novo, MAJOR quando o jeito de usar muda.
   edições ficam como "alterações não publicadas", com "Publicar alterações" e "Descartar alterações".
 - Tela do evento: dados da agenda só para leitura ("Corrija na Google Agenda"), tipo, observações e vagas a mais,
   antes e depois das mudanças da agenda com "Marcar como revisado", duplicados e atividades internas.
+- "Minha semana" para quem é escalado: o dia de hoje aberto e destacado com a próxima atividade no topo, cada
+  atividade com horário, título inteiro, local que abre o mapa, função, observações e colegas, os selos "mudou"
+  (com o que mudou), "cancelado" e "interna", folgas, férias e ausências no dia, e as setas de semana anterior e
+  seguinte.
+- "Equipe": a semana publicada de todos, por dia, com filtros por setor, função e pessoa, "a definir" nas vagas
+  abertas e rolagem leve mesmo com centenas de pessoas.
+- A equipe abre o evento só para leitura, com as observações e quem está escalado.
+- Sino de avisos no topo, com o contador: o aviso chega na hora, tocar abre a atividade e marca como lido, e há
+  "Marcar todos como lidos". A lista mostra os últimos 30 dias.
+- Notificações no celular em Preferências, com o aviso de como liberar quando estão bloqueadas e o pedido para
+  "Reativar notificações" quando o aparelho deixa de recebê-las.
+- "Minha agenda no meu calendário": um link secreto com as suas atividades para assinar no Google, no iPhone ou
+  no Outlook, com "Copiar link", "Gerar link novo" e desligar.
+- App instalável no celular, com as instruções do navegador em uso (inclusive o iPhone), abertura em tela cheia
+  no tema escuro e funcionamento sem internet; depois de uma atualização, aparece "Atualizado para vX.Y.Z".
+- Publicação do app web em audiovisualpecege.github.io/cronograma-audiovisual.

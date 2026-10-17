@@ -1,5 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
-import { e2eEnv } from './tests/e2e/env.ts';
+import { E2E_VAPID_PUBLIC_KEY, e2eEnv } from './tests/e2e/env.ts';
 
 // Ponta a ponta contra `vite preview` e o Supabase local (TechSpec, Testing Approach): projeto celular
 // (Pixel 7) e desktop (1440x900). O Electron entra na tarefa 9.
@@ -34,6 +34,8 @@ export default defineConfig({
     env: {
       VITE_SUPABASE_URL: env.apiUrl,
       VITE_SUPABASE_ANON_KEY: env.publishableKey,
+      // Chave pública VAPID de teste: o navegador dos testes tem a inscrição simulada (E2E-022).
+      VITE_VAPID_PUBLIC_KEY: E2E_VAPID_PUBLIC_KEY,
     },
   },
 });

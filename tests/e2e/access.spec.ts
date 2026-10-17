@@ -26,7 +26,7 @@ test.describe('acesso', () => {
     await logout(page, info);
     await login(page, address, newPassword);
     await expect(page).toHaveURL(/#\/minha-semana$/);
-    await expect(page.getByRole('heading', { name: 'MINHA SEMANA' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /^MINHA SEMANA/ })).toBeVisible();
   });
 
   test('E2E-004 P10 entra, recarrega a página e continua logado', async ({ page }, info) => {
@@ -35,11 +35,11 @@ test.describe('acesso', () => {
     await expect(page.getByRole('img', { name: 'Chiaro Filmes' })).toBeVisible();
     await login(page, email(10));
     await expect(page).toHaveURL(/#\/minha-semana$/);
-    await expect(page.getByRole('heading', { name: 'MINHA SEMANA' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /^MINHA SEMANA/ })).toBeVisible();
 
     await page.reload();
     await expect(page).toHaveURL(/#\/minha-semana$/);
-    await expect(page.getByRole('heading', { name: 'MINHA SEMANA' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /^MINHA SEMANA/ })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Entrar' })).toHaveCount(0);
 
     // Tema Noite e versão na moldura: rodapé do menu lateral no desktop, fim do "Mais" no celular.
@@ -60,6 +60,6 @@ test.describe('acesso', () => {
     await expect(page.getByRole('heading', { name: 'SEM PERMISSÃO' })).toBeVisible();
     await page.getByRole('button', { name: 'Ir para minha semana' }).click();
     await expect(page).toHaveURL(/#\/minha-semana$/);
-    await expect(page.getByRole('heading', { name: 'MINHA SEMANA' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /^MINHA SEMANA/ })).toBeVisible();
   });
 });

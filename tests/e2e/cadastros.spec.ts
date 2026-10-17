@@ -42,7 +42,7 @@ test.describe('cadastros', () => {
     await page.getByLabel(/^Repita a senha/).fill('Senha-da-Ana-123');
     await page.getByRole('button', { name: 'Salvar senha' }).click();
     await expect(page).toHaveURL(/#\/minha-semana$/);
-    await expect(page.getByRole('heading', { name: 'MINHA SEMANA' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /^MINHA SEMANA/ })).toBeVisible();
 
     const row = await withDb(e2eEnv().dbUrl, (c) =>
       c.query<{ code: string; weekly_limit_hours: string; roles: string }>(

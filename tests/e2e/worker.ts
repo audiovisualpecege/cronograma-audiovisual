@@ -8,6 +8,7 @@ import { geminiFactory } from '../../apps/worker/src/ai/gemini.ts';
 import { supabaseAuthApi } from '../../apps/worker/src/auth/admin.ts';
 import { GoogleCalendar } from '../../apps/worker/src/calendar/google.ts';
 import { clockFrom } from '../../apps/worker/src/clock.ts';
+import type { PushSender } from '../../apps/worker/src/push/notifier.ts';
 import { silentLogger } from '../../apps/worker/src/log.ts';
 import { SupabaseStore } from '../../apps/worker/src/store.ts';
 import { fixture, GeminiFake, GoogleFake, testServiceAccount } from '../../apps/worker/src/test/mocks.ts';
@@ -26,11 +27,16 @@ export interface RunningWorker {
 }
 
 /**
- * Sobe o worker; chaves em `refusedKeys` são recusadas pelo Gemini simulado (400 API_KEY_INVALID) e
- * `configure` ajusta os simuladores antes da primeira leitura.
+ * Sobe o worker; chaves em `refusedKeys` são recusadas pelo Gemini simulado (400 API_KEY_INVALID),
+ * `configure` ajusta os simuladores antes da primeira leitura e `pushSender` recebe as notificações.
  */
 export async function startWorker(
-  options: { refusedKeys?: string[]; configure?: (fakes: { google: GoogleFake; gemini: GeminiFake }) => void } = {},
+  options: {
+    refusedKeys?: string[];
+    configure?: (fakes: { google: GoogleFake; gemini: GeminiFake }) => void;
+    /** Envio de Web Push; sem ele o worker não envia notificação ao aparelho. */
+    pushSender?: PushSender;
+  } = {},
 ): Promise<RunningWorker> {
   const env = e2eEnv();
   const google = new GoogleFake();
@@ -59,7 +65,7 @@ export async function startWorker(
     appUrl: APP_URL,
     google: new GoogleCalendar(testServiceAccount(), clock),
     providerFactory: geminiFactory(clock),
-    pushSender: null,
+    pushSender: options.pushSender ?? null,
     authApi: supabaseAuthApi(db),
     aiMinIntervalMs: 0,
     queuePollMs: 500,

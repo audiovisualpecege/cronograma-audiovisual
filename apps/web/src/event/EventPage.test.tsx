@@ -1,7 +1,8 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { renderWithSync } from '../../test/helpers';
+import { renderAsMe, renderWithSync } from '../../test/helpers';
+import { pub, teamEvent, teamRemote } from '../../test/teamFixtures';
 import { eventRow, NOW, slotWith, weekRemote } from '../../test/weekFixtures';
 import type { Row } from '../sync/types';
 import { EventPage, FIX_IN_CALENDAR } from './EventPage';
@@ -78,5 +79,22 @@ describe('EventPage', () => {
     expect(notes).toHaveValue('x'.repeat(2001));
     expect(screen.getByText('A observação vai até 2.000 caracteres.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Salvar dados extras' })).toBeDisabled();
+  });
+
+  it('UT-160 perfil Equipe vê as observações do evento sem campo de edição', async () => {
+    const event = teamEvent('e1', { title: 'Congresso de Agronegócio', notes: 'Credenciamento às 7h30', location: 'Centro de Convenções' });
+    const remote = teamRemote({ events: [event], published: [pub('e1', 'r2', 'p10', { notes: 'Credenciamento às 7h30' }), pub('e1', 'r1', 'p7'), pub('e1', 'r6', null)] });
+    const view = renderAsMe(<EventPage params={{ id: 'e1' }} />, { remote });
+    await waitFor(() => expect(view.engine.getState().lastSyncAt).not.toBeNull());
+    const notes = await screen.findByRole('region', { name: 'Observações' });
+    expect(notes).toHaveTextContent('Credenciamento às 7h30');
+    const crew = screen.getByRole('list', { name: 'Escalados' });
+    expect(crew).toHaveTextContent('Áudio Pessoa Exemplo 10');
+    expect(crew).toHaveTextContent('Câmera Pessoa Exemplo 07');
+    expect(crew).toHaveTextContent('Produção a definir');
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.queryByRole('form', { name: 'Dados extras' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Salvar|Editar|Escalar|Trocar/ })).toBeNull();
+    expect(screen.queryByRole('note')).toBeNull();
   });
 });

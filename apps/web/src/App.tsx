@@ -1,5 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { MeProvider } from './auth/me';
 import { SessionProvider, useSession } from './auth/session';
+import { UpdateNotice } from './install/UpdateNotice';
 import { AppShell } from './layout/AppShell';
 import { NoPermission } from './layout/NoPermission';
 import { homeFor, isAdminPath, loginPath, matchRoute, navigate, useHash, type RouteDef } from './router';
@@ -14,6 +16,7 @@ export function App({ remote, routes = ROUTES }: { remote: Remote; routes?: read
   return (
     <SessionProvider remote={remote}>
       <AppRoutes routes={routes} />
+      <UpdateNotice />
     </SessionProvider>
   );
 }
@@ -75,5 +78,9 @@ function SignedIn({ me, children }: { me: Me; children: ReactNode }) {
     // Fecha sem impedir a reabertura: no modo estrito do React o efeito monta duas vezes.
     return () => engine.store.close({ disableAutoOpen: false });
   }, [engine]);
-  return <SyncProvider engine={engine}>{children}</SyncProvider>;
+  return (
+    <MeProvider me={me}>
+      <SyncProvider engine={engine}>{children}</SyncProvider>
+    </MeProvider>
+  );
 }

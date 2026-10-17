@@ -238,4 +238,49 @@ describe('SyncEngine e LocalStore', () => {
     await expect(engine.runOnline((r) => r.rpc('publish_week', {}))).rejects.toMatchObject({ code: 'offline' });
     expect(remote.rpcCalls).toHaveLength(0);
   });
+
+  it('equipe: semana recém-publicada relê os eventos dela, mesmo com updated_at anterior ao cursor', async () => {
+    const remote = new FakeRemote();
+    const engine = new SyncEngine({ store: new LocalStore('equipe'), remote, profile: 'team', online: true, now, newId });
+    const old = '2026-10-16T12:00:00.000Z';
+    const eventA = { id: 'ea', week_start: '2026-10-19', version: 1, updated_at: old };
+    const eventB = { id: 'eb', week_start: '2026-10-26', version: 1, updated_at: old };
+    remote.rows = { weeks: [{ id: 'wa', week_start: '2026-10-19', state: 'published', version: 1, updated_at: old }], events: [eventA] };
+    await engine.pullAll();
+    expect(await engine.store.mirror('events').count()).toBe(1);
+
+    // A RLS passa a mostrar a semana B e os eventos dela, que não mudaram no servidor.
+    remote.rows.weeks = [...(remote.rows.weeks ?? []), { id: 'wb', week_start: '2026-10-26', state: 'published', version: 2, updated_at: '2026-10-21T15:00:00.000Z' }];
+    remote.rows.events = [eventA, eventB];
+    await engine.pull('weeks');
+    await vi.waitFor(async () => expect(await engine.store.mirror('events').get('eb')).toMatchObject({ week_start: '2026-10-26' }));
+  });
+
+  it('leitura de segurança: sem aviso do Realtime, as tabelas dele são lidas pelo cursor a cada intervalo', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    try {
+      const remote = new FakeRemote();
+      const engine = new SyncEngine({ store: new LocalStore('seguranca'), remote, profile: 'team', online: true, now, newId, safetyPullMs: 30_000 });
+      await engine.start();
+      remote.pullCalls = [];
+      remote.rows.notifications = [{ id: 'n1', person_id: 'p10', read_at: null, version: 1, updated_at: '2026-10-21T15:00:00.000Z' }];
+      vi.advanceTimersByTime(30_000);
+      await vi.waitFor(async () => expect(await engine.store.mirror('notifications').get('n1')).toBeTruthy());
+      expect(new Set(remote.pullCalls.map((c) => c.table))).toEqual(new Set(['notifications', 'events', 'weeks', 'published_assignments']));
+
+      // Sem rede, nada é pedido; depois de parar, o intervalo acaba.
+      engine.setOnline(false);
+      remote.pullCalls = [];
+      vi.advanceTimersByTime(30_000);
+      expect(remote.pullCalls).toHaveLength(0);
+      engine.stop();
+      engine.setOnline(true);
+      remote.pullCalls = [];
+      vi.advanceTimersByTime(60_000);
+      expect(remote.pullCalls).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
+

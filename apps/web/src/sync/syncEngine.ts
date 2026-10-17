@@ -21,6 +21,8 @@ import {
 
 export const PAGE_SIZE = 1000;
 const BATCH_SIZE = 100;
+/** Leitura de segurança das tabelas do Realtime: o servidor descarta avisos em rajadas (limite por segundo). */
+export const SAFETY_PULL_MS = 30_000;
 
 export interface SyncState {
   online: boolean;
@@ -43,6 +45,8 @@ export interface SyncEngineOptions {
   online?: boolean;
   now?: () => Date;
   newId?: () => string;
+  /** Intervalo da leitura de segurança; 0 desliga. */
+  safetyPullMs?: number;
 }
 
 export interface EnqueueOptions {
@@ -77,6 +81,8 @@ export class SyncEngine {
   private unsubscribeRealtime: (() => void) | null = null;
   private lastCreatedAt = '';
   private started = false;
+  private readonly safetyPullMs: number;
+  private safetyTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(options: SyncEngineOptions) {
     this.store = options.store;
@@ -84,6 +90,7 @@ export class SyncEngine {
     this.tables = options.profile === 'admin' ? ADMIN_TABLES : TEAM_TABLES;
     this.now = options.now ?? (() => new Date());
     this.newId = options.newId ?? (() => crypto.randomUUID());
+    this.safetyPullMs = options.safetyPullMs ?? SAFETY_PULL_MS;
     this.state = {
       online: options.online ?? true,
       pending: 0,
@@ -149,11 +156,21 @@ export class SyncEngine {
         }
       },
     );
+    if (this.safetyPullMs > 0) {
+      // Avisos do Realtime podem se perder (limite de mensagens por segundo, queda do canal): a cada intervalo,
+      // com rede e com a tela à vista, as mesmas tabelas são lidas pelo cursor (nada muda = resposta vazia).
+      this.safetyTimer = setInterval(() => {
+        if (!this.state.online || (typeof document !== 'undefined' && document.visibilityState === 'hidden')) return;
+        for (const table of realtime) void this.pull(table).catch(() => undefined);
+      }, this.safetyPullMs);
+    }
     if (this.state.online) await this.sync();
   }
 
   stop(): void {
     this.started = false;
+    if (this.safetyTimer) clearInterval(this.safetyTimer);
+    this.safetyTimer = null;
     this.unsubscribeRealtime?.();
     this.unsubscribeRealtime = null;
     this.state = { ...this.state, realtimeLive: false };
@@ -335,12 +352,16 @@ export class SyncEngine {
 
   private async doPull(table: TableName): Promise<number> {
     const mirror = this.store.mirror(table);
+    // Equipe: semana recém-publicada torna visíveis eventos com updated_at antigo, que o cursor não traria.
+    const knownWeeks = table === 'weeks' && !this.tables.includes('slots') ? new Set(await mirror.toCollection().primaryKeys()) : null;
+    let newWeek = false;
     let cursor = await this.store.getCursor(table);
     let after: { updatedAt: string; id: string } | null = null;
     let total = 0;
     for (;;) {
       const rows = await this.remote.pullPage(table, cursor, after, PAGE_SIZE);
       if (rows.length === 0) break;
+      if (knownWeeks && rows.some((r) => !knownWeeks.has(r.id))) newWeek = true;
       const last = rows[rows.length - 1] as Row;
       await this.store.transaction('rw', [mirror, this.store.cursors, this.store.outbox], async () => {
         const pending = await this.pendingChanges(table);
@@ -351,6 +372,10 @@ export class SyncEngine {
       cursor = last.updated_at;
       if (rows.length < PAGE_SIZE) break;
       after = { updatedAt: last.updated_at, id: last.id };
+    }
+    if (newWeek) {
+      await this.store.cursors.delete('events');
+      void this.pull('events').catch(() => undefined);
     }
     return total;
   }

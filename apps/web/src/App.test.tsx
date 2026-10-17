@@ -29,7 +29,7 @@ describe('sessão e rotas por perfil', () => {
     expect(await screen.findByRole('heading', { name: 'SEM PERMISSÃO' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Ir para minha semana' }));
     await waitFor(() => expect(window.location.hash).toBe('#/minha-semana'));
-    expect(await screen.findByRole('heading', { name: 'MINHA SEMANA' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /^MINHA SEMANA/ })).toBeInTheDocument();
   });
 
   it('UT-089 rota #/evento/E1 sem sessão leva ao login e, depois de entrar, volta a #/evento/E1', async () => {
@@ -91,7 +91,7 @@ describe('sessão e rotas por perfil', () => {
     const offline = signedIn(TEAM_ME);
     offline.offline = true;
     render(<App remote={offline} />);
-    expect(await screen.findByRole('heading', { name: 'MINHA SEMANA' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /^MINHA SEMANA/ })).toBeInTheDocument();
     expect(screen.getByText(/^Sem internet/)).toBeInTheDocument();
   });
 

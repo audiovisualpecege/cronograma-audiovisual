@@ -1,6 +1,8 @@
 import { act, render } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { vi } from 'vitest';
+import { MeProvider } from '../src/auth/me';
+import type { Me } from '../src/supabase';
 import { LocalStore } from '../src/sync/localStore';
 import { SyncEngine } from '../src/sync/syncEngine';
 import { SyncProvider } from '../src/sync/SyncProvider';
@@ -20,4 +22,10 @@ export function renderWithSync(ui: ReactNode, options: { remote?: FakeRemote; pr
   const engine = new SyncEngine({ store, remote, profile: options.profile ?? 'admin', online: navigator.onLine, now: options.now });
   const view = render(<SyncProvider engine={engine}>{ui}</SyncProvider>);
   return { ...view, engine, store, remote };
+}
+
+/** Tela da pessoa logada (Minha semana, avisos, preferências): cópia local e a pessoa no contexto. */
+export function renderAsMe(ui: ReactNode, options: { remote?: FakeRemote; me?: Me; profile?: 'admin' | 'team'; now?: () => Date } = {}) {
+  const me = options.me ?? { personId: 'p10', name: 'Pessoa Exemplo 10', profile: 'team' as const };
+  return renderWithSync(<MeProvider me={me}>{ui}</MeProvider>, { ...options, profile: options.profile ?? me.profile });
 }

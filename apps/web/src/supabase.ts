@@ -59,6 +59,8 @@ export interface Remote {
   rpc<T>(fn: string, args: Record<string, unknown>): Promise<T>;
   /** Lê uma view inteira, em páginas (history_facts, que não entra na cópia local). Precisa de internet. */
   readView<T>(view: string, columns: string, order?: string[]): Promise<T[]>;
+  /** Endereço público de um caminho do projeto (o feed iCal no Storage). */
+  publicUrl(path: string): string;
   /** Fecha o Realtime e a renovação da sessão (a sessão guardada continua). */
   close(): Promise<void>;
 }
@@ -249,6 +251,10 @@ export function createSupabaseRemote(options: RemoteOptions): Remote {
         out.push(...rows);
         if (rows.length < VIEW_PAGE) return out;
       }
+    },
+
+    publicUrl(path: string) {
+      return `${options.url.replace(/\/+$/, '')}${path.startsWith('/') ? path : `/${path}`}`;
     },
 
     async close() {
