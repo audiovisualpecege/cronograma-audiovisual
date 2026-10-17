@@ -3,12 +3,13 @@ import { createRoot } from 'react-dom/client';
 import '@chiaro/styles.css';
 import './app.css';
 import { App } from './App';
+import { createAppRemote } from './supabase';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Elemento #root não encontrado');
 
 createRoot(root).render(
   <StrictMode>
-    <App />
+    <App remote={createAppRemote()} />
   </StrictMode>,
 );
