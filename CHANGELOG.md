@@ -30,3 +30,15 @@ PATCH para um conserto, MINOR para algo novo, MAJOR quando o jeito de usar muda.
   cada pessoa, com filtro de período.
 - Configuração: as Google Agendas lidas (com o estado e a última leitura, e "Reler agora"), a chave da IA (só o
   final dela aparece, com "Testar chave" e o aviso sobre o plano gratuito) e o liga e desliga de cada automação.
+- Painel do administrador com as pendências no topo (mudanças da agenda, vagas sem escala, propostas para
+  revisar, alterações não publicadas, duplicados e semanas sem montagem), o aviso "Serviço de fundo parado desde
+  ..." e as agendas desconectadas.
+- Semana: prévia por dia antes de montar, com a agenda de origem, o tipo previsto, a certeza, a equipe estimada e
+  as horas pedidas e disponíveis por função; "Montar semana" cria as vagas. Depois, a escala em lista por evento
+  ou em grade por pessoa e dia, com o painel de carga, alertas que pedem "Escalar mesmo assim", travar e desfazer.
+- Pré-escala pela IA: "Propor escala" com o progresso, propostas com justificativa para aceitar, trocar ou
+  descartar por vaga, por evento ou na semana inteira; nada vale sem o administrador aceitar.
+- Publicar a semana com o resumo de vagas abertas, propostas pendentes e alertas; numa semana publicada, as
+  edições ficam como "alterações não publicadas", com "Publicar alterações" e "Descartar alterações".
+- Tela do evento: dados da agenda só para leitura ("Corrija na Google Agenda"), tipo, observações e vagas a mais,
+  antes e depois das mudanças da agenda com "Marcar como revisado", duplicados e atividades internas.

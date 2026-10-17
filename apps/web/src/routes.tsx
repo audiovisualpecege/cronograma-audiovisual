@@ -3,6 +3,7 @@ import { CreatePasswordPage } from './auth/CreatePasswordPage';
 import { ForgotPasswordPage } from './auth/ForgotPasswordPage';
 import { LoginPage } from './auth/LoginPage';
 import { AbsencesPage } from './admin/absences/AbsencesPage';
+import { DashboardPage } from './admin/dashboard/DashboardPage';
 import { PeoplePage } from './admin/people/PeoplePage';
 import { RolesPage } from './admin/roles/RolesPage';
 import { SectorsPage } from './admin/sectors/SectorsPage';
@@ -13,6 +14,8 @@ import { PatternsPage } from './patterns/PatternsPage';
 import type { RouteDef } from './router';
 import { SettingsPage } from './settings/SettingsPage';
 import { MyWeekPage } from './team/MyWeekPage';
+import { EventPage } from './event/EventPage';
+import { WeekPage } from './week/WeekPage';
 
 function provisional(light: string | undefined, black: string) {
   return function ProvisionalPage() {
@@ -34,11 +37,11 @@ export const ROUTES: readonly RouteDef[] = [
   { path: '/minha-semana/:date', access: 'any', title: 'Minha semana', component: MyWeekPage },
   { path: '/equipe', access: 'any', title: 'Equipe', component: provisional('SEMANA DA', 'EQUIPE') },
   { path: '/avisos', access: 'any', title: 'Avisos', component: provisional(undefined, 'AVISOS') },
-  { path: '/evento/:id', access: 'any', title: 'Evento', component: provisional(undefined, 'EVENTO') },
+  { path: '/evento/:id', access: 'any', title: 'Evento', component: EventPage },
 
-  { path: '/painel', access: 'admin', title: 'Painel', component: provisional('PAINEL DA', 'SEMANA') },
-  { path: '/semana', access: 'admin', title: 'Semana', component: provisional('MONTAGEM DA', 'SEMANA') },
-  { path: '/semana/:date', access: 'admin', title: 'Semana', component: provisional('MONTAGEM DA', 'SEMANA') },
+  { path: '/painel', access: 'admin', title: 'Painel', component: DashboardPage },
+  { path: '/semana', access: 'admin', title: 'Semana', component: WeekPage },
+  { path: '/semana/:date', access: 'admin', title: 'Semana', component: WeekPage },
   { path: '/admin/pessoas', access: 'admin', title: 'Pessoas', component: PeoplePage },
   { path: '/admin/ausencias', access: 'admin', title: 'Ausências', component: AbsencesPage },
   { path: '/admin/funcoes', access: 'admin', title: 'Funções', component: RolesPage },

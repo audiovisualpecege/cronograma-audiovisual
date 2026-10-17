@@ -25,13 +25,19 @@ export interface RunningWorker {
   stop(): Promise<void>;
 }
 
-/** Sobe o worker; chaves em `refusedKeys` são recusadas pelo Gemini simulado (400 API_KEY_INVALID). */
-export async function startWorker(options: { refusedKeys?: string[] } = {}): Promise<RunningWorker> {
+/**
+ * Sobe o worker; chaves em `refusedKeys` são recusadas pelo Gemini simulado (400 API_KEY_INVALID) e
+ * `configure` ajusta os simuladores antes da primeira leitura.
+ */
+export async function startWorker(
+  options: { refusedKeys?: string[]; configure?: (fakes: { google: GoogleFake; gemini: GeminiFake }) => void } = {},
+): Promise<RunningWorker> {
   const env = e2eEnv();
   const google = new GoogleFake();
   google.list(CALENDARS.pecegeworks, 'google/week-b.json');
   google.list(CALENDARS.audiovisual, 'google/week-b-s2.json');
   const gemini = new GeminiFake();
+  options.configure?.({ google, gemini });
   const refused = new Set(options.refusedKeys ?? []);
   const refuse = http.get(/^https:\/\/generativelanguage\.googleapis\.com\/v1beta\/models\/[^/:?]+/, ({ request }) => {
     if (!refused.has(request.headers.get('x-goog-api-key') ?? '')) return undefined;

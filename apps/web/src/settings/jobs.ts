@@ -2,6 +2,7 @@
 import { useEffect } from 'react';
 import type { JobRow, SettingsRow } from '../data/catalog';
 import { useLocalQuery, useSyncEngine } from '../sync/SyncProvider';
+import type { TableName } from '../sync/types';
 
 export function useJob(id: string | null): JobRow | undefined {
   return useLocalQuery(
@@ -13,13 +14,13 @@ export function useJob(id: string | null): JobRow | undefined {
 export const isFinished = (job: JobRow | undefined) => job?.status === 'done' || job?.status === 'failed';
 
 /** Quando o pedido termina, lê de novo as tabelas que o serviço de fundo gravou. */
-export function useRefreshWhenFinished(job: JobRow | undefined, tables: ('calendar_sources' | 'settings' | 'events')[]) {
+export function useRefreshWhenFinished(job: JobRow | undefined, tables: TableName[]) {
   const engine = useSyncEngine();
   const finished = isFinished(job);
   const key = tables.join(',');
   useEffect(() => {
     if (!finished) return;
-    for (const t of key.split(',')) void engine.pull(t as 'settings').catch(() => undefined);
+    for (const t of key.split(',')) void engine.pull(t as TableName).catch(() => undefined);
   }, [finished, engine, key]);
 }
 

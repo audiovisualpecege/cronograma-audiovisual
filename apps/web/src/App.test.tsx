@@ -72,7 +72,7 @@ describe('sessão e rotas por perfil', () => {
     goTo('#/semana/2026-10-19');
     const remote = signedIn(ADMIN_ME);
     render(<App remote={remote} />);
-    expect(await screen.findByRole('heading', { name: 'MONTAGEM DA SEMANA' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'SEMANA DE 19/10' })).toBeInTheDocument();
     act(() => remote.expireSession());
     await waitFor(() => expect(window.location.hash).toBe('#/entrar?volta=%2Fsemana%2F2026-10-19'));
     expect(await screen.findByText(/Sua sessão terminou/)).toBeInTheDocument();

@@ -84,6 +84,7 @@ export interface SettingsRow extends Row {
   ai_model: string;
   ai_key_hint: string | null;
   push_enabled_global: boolean;
+  worker_seen_at?: string | null;
 }
 
 export interface JobRow extends Row {
@@ -98,6 +99,20 @@ export interface JobRow extends Row {
 export interface WeekRow extends Row {
   week_start: string;
   state: 'building' | 'published';
+  revision?: number;
+  dirty_since?: string | null;
+  published_at?: string | null;
+  published_by?: string | null;
+}
+
+/** Estado do evento antes da mudança vinda da agenda (US-011 AC-2), em camelCase como o worker grava. */
+export interface ChangeOriginal {
+  title?: string | null;
+  location?: string | null;
+  description?: string | null;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  allDay?: boolean | null;
 }
 
 export interface EventRow extends Row {
@@ -106,18 +121,55 @@ export interface EventRow extends Row {
   starts_at: string;
   ends_at: string;
   status: string;
+  origin?: 'calendar' | 'internal';
+  calendar_source_id?: string | null;
+  location?: string | null;
+  description?: string | null;
+  all_day?: boolean;
+  period_start?: string | null;
+  period_end?: string | null;
+  change_original?: ChangeOriginal | null;
+  review_pending?: boolean;
+  restored?: boolean;
+  duplicate_group?: string | null;
+  ignored?: boolean;
+  service_type_id?: string | null;
+  type_certainty?: 'alta' | 'media' | 'baixa' | null;
+  type_source?: string | null;
+  no_team?: boolean;
+  notes?: string | null;
+  crew_outdated?: boolean;
+  source_disconnected?: boolean;
 }
 
 export interface SlotRow extends Row {
   event_id: string;
   job_role_id: string;
   archived_at: string | null;
+  extra?: boolean;
 }
 
 export interface AssignmentRow extends Row {
   slot_id: string;
   event_id: string;
   person_id: string | null;
+  status?: 'proposed' | 'confirmed' | null;
+  locked?: boolean;
+  warnings?: string[];
+  override?: boolean;
+  reason?: string | null;
+  decided_by?: string | null;
+  decided_at?: string | null;
+}
+
+export interface PublishedRow extends Row {
+  week_id: string;
+  revision: number;
+  event_id: string;
+  slot_id: string | null;
+  job_role_id: string;
+  person_id: string | null;
+  notes: string | null;
 }
 
 /** Todas as linhas de uma tabela espelhada; `undefined` enquanto a cópia local abre. */
