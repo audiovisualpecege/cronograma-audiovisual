@@ -122,7 +122,7 @@ describe('moldura de navegação', () => {
     const side = await screen.findByRole('navigation', { name: 'Menu principal' });
     expect(within(side).getByRole('link', { name: 'Painel' })).toHaveAttribute('aria-current', 'page');
     expect(within(side).getByRole('link', { name: 'Pessoas' })).toBeInTheDocument();
-    expect(within(side).getByText('v1.0.0')).toBeInTheDocument();
+    expect(within(side).getByText(`v${__APP_VERSION__}`)).toBeInTheDocument();
   });
 
   it('Equipe não vê telas de administrador no menu', async () => {
@@ -141,7 +141,7 @@ describe('moldura de navegação', () => {
     const more = screen.getByRole('dialog', { name: 'Mais' });
     expect(within(more).getByRole('link', { name: 'Configuração' })).toBeInTheDocument();
     const last = more.lastElementChild;
-    expect(last).toHaveTextContent('v1.0.0');
+    expect(last).toHaveTextContent(`v${__APP_VERSION__}`);
     await userEvent.click(within(more).getByRole('button', { name: 'Sair' }));
     await waitFor(() => expect(window.location.hash).toBe('#/entrar?volta=%2Fpainel'));
   });

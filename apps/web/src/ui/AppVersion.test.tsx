@@ -3,9 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { AppVersion } from './AppVersion';
 
 describe('AppVersion', () => {
-  it("UT-106 o rodapé mostra v1.0.0 quando __APP_VERSION__='1.0.0'", () => {
-    expect(__APP_VERSION__).toBe('1.0.0');
+  // A versão vem do package.json da raiz (UT-177); o teste não fixa o número, para não quebrar a cada versão.
+  it('UT-106 o rodapé mostra "v" + __APP_VERSION__', () => {
+    expect(__APP_VERSION__).toMatch(/^\d+\.\d+\.\d+$/);
     render(<AppVersion />);
-    expect(screen.getByText('v1.0.0')).toHaveClass('app-version');
+    expect(screen.getByText(`v${__APP_VERSION__}`)).toHaveClass('app-version');
   });
 });

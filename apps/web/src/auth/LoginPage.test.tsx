@@ -88,7 +88,7 @@ describe('login', () => {
     render(<App remote={new FakeRemote()} />);
     expect(await screen.findByText('um produto')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Chiaro Filmes' })).toHaveAttribute('src', expect.stringContaining('chiaro-filmes-horizontal-white'));
-    expect(screen.getByText('v1.0.0')).toBeInTheDocument();
+    expect(screen.getByText(`v${__APP_VERSION__}`)).toBeInTheDocument();
   });
 
   it('"Esqueci a senha" pede o link com a volta para #/criar-senha', async () => {

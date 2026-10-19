@@ -12,7 +12,7 @@ const rootVersion = readPackage('../package.json').version;
 
 describe('versão única', () => {
   it('UT-177 o build lê a versão do package.json da raiz; apps/desktop e o worker relatam o mesmo número', () => {
-    expect(rootVersion).toBe('1.0.0');
+    expect(rootVersion).toMatch(/^\d+\.\d+\.\d+$/);
     expect(webVersion).toBe(rootVersion);
     expect(viteConfig.define?.__APP_VERSION__).toBe(JSON.stringify(rootVersion));
     expect(workerVersion()).toBe(rootVersion);
