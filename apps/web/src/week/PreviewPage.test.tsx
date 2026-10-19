@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { row } from '../../test/catalogRows';
 import { FakeRemote } from '../../test/fakeRemote';
-import { renderWithSync } from '../../test/helpers';
+import { PERF_BUDGET, renderWithSync } from '../../test/helpers';
 import { CREW_ROWS, eventRow, NOW, peopleRows, personRoleRows, ROLE_ROWS, SOURCES, TYPE_ROWS, WEEK_B, weekRemote } from '../../test/weekFixtures';
 import type { CalendarSourceRow, CrewRow, EventRow, JobRoleRow, PersonRoleRow, PersonRow, ServiceTypeRow } from '../data/catalog';
 import { LocalStore } from '../sync/localStore';
@@ -86,7 +86,7 @@ describe('PreviewPage', () => {
       </SyncProvider>,
     );
     const elapsed = performance.now() - started;
-    expect(elapsed).toBeLessThan(500);
+    expect(elapsed).toBeLessThan(500 * PERF_BUDGET);
     const days = screen.getAllByRole('region').filter((r) => /^(segunda|terça|quarta|quinta|sexta|sábado|domingo), /.test(r.getAttribute('aria-label') ?? ''));
     expect(days.map((d) => d.getAttribute('aria-label'))).toEqual(['segunda, 26/10', 'terça, 27/10', 'quarta, 28/10', 'quinta, 29/10', 'sexta, 30/10', 'sábado, 31/10']);
     expect(within(days[0] as HTMLElement).getAllByRole('listitem')).toHaveLength(20);

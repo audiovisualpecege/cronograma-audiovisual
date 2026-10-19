@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { renderAsMe } from '../../test/helpers';
+import { PERF_BUDGET, renderAsMe } from '../../test/helpers';
 import { pub, publicPeople, teamEvent, teamRemote, type TeamSetup } from '../../test/teamFixtures';
 import { NOW } from '../../test/weekFixtures';
 import { MAX_RENDERED } from '../ui/VirtualList';
@@ -89,7 +89,7 @@ describe('TeamPage', () => {
     const elapsed = performance.now() - started;
     expect(lines.length).toBeLessThan(10);
     expect(lines.some((l) => l.textContent?.includes('Pessoa Exemplo 150'))).toBe(true);
-    expect(elapsed).toBeLessThan(200);
+    expect(elapsed).toBeLessThan(200 * PERF_BUDGET);
   });
 
   it('semana não publicada mostra "A escala desta semana ainda não foi publicada"', async () => {
