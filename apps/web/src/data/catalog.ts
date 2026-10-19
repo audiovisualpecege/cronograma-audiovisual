@@ -73,6 +73,7 @@ export interface CalendarSourceRow extends Row {
   status: 'pending' | 'connected' | 'error';
   last_synced_at: string | null;
   last_error: string | null;
+  archived_at: string | null;
 }
 
 export interface SettingsRow extends Row {

@@ -2,7 +2,7 @@
 
 export type OpKind =
   | 'person.upsert' | 'person.deactivate' | 'person.reactivate' | 'absence.upsert' | 'absence.archive'
-  | 'sector.upsert' | 'sector.archive' | 'calendar_source.upsert'
+  | 'sector.upsert' | 'sector.archive' | 'calendar_source.upsert' | 'calendar_source.remove'
   | 'job_role.upsert' | 'job_role.archive' | 'service_type.upsert' | 'service_type.archive'
   | 'event.update_extras' | 'event.internal_upsert' | 'event.internal_cancel' | 'event.mark_reviewed'
   | 'event.resolve_duplicate' | 'week.build' | 'slot.add' | 'slot.remove'

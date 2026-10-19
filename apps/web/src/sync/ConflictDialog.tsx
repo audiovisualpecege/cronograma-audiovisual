@@ -14,6 +14,7 @@ export const OP_LABELS: Record<OpKind, string> = {
   'sector.upsert': 'Setor',
   'sector.archive': 'Arquivar setor',
   'calendar_source.upsert': 'Agenda',
+  'calendar_source.remove': 'Remover agenda',
   'job_role.upsert': 'Função',
   'job_role.archive': 'Arquivar função',
   'service_type.upsert': 'Tipo de serviço',

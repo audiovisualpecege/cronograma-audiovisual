@@ -88,7 +88,8 @@ describe('EventPage', () => {
     await waitFor(() => expect(view.engine.getState().lastSyncAt).not.toBeNull());
     const notes = await screen.findByRole('region', { name: 'Observações' });
     expect(notes).toHaveTextContent('Credenciamento às 7h30');
-    const crew = screen.getByRole('list', { name: 'Escalados' });
+    // Os escalados chegam depois das observações (published_assignments é outra tabela).
+    const crew = await screen.findByRole('list', { name: 'Escalados' });
     expect(crew).toHaveTextContent('Áudio Pessoa Exemplo 10');
     expect(crew).toHaveTextContent('Câmera Pessoa Exemplo 07');
     expect(crew).toHaveTextContent('Produção a definir');

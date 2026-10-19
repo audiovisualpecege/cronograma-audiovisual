@@ -107,26 +107,32 @@ Em **Authentication > URL Configuration**:
 
 É para esse endereço que os links de convite e de "Esqueci a senha" levam.
 
-### 3.4 E-mail pela conta audiovisualpecege@gmail.com
+### 3.4 E-mail pelo Brevo
 
-O e-mail embutido do Supabase só envia para membros do projeto. Os convites e as senhas novas saem pelo Gmail da
-equipe, com uma **senha de app**.
+O e-mail embutido do Supabase só envia para membros do projeto. Os convites e as senhas novas saem pelo
+[Brevo](https://www.brevo.com), um serviço de envio gratuito (300 e-mails por dia), com o remetente
+**pecegeworks@gmail.com**. Não precisa de domínio próprio nem de mexer em DNS.
 
-1. Entre em <https://myaccount.google.com> com **audiovisualpecege@gmail.com**. Em **Segurança**, ative a
-   **Verificação em duas etapas**, se ainda não estiver ativa.
-2. Abra <https://myaccount.google.com/apppasswords>, dê o nome `Cronograma Supabase` e clique em **Criar**. Copie
-   a senha de 16 letras que aparece (ela só é mostrada uma vez).
+1. Crie a conta no Brevo com **pecegeworks@gmail.com** (o remetente da conta já fica verificado). Para usar outro
+   remetente, adicione em **Remetentes, Domínios e IPs > Remetentes** e confirme pelo código que chega nele.
+2. Em **SMTP & API**, aba **SMTP**, anote o **Fazer login** (algo como `xxxx@smtp-brevo.com`) e clique em
+   **Gerar chave SMTP**. Copie a chave na hora: ela só é mostrada uma vez.
 3. No Supabase, abra **Authentication > Emails > SMTP Settings**, ative **Enable custom SMTP** e preencha:
-   - **Sender email**: `audiovisualpecege@gmail.com`
+   - **Sender email**: `pecegeworks@gmail.com`
    - **Sender name**: `Cronograma Audiovisual`
-   - **Host**: `smtp.gmail.com`
-   - **Port**: `465`
-   - **Username**: `audiovisualpecege@gmail.com`
-   - **Password**: a senha de app do passo 2, sem espaços
-4. Salve. Em **Authentication > Rate Limits**, aumente **emails sent per hour** para pelo menos `30`, para mandar
-   os convites da equipe de uma vez.
+   - **Host**: `smtp-relay.brevo.com`
+   - **Port**: `587`
+   - **Username**: o login do passo 2
+   - **Password**: a chave SMTP do passo 2
+4. Salve. Em **Authentication > Rate Limits**, confira **emails sent per hour** em pelo menos `30`, para mandar os
+   convites da equipe de uma vez.
 
-Se a senha da conta Google mudar, a senha de app deixa de valer: crie outra e troque no Supabase.
+O Brevo avisa que remetente @gmail.com não é o ideal para entrega: no primeiro convite, peça para a pessoa olhar
+o spam. Se a chave vazar ou parar de valer, gere outra no Brevo e troque no Supabase.
+
+O Gmail com senha de app também serve (Host `smtp.gmail.com`, porta `465`), mas exige a verificação em duas
+etapas na conta, e o Google costuma barrar a página de senhas de app logo depois de ela ser ligada ("Não foi
+possível confirmar sua identidade"). Foi por isso que a instalação de 19/10/2026 ficou no Brevo.
 
 ## 4. Chaves das notificações no celular
 
@@ -205,7 +211,8 @@ O primeiro administrador é criado à mão, uma vez só. Os demais são convidad
    **Painel**.
 4. Em **Configuração**:
    - **Google Agendas**: adicione as duas agendas pelo ID anotado na etapa 2 e clique em **Reler agora**. O
-     estado de cada uma deve ficar em dia em alguns minutos.
+     estado de cada uma deve ficar em dia em alguns minutos. Errou o ID? **Editar** corrige enquanto a agenda
+     não tem eventos lidos, e **Remover** tira da lista uma agenda sem eventos.
    - **IA**: cole a chave do Gemini (crie em <https://aistudio.google.com/apikey> com a conta da equipe) e clique
      em **Testar chave**.
    - **Automações**: confira o liga e desliga de cada uma.
@@ -333,7 +340,7 @@ O `latest.json` tem esta forma (os nomes são os dos arquivos na mesma pasta):
 
 | O que acontece | O que fazer |
 |----------------|-------------|
-| Convite ou "Esqueci a senha" não chega | Confira a caixa de spam. No Supabase, confira o SMTP (etapa 3.4) e se a senha de app ainda vale. |
+| Convite ou "Esqueci a senha" não chega | Confira a caixa de spam. No Supabase, confira o SMTP (etapa 3.4); no Brevo, em **Estatísticas > E-mails transacionais**, veja se o e-mail saiu ou foi barrado. |
 | "Agenda X desconectada desde ..." | A agenda deixou de estar compartilhada com a conta de serviço. Refaça o passo 7 da etapa 2 e clique em **Reler agora**. |
 | "Serviço de fundo parado desde ..." | O contêiner do NAS parou. Veja a etapa 6. |
 | Notificações não chegam no iPhone | O app precisa estar instalado na tela inicial e aberto por lá ao menos uma vez (iOS 16.4 ou mais novo). Em **Preferências**, toque em **Reativar notificações**. |

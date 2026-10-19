@@ -3,6 +3,16 @@
 Cada versão nova entra no topo, com a data e o que mudou para quem usa.
 PATCH para um conserto, MINOR para algo novo, MAJOR quando o jeito de usar muda.
 
+## 1.0.1 (19/10/2026)
+
+- Configuração > Google Agendas: cada agenda ganhou **Editar** e **Remover**. Errou o ID ao adicionar? Edite e a
+  agenda volta a "aguardando a primeira leitura" e é lida na hora. O rótulo muda sempre; o ID só enquanto a agenda
+  não tem eventos lidos, para os eventos antigos não serem dados como cancelados. Remover tira da lista uma agenda
+  sem eventos; a que já tem eventos fica com a leitura desligada, para o histórico não se perder.
+- Os convites e o "Esqueci a senha" saem pelo Brevo, com o remetente pecegeworks@gmail.com.
+- Testes de tempo com folga no GitHub, onde rodam mais devagar, e um teste da tela do evento que às vezes falhava
+  sem motivo.
+
 ## 1.0.0 (17/10/2026)
 
 - Primeira versão do Cronograma Audiovisual: a base do app, com o ícone próprio, o visual escuro da Chiaro Filmes

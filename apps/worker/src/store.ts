@@ -358,7 +358,7 @@ export class SupabaseStore implements Store {
   // Agenda --------------------------------------------------------------------------------
 
   async sources(): Promise<SourceRow[]> {
-    return check(await this.db.from('calendar_sources').select('*').order('label'), 'sources') as SourceRow[];
+    return check(await this.db.from('calendar_sources').select('*').is('archived_at', null).order('label'), 'sources') as SourceRow[];
   }
 
   async storedEvents(sourceId: string, from: Date, to: Date): Promise<StoredEventRow[]> {

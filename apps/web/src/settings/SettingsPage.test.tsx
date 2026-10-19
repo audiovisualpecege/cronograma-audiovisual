@@ -101,4 +101,82 @@ describe('SettingsPage', () => {
     await waitFor(() => expect(remote.rpcCalls).toContainEqual({ fn: 'request_job', args: { kind: 'calendar_sync', payload: {} } }));
     expect(await screen.findByRole('listitem', { name: 'audiovisualpecege' })).toHaveTextContent('aguardando a primeira leitura');
   });
+
+  it('agenda com ID digitado errado e sem eventos: Editar corrige o ID, ela volta a aguardar a leitura e é lida na hora', async () => {
+    const user = userEvent.setup();
+    const remote = remoteWith();
+    remote.rows.calendar_sources?.push(row('cs-2', { google_calendar_id: 'pcegeworks@gmail.com', label: 'Estúdios', enabled: true, status: 'error', last_synced_at: null, last_error: 'Sem acesso à agenda', archived_at: null }));
+    remote.rpcHandler = (fn) => (fn === 'request_job' ? { job_id: 'job-sync' } : {});
+    renderWithSync(<SettingsPage />, { remote });
+    const item = await screen.findByRole('listitem', { name: 'Estúdios' });
+    await user.click(within(item).getByRole('button', { name: 'Editar' }));
+
+    const form = screen.getByRole('form', { name: 'Editar Estúdios' });
+    const field = within(form).getByLabelText(/^ID da agenda/);
+    expect(field).toBeEnabled();
+    await user.clear(field);
+    await user.type(field, 'pecegeworks@gmail.com');
+    await user.click(within(form).getByRole('button', { name: 'Salvar' }));
+    expect(within(form).getByText('Esta agenda já está na lista.')).toBeInTheDocument();
+
+    await user.clear(field);
+    await user.type(field, 'Estudios.Pecege@gmail.com');
+    await user.click(within(form).getByRole('button', { name: 'Salvar' }));
+    await waitFor(() =>
+      expect(remote.applyCalls.flat().find((o) => o.kind === 'calendar_source.upsert')?.payload).toEqual({ id: 'cs-2', google_calendar_id: 'estudios.pecege@gmail.com', label: 'Estúdios' }),
+    );
+    const edited = await screen.findByRole('listitem', { name: 'Estúdios' });
+    expect(edited).toHaveTextContent('estudios.pecege@gmail.com');
+    expect(edited).toHaveTextContent('aguardando a primeira leitura');
+    await waitFor(() => expect(remote.rpcCalls).toContainEqual({ fn: 'request_job', args: { kind: 'calendar_sync', payload: {} } }));
+  });
+
+  it('agenda sem eventos: Remover pede confirmação e manda calendar_source.remove; ela sai da lista', async () => {
+    const user = userEvent.setup();
+    const remote = remoteWith();
+    remote.rows.calendar_sources?.push(row('cs-2', { google_calendar_id: 'pcegeworks@gmail.com', label: 'Errada', enabled: true, status: 'error', last_synced_at: null, last_error: null, archived_at: null }));
+    renderWithSync(<SettingsPage />, { remote });
+    const item = await screen.findByRole('listitem', { name: 'Errada' });
+    await user.click(within(item).getByRole('button', { name: 'Remover' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Remover Errada' });
+    expect(dialog).toHaveTextContent('pcegeworks@gmail.com');
+    expect(dialog).toHaveTextContent('Nada muda na Google Agenda');
+    await user.click(within(dialog).getByRole('button', { name: 'Remover agenda' }));
+
+    await waitFor(() => expect(remote.applyCalls.flat().map((o) => [o.kind, o.payload])).toContainEqual(['calendar_source.remove', { id: 'cs-2' }]));
+    await waitFor(() => expect(screen.queryByRole('listitem', { name: 'Errada' })).toBeNull());
+    expect(screen.getByRole('listitem', { name: 'pecegeworks' })).toBeInTheDocument();
+  });
+
+  it('agenda com eventos lidos: o ID fica travado e Remover só oferece desligar a leitura', async () => {
+    const user = userEvent.setup();
+    const remote = remoteWith();
+    remote.rows.events = [row('ev-1', { calendar_source_id: 'cs-1', title: 'Gravação aula', starts_at: '2026-10-21T13:00:00.000Z', ends_at: '2026-10-21T14:00:00.000Z' })];
+    renderWithSync(<SettingsPage />, { remote });
+    const item = await screen.findByRole('listitem', { name: 'pecegeworks' });
+
+    await user.click(within(item).getByRole('button', { name: 'Editar' }));
+    const form = screen.getByRole('form', { name: 'Editar pecegeworks' });
+    expect(within(form).getByLabelText(/^ID da agenda/)).toBeDisabled();
+    expect(form).toHaveTextContent('A agenda já tem eventos lidos: o ID não muda.');
+    await user.clear(within(form).getByLabelText(/^Rótulo/));
+    await user.type(within(form).getByLabelText(/^Rótulo/), 'Estúdios');
+    await user.click(within(form).getByRole('button', { name: 'Salvar' }));
+    await waitFor(() =>
+      expect(remote.applyCalls.flat().find((o) => o.kind === 'calendar_source.upsert')?.payload).toEqual({ id: 'cs-1', google_calendar_id: 'pecegeworks@gmail.com', label: 'Estúdios' }),
+    );
+
+    const renamed = await screen.findByRole('listitem', { name: 'Estúdios' });
+    expect(renamed).toHaveTextContent('conectada');
+    await user.click(within(renamed).getByRole('button', { name: 'Remover' }));
+    const dialog = screen.getByRole('dialog', { name: 'Remover Estúdios' });
+    expect(dialog).toHaveTextContent('já tem eventos lidos e não pode ser removida');
+    expect(within(dialog).queryByRole('button', { name: 'Remover agenda' })).toBeNull();
+    await user.click(within(dialog).getByRole('button', { name: 'Desligar a leitura' }));
+
+    await waitFor(() => expect(remote.applyCalls.flat().map((o) => [o.kind, o.payload])).toContainEqual(['calendar_source.upsert', { id: 'cs-1', enabled: false }]));
+    expect(remote.applyCalls.flat().some((o) => o.kind === 'calendar_source.remove')).toBe(false);
+    expect(await screen.findByText('leitura desligada')).toBeInTheDocument();
+  });
 });
