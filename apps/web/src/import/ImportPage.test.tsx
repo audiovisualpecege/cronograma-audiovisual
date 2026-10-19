@@ -81,7 +81,8 @@ function renderImport(remote: FakeRemote, createWorker: () => ReadWorker = inThr
 async function upload(user: ReturnType<typeof userEvent.setup>, name: string, bytes: Uint8Array, view?: ReturnType<typeof renderImport>) {
   // A cópia local termina a primeira leitura antes do arquivo chegar, como no aparelho.
   if (view) await waitFor(() => expect(view.engine.getState().lastSyncAt).not.toBeNull());
-  const file = new File([bytes.slice().buffer as ArrayBuffer], name);
+  // Cópia do tamanho exato: no Node 24 o Buffer do readFileSync fica num ArrayBuffer maior, e o resto vira lixo.
+  const file = new File([new Uint8Array(bytes).buffer], name);
   await user.upload(screen.getByTestId('arquivo'), file);
 }
 
