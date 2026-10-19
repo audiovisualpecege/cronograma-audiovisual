@@ -76,18 +76,18 @@ describe('PeoplePage', () => {
     expect(drawn).toBeLessThanOrEqual(MAX_RENDERED);
 
     await user.type(screen.getByLabelText(/^Buscar/), 'pessoa 150');
-    expect(screen.getByText('1 de 300 pessoas')).toBeInTheDocument();
-    expect(within(list).getByText('Pessoa 150')).toBeInTheDocument();
+    expect(await screen.findByText('1 de 300 pessoas')).toBeInTheDocument();
+    expect(await within(list).findByText('Pessoa 150')).toBeInTheDocument();
     await user.clear(screen.getByLabelText(/^Buscar/));
 
     // Setor e função seguem a mesma ordem: Técnica e Edição caem nas mesmas 100 pessoas; Técnica e Câmera, em nenhuma.
     await user.selectOptions(screen.getByLabelText(/^Setor/), 's-3');
-    expect(screen.getByText('100 de 300 pessoas')).toBeInTheDocument();
+    expect(await screen.findByText('100 de 300 pessoas')).toBeInTheDocument();
     await user.selectOptions(screen.getByLabelText(/^Função/), 'r-3');
-    expect(screen.getByText('100 de 300 pessoas')).toBeInTheDocument();
+    expect(await screen.findByText('100 de 300 pessoas')).toBeInTheDocument();
     await user.selectOptions(screen.getByLabelText(/^Função/), 'r-1');
-    expect(screen.getByText('0 de 300 pessoas')).toBeInTheDocument();
-    expect(screen.getByText('Nenhuma pessoa com esses filtros.')).toBeInTheDocument();
+    expect(await screen.findByText('0 de 300 pessoas')).toBeInTheDocument();
+    expect(await screen.findByText('Nenhuma pessoa com esses filtros.')).toBeInTheDocument();
   });
 
   it('cadastro novo sem limite grava 44 horas, exige função e entra na fila sem internet com convite pendente', async () => {
