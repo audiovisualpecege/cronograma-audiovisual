@@ -1671,8 +1671,19 @@ body {
   display: flex;
   align-items: flex-start;
   gap: var(--space-4);
+  padding: 20px;
+  border-radius: var(--radius-card);
   color: inherit;
   text-decoration: none;
+  transition: background-color 0.2s var(--ease-cine);
+}
+
+/* O cartão já sobe no hover; em vez de sublinhar o texto, ele fica num tom mais claro. */
+.week-card:hover,
+.week-card:focus-visible {
+  background-color: rgba(255, 255, 255, 0.06);
+  text-decoration: none;
+  outline: none;
 }
 
 /* Semana atual: moldura no gradiente da Chiaro com brilho, para saltar aos olhos. */

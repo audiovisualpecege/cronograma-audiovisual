@@ -71,7 +71,8 @@ function cardDetail(c: WeekCard): string {
 function WeekCardView({ card, label, current }: { card: WeekCard; label: string; current: boolean }) {
   const state = STATE[card.state];
   return (
-    <Card variant="raised" padding={20} interactive>
+    // O link ocupa o cartão todo (padding 0 no Card): o tom mais claro do hover cobre o cartão inteiro.
+    <Card variant="raised" padding={0} interactive>
       <a
         className={`week-card${current ? ' week-card--current' : ''}`}
         href={`#/semana/${card.weekStart}`}
