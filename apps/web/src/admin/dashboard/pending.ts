@@ -68,6 +68,7 @@ export function weekCards(input: PendingInput, starts: readonly string[]): WeekC
 
 export interface AgendaNotice {
   key: string;
+  kind: 'new' | 'changed' | 'cancelled' | 'restored';
   text: string;
   /** Quando a mudança chegou (updated_at do evento). */
   at: string;
@@ -102,6 +103,7 @@ export function agendaNotices(events: readonly EventRow[], starts: readonly stri
     .slice(0, limit)
     .map((e) => ({
       key: e.id,
+      kind: e.status === 'cancelled' ? ('cancelled' as const) : e.status === 'changed' ? ('changed' as const) : e.restored ? ('restored' as const) : ('new' as const),
       text: `${e.title || 'Sem título'} (${dayMonth(localDate(new Date(e.starts_at)))}): ${changeText(e)}`,
       at: e.updated_at,
       link: `/evento/${e.id}`,

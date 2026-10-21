@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithSync } from '../../test/helpers';
 import { eventRow, NOW, slotWith, WEEK_B, weekRemote } from '../../test/weekFixtures';
+import { RemoteError } from '../supabase';
 import { ProposalPage } from './ProposalPage';
 
 beforeEach(() => {
@@ -44,6 +45,29 @@ describe('ProposalPage: passo 1, tipos de serviço', () => {
     await user.click(await screen.findByRole('button', { name: 'Usar a sugestão do histórico' }));
     await waitFor(() => expect(ops(remote).find((o) => o.kind === 'event.update_extras')).toMatchObject({ payload: { id: 'ex', service_type_id: 't2' } }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Próximo passo' })).toBeEnabled());
+  });
+
+  it('ao chegar, identifica pela palavra-chave na hora e pede ao serviço de fundo os que sobraram', async () => {
+    const porPalavra = eventRow('ek', { title: 'Revisão aula extra', service_type_id: null, type_certainty: 'baixa', type_source: null });
+    const semPista = eventRow('ex', { title: 'Xpto especial', service_type_id: null, type_certainty: 'baixa', type_source: null });
+    const remote = weekRemote({ events: [porPalavra, semPista] });
+    remote.rpcHandler = (fn) => (fn === 'request_job' ? { job_id: 'job-c' } : {});
+    await page(remote);
+    await waitFor(() => expect(ops(remote).find((o) => o.kind === 'event.update_extras')).toMatchObject({ payload: { id: 'ek', service_type_id: 't1' } }));
+    await waitFor(() => expect(remote.rpcCalls).toContainEqual({ fn: 'request_job', args: { kind: 'classify', payload: {} } }));
+    expect(await screen.findByText(/1 evento identificado pelas palavras-chave/)).toBeInTheDocument();
+  });
+
+  it('servidor sem a liberação do pedido mostra o aviso e deixa escolher à mão', async () => {
+    const semPista = eventRow('ex', { title: 'Xpto especial', service_type_id: null, type_certainty: 'baixa', type_source: null });
+    const remote = weekRemote({ events: [semPista] });
+    remote.rpcHandler = (fn) => {
+      if (fn === 'request_job') throw new RemoteError('forbidden', 'Este pedido não pode ser feito pelo aparelho.');
+      return {};
+    };
+    await page(remote);
+    expect(await screen.findByRole('alert')).toHaveTextContent('ainda não foi liberada no servidor');
+    expect(screen.getByRole('button', { name: 'Trocar o tipo de Xpto especial' })).toBeInTheDocument();
   });
 
   it('semana sem montagem é montada ao seguir para o passo 2', async () => {

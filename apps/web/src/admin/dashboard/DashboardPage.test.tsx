@@ -58,7 +58,9 @@ describe('DashboardPage', () => {
       'Próxima semana: semana de 26/10, em montagem',
       'Daqui a 2 semanas: semana de 02/11, sem montagem',
     ]));
+    expect(within(cards).getByRole('link', { name: /semana de 19\/10/ })).toHaveAttribute('aria-current', 'date');
     const next = within(cards).getByRole('link', { name: /semana de 26\/10/ });
+    expect(next).not.toHaveAttribute('aria-current');
     expect(next).toHaveAttribute('href', '#/semana/2026-10-26');
     await waitFor(() => expect(next).toHaveTextContent('1 evento, 1 vaga sem escala, 1 proposta para revisar'));
   });
@@ -78,6 +80,9 @@ describe('DashboardPage', () => {
       'Podcast (26/10): cancelado na agenda',
       'Gravação aula Biologia (26/10): mudou o local e o horário na agenda',
     ]));
+    const [cancelled, changed] = within(notices).getAllByRole('listitem');
+    expect(cancelled).toHaveClass('notice--cancelled');
+    expect(changed).toHaveClass('notice--changed');
     const pending = screen.getByRole('list', { name: 'Pendências' });
     expect(notices.compareDocumentPosition(pending) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });

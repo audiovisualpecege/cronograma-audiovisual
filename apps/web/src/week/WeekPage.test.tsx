@@ -64,6 +64,8 @@ describe('WeekPage: escala manual', () => {
     expect(within(nav).getByRole('heading', { level: 1 })).toHaveTextContent('SEMANA DE 26/10');
     expect(nav).toHaveTextContent('Semana de 19/10');
     expect(nav).toHaveTextContent('Semana de 02/11');
+    // Hoje é 21/10: a semana de 26/10 é a próxima.
+    expect(nav).toHaveTextContent('Próxima semana');
     await user.click(within(nav).getByRole('button', { name: 'Próxima semana' }));
     expect(window.location.hash).toBe('#/semana/2026-11-02');
     await user.click(within(nav).getByRole('button', { name: 'Semana anterior' }));
@@ -75,6 +77,7 @@ describe('WeekPage: escala manual', () => {
     expect(await screen.findByText('Em montagem: a equipe ainda não vê esta semana.')).toBeInTheDocument();
     for (const name of ['Nova atividade interna', 'Publicar', 'Propor escala']) expect(screen.getByRole('button', { name })).toBeInTheDocument();
     expect(screen.getByRole('list', { name: 'Pessoas disponíveis por função' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Folga e férias' })).toBeInTheDocument();
     expect(await screen.findByRole('article', { name: 'Gravação aula Biologia' })).toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: 'Grade por pessoa' })).toBeNull();
     expect(screen.queryByRole('list', { name: 'Carga por pessoa' })).toBeNull();

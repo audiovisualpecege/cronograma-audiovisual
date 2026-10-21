@@ -4,8 +4,10 @@ import {
   addDays,
   availableHours,
   daysOf,
+  diffDays,
   localDate,
   localTime,
+  nameTokens,
   type AbsenceLike,
   type AssignmentLike,
   type EventLike,
@@ -188,6 +190,82 @@ export function availabilityByRole(rows: WeekRows, facts: readonly Pick<HistoryF
   return [...count]
     .map(([jobRoleId, people]) => ({ jobRoleId, name: roles.get(jobRoleId)?.name ?? 'Função', people }))
     .sort((a, b) => b.people - a.people || a.name.localeCompare(b.name, 'pt-BR'));
+}
+
+/** "Semana atual", "Próxima semana", "Semana passada", "Daqui a 3 semanas", "Há 2 semanas". */
+export function relativeWeekLabel(weekStart: string, currentWeek: string): string {
+  const n = Math.round(diffDays(currentWeek, weekStart) / 7);
+  if (n === 0) return 'Semana atual';
+  if (n === 1) return 'Próxima semana';
+  if (n === -1) return 'Semana passada';
+  return n > 1 ? `Daqui a ${n} semanas` : `Há ${-n} semanas`;
+}
+
+export interface TimeOff {
+  key: string;
+  personId: string | null;
+  /** Nome da pessoa; sem pessoa reconhecida, o título do evento da agenda. */
+  name: string;
+  kind: 'ferias' | 'folga' | 'ausencia';
+  from: string;
+  to: string;
+  /** Título do evento, quando veio da agenda. */
+  agendaTitle: string | null;
+}
+
+const TIME_OFF_WORD: [RegExp, TimeOff['kind']][] = [
+  [/\bferias\b/, 'ferias'],
+  [/\bfolgas?\b/, 'folga'],
+  [/\b(ausente|ausencia)\b/, 'ausencia'],
+];
+
+/** Pessoa ativa citada no título: o primeiro nome basta quando é único; senão, precisa de mais um nome. */
+function personInTitle(title: string, people: readonly PersonRow[]): PersonRow | null {
+  const words = new Set(nameTokens(title));
+  const active = people.filter((p) => p.active);
+  const first = (p: PersonRow) => nameTokens(p.name)[0] ?? '';
+  const hits = active.filter((p) => {
+    const tokens = nameTokens(p.name);
+    if (!words.has(first(p))) return false;
+    const sameFirst = active.filter((o) => first(o) === first(p)).length;
+    return sameFirst === 1 || tokens.slice(1).some((t) => t.length > 2 && words.has(t));
+  });
+  return hits.length === 1 ? (hits[0] ?? null) : null;
+}
+
+/**
+ * Quem está de folga, férias ou ausente na semana: as ausências cadastradas e os eventos da agenda com
+ * "férias", "folga" ou "ausente" no título (com a pessoa reconhecida pelo nome, quando dá).
+ */
+export function weekTimeOff(rows: WeekRows): TimeOff[] {
+  const ws = rows.weekStart;
+  const we = addDays(ws, 6);
+  const clip = (start: string, end: string) => {
+    const from = localDate(new Date(start));
+    const to = localDate(new Date(Math.max(Date.parse(start), Date.parse(end) - 1)));
+    return { from: from < ws ? ws : from, to: to > we ? we : to, inWeek: from <= we && to >= ws };
+  };
+  const names = new Map(rows.people.map((p) => [p.id, p.name]));
+  const out: TimeOff[] = [];
+  for (const a of rows.absences) {
+    if (a.archived_at) continue;
+    const span = clip(a.starts_at, a.ends_at);
+    if (!span.inWeek) continue;
+    out.push({ key: `a:${a.id}`, personId: a.person_id, name: names.get(a.person_id) ?? 'Pessoa', kind: a.kind, from: span.from, to: span.to, agendaTitle: null });
+  }
+  for (const e of rows.events) {
+    if (e.ignored || e.status === 'cancelled') continue;
+    const title = nameTokens(e.title).join(' ');
+    const kind = TIME_OFF_WORD.find(([re]) => re.test(title))?.[1];
+    if (!kind) continue;
+    const span = clip(e.starts_at, e.ends_at);
+    if (!span.inWeek) continue;
+    const person = personInTitle(e.title, rows.people);
+    // A mesma folga cadastrada e na agenda aparece uma vez só.
+    if (person && out.some((o) => o.personId === person.id && o.kind === kind && o.from <= span.to && span.from <= o.to)) continue;
+    out.push({ key: `e:${e.id}`, personId: person?.id ?? null, name: person?.name ?? e.title, kind, from: span.from, to: span.to, agendaTitle: e.title });
+  }
+  return out.sort((a, b) => a.from.localeCompare(b.from) || a.name.localeCompare(b.name, 'pt-BR'));
 }
 
 /** Eventos de cada dia da semana; evento de vários dias aparece em cada dia que ocupa (US-010 EC-4). */

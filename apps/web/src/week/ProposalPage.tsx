@@ -4,7 +4,7 @@ import { useTable, type CalendarSourceRow, type HistoryFactRow, type ServiceType
 import { useHistory } from '../data/history';
 import { PageTitle } from '../layout/PageTitle';
 import { navigate, type RouteProps } from '../router';
-import { useSettings } from '../settings/jobs';
+import { isFinished, useSettings } from '../settings/jobs';
 import { useSyncEngine, useSyncState } from '../sync/SyncProvider';
 import { OnlineButton } from '../sync/OnlineButton';
 import { Button, Card } from '../ui/chiaro';
@@ -14,6 +14,7 @@ import { changeType, NO_EVENTS, PreviewList, SourceAlerts } from './PreviewPage'
 import { AI_OFF, isRunning, ProposalActions, ProposalMessage, useProposalRequest } from './ProposalBar';
 import { ScheduleEditor, useSchedule } from './ScheduleEditor';
 import { routeWeek } from './WeekPage';
+import { useIdentifyTypes } from './useIdentifyTypes';
 import { buildWeek, useBuildPending, useNow, useWeekRows } from './useWeek';
 
 const plural = (n: number, one: string, many: string) => (n === 1 ? `1 ${one}` : `${n} ${many}`);
@@ -106,6 +107,12 @@ function TypesStep({ rows, sources, today, now, historyRows, onNext }: TypesProp
   const live = rows.events.filter((e) => !e.ignored && e.status !== 'cancelled');
   const missing = live.filter((e) => !e.service_type_id);
   const suggestions = typeSuggestions(rows, historyRows);
+  const id = useIdentifyTypes(rows, !past);
+  const notes: string[] = [];
+  if (id.byKeyword) notes.push(`${plural(id.byKeyword, 'evento identificado', 'eventos identificados')} pelas palavras-chave.`);
+  if (id.job && !isFinished(id.job)) notes.push('Identificando os outros pelo histórico e pela IA.');
+  if (id.job?.status === 'done' && id.classified !== null) notes.push(`O histórico e a IA identificaram mais ${plural(id.classified, 'evento', 'eventos')}.`);
+  if (id.job?.status === 'failed') notes.push(id.job.error ?? 'A identificação pela IA falhou.');
 
   if (live.length === 0) {
     return (
@@ -126,6 +133,11 @@ function TypesStep({ rows, sources, today, now, historyRows, onNext }: TypesProp
               : `${live.length - missing.length} de ${live.length} eventos com tipo. ${plural(missing.length, 'evento sem tipo está', 'eventos sem tipo estão')} em destaque: escolha o tipo para seguir.`}
           </p>
           <span className="week-actions-buttons">
+            {!past && missing.length > 0 && (
+              <OnlineButton variant="ghost" size="sm" disabled={id.running} onClick={() => void id.identify()}>
+                {id.running ? 'Identificando' : 'Identificar de novo'}
+              </OnlineButton>
+            )}
             {!past && suggestions.size > 0 && (
               <Button variant="secondary" size="sm" onClick={() => rows.events.forEach((e) => suggestions.has(e.id) && void changeType(engine, e, suggestions.get(e.id)?.id ?? null))}>
                 {suggestions.size === 1 ? 'Usar a sugestão do histórico' : `Usar as ${suggestions.size} sugestões do histórico`}
@@ -136,6 +148,16 @@ function TypesStep({ rows, sources, today, now, historyRows, onNext }: TypesProp
             </Button>
           </span>
         </div>
+        {notes.length > 0 && (
+          <p className="form-text identify-note" aria-live="polite">
+            {notes.join(' ')}
+          </p>
+        )}
+        {id.error && (
+          <p className="form-message form-message--alert" role="alert">
+            {id.error}
+          </p>
+        )}
       </Card>
       <PreviewList rows={rows} sources={sources} today={today} readOnly={past} highlight suggestions={suggestions} />
     </>
@@ -157,12 +179,12 @@ function PeopleStep({ rows, now, today, historyRows, onBack }: PeopleProps) {
   const building = useBuildPending(rows.weekStart);
   const buildAsked = useRef(false);
 
-  // Semana sem montagem: monta primeiro, para os eventos ganharem as vagas pelos tipos.
+  // Monta a semana (ou completa as vagas dos eventos que ganharam tipo depois da montagem) antes de propor.
   useEffect(() => {
-    if (rows.week || buildAsked.current) return;
+    if (buildAsked.current) return;
     buildAsked.current = true;
     void buildWeek(engine, rows.weekStart);
-  }, [rows.week, engine, rows.weekStart]);
+  }, [engine, rows.weekStart]);
 
   if (!rows.week || !settings) {
     return (

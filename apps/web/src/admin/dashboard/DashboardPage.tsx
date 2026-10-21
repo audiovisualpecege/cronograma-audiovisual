@@ -1,5 +1,13 @@
 import { addDays, localDate, weekStartOf } from '@cronograma/core';
-import { CalendarIcon, CheckCircleIcon, PenNewSquareIcon } from '@solar-icons/react/bold-duotone';
+import {
+  AddCircleIcon,
+  CalendarIcon,
+  CheckCircleIcon,
+  CloseCircleIcon,
+  PenNewSquareIcon,
+  RefreshCircleIcon,
+  RestartIcon,
+} from '@solar-icons/react/bold-duotone';
 import { DangerTriangleIcon } from '@solar-icons/react/linear';
 import { useMemo } from 'react';
 import {
@@ -36,6 +44,13 @@ const KIND_LABEL = {
 
 const WEEK_LABEL = ['Esta semana', 'Próxima semana', 'Daqui a 2 semanas'];
 
+const NOTICE_ICON = {
+  new: AddCircleIcon,
+  changed: RefreshCircleIcon,
+  cancelled: CloseCircleIcon,
+  restored: RestartIcon,
+} as const;
+
 const STATE = {
   published: { label: 'Publicada', tone: 'success', icon: CheckCircleIcon },
   building: { label: 'Em montagem', tone: 'brand', icon: PenNewSquareIcon },
@@ -53,13 +68,18 @@ function cardDetail(c: WeekCard): string {
   return parts.join(', ');
 }
 
-function WeekCardView({ card, label }: { card: WeekCard; label: string }) {
+function WeekCardView({ card, label, current }: { card: WeekCard; label: string; current: boolean }) {
   const state = STATE[card.state];
   return (
     <Card variant="raised" padding={20} interactive>
-      <a className="week-card" href={`#/semana/${card.weekStart}`} aria-label={`${label}: semana de ${dayMonth(card.weekStart)}, ${state.label.toLowerCase()}`}>
+      <a
+        className={`week-card${current ? ' week-card--current' : ''}`}
+        href={`#/semana/${card.weekStart}`}
+        aria-label={`${label}: semana de ${dayMonth(card.weekStart)}, ${state.label.toLowerCase()}`}
+        aria-current={current ? 'date' : undefined}
+      >
         <span className={`week-card-icon week-card-icon--${card.state}`}>
-          <AppIcon icon={state.icon} size={28} />
+          <AppIcon icon={state.icon} size={32} />
         </span>
         <span className="week-card-body">
           <span className="week-card-label">{label}</span>
@@ -119,8 +139,8 @@ export function DashboardPage() {
       <SourceAlerts sources={sources} />
       <div className="dashboard-weeks" aria-label="Próximas semanas" role="list">
         {cards.map((c, i) => (
-          <div key={c.weekStart} role="listitem">
-            <WeekCardView card={c} label={WEEK_LABEL[i] ?? ''} />
+          <div key={c.weekStart} role="listitem" className={i === 0 ? 'week-card-slot week-card-slot--current' : 'week-card-slot'}>
+            <WeekCardView card={c} label={WEEK_LABEL[i] ?? ''} current={i === 0} />
           </div>
         ))}
       </div>
@@ -134,10 +154,13 @@ export function DashboardPage() {
           ) : notices.length === 0 ? (
             <p className="form-text">Nenhuma mudança da agenda nas próximas 3 semanas.</p>
           ) : (
-            <ul className="plain-list pending-list" aria-label="Avisos da agenda">
+            <ul className="plain-list notice-list" aria-label="Avisos da agenda">
               {notices.map((n) => (
-                <li key={n.key} className="pending-item">
-                  <a className="text-link" href={`#${n.link}`}>
+                <li key={n.key} className={`notice notice--${n.kind}`}>
+                  <span className="notice-icon">
+                    <AppIcon icon={NOTICE_ICON[n.kind]} size={22} />
+                  </span>
+                  <a className="notice-text" href={`#${n.link}`}>
                     {n.text}
                   </a>
                   <span className="notice-time">{formatStamp(n.at)}</span>

@@ -1,4 +1,5 @@
 import { addDays, isWeekPast, localDate, weekStartOf } from '@cronograma/core';
+import { ClockCircleIcon, SuitcaseIcon, SunIcon } from '@solar-icons/react/bold-duotone';
 import { AltArrowLeftIcon, AltArrowRightIcon } from '@solar-icons/react/linear';
 import { useMemo, useState } from 'react';
 import { useTable, type CalendarSourceRow, type HistoryFactRow } from '../data/catalog';
@@ -7,12 +8,14 @@ import { navigate, type RouteProps } from '../router';
 import { useSettings } from '../settings/jobs';
 import { useSyncEngine, useSyncState } from '../sync/SyncProvider';
 import { OnlineButton } from '../sync/OnlineButton';
+import { AppIcon } from '../ui/AppIcon';
 import { Badge, Button, Card } from '../ui/chiaro';
 import { formatStamp } from '../ui/format';
 import { IconButton } from '../ui/IconButton';
 import { Toast } from '../ui/Toast';
 import { InternalEventForm } from '../event/InternalEventForm';
-import { availabilityByRole, dayMonth, publishSummary, unpublishedChanges, type WeekRows } from './model';
+import { availabilityByRole, dayMonth, publishSummary, relativeWeekLabel, unpublishedChanges, weekTimeOff, type TimeOff, type WeekRows } from './model';
+import { roleIcon } from './roleIcon';
 import { NO_EVENTS, PreviewList, SourceAlerts } from './PreviewPage';
 import { ProposalBar } from './ProposalBar';
 import { PublishDialog } from './PublishDialog';
@@ -34,21 +37,34 @@ export function stateLabel(rows: WeekRows): string {
   return rows.week.state === 'published' ? 'Publicada' : 'Em montagem';
 }
 
-/** "< Semana de 19/10 >" no centro, com a anterior e a seguinte esmaecidas dos lados. */
-export function WeekSwitcher({ weekStart, base = '/semana' }: { weekStart: string; base?: string }) {
+// Lado da última troca pelas setas: a semana nova entra deslizando por ele. Fora das setas (link, rota
+// digitada), entra só com o esmaecer.
+let slideFrom: 'next' | 'prev' | null = null;
+
+function go(base: string, weekStart: string, dir: 'next' | 'prev') {
+  slideFrom = dir;
+  navigate(`${base}/${weekStart}`);
+}
+
+/** "< Semana de 19/10 >" no centro, com a anterior e a seguinte esmaecidas dos lados e "Semana atual" embaixo. */
+export function WeekSwitcher({ weekStart, currentWeek, base = '/semana' }: { weekStart: string; currentWeek: string; base?: string }) {
   const prev = addDays(weekStart, -7);
   const next = addDays(weekStart, 7);
+  const relative = relativeWeekLabel(weekStart, currentWeek);
   return (
     <nav className="week-switcher" aria-label="Trocar de semana">
-      <button type="button" className="week-switcher-side" onClick={() => navigate(`${base}/${prev}`)} tabIndex={-1} aria-hidden="true">
+      <button type="button" className="week-switcher-side" onClick={() => go(base, prev, 'prev')} tabIndex={-1} aria-hidden="true">
         Semana de {dayMonth(prev)}
       </button>
-      <IconButton icon={AltArrowLeftIcon} label="Semana anterior" onClick={() => navigate(`${base}/${prev}`)} />
-      <h1 className="screen-title page-title week-switcher-title">
-        <span className="screen-title-light">SEMANA DE</span> <span className="screen-title-black">{dayMonth(weekStart)}</span>
-      </h1>
-      <IconButton icon={AltArrowRightIcon} label="Próxima semana" onClick={() => navigate(`${base}/${next}`)} />
-      <button type="button" className="week-switcher-side" onClick={() => navigate(`${base}/${next}`)} tabIndex={-1} aria-hidden="true">
+      <IconButton icon={AltArrowLeftIcon} label="Semana anterior" onClick={() => go(base, prev, 'prev')} />
+      <span key={weekStart} className={`week-switcher-center week-slide week-slide--${slideFrom ?? 'fade'}`}>
+        <h1 className="screen-title page-title week-switcher-title">
+          <span className="screen-title-light">SEMANA DE</span> <span className="screen-title-black">{dayMonth(weekStart)}</span>
+        </h1>
+        <span className={`week-relative${weekStart === currentWeek ? ' is-current' : ''}`}>{relative}</span>
+      </span>
+      <IconButton icon={AltArrowRightIcon} label="Próxima semana" onClick={() => go(base, next, 'next')} />
+      <button type="button" className="week-switcher-side" onClick={() => go(base, next, 'next')} tabIndex={-1} aria-hidden="true">
         Semana de {dayMonth(next)}
       </button>
     </nav>
@@ -67,16 +83,18 @@ export function WeekPage({ params }: RouteProps) {
   return (
     <section className="page week-page">
       <div className="week-head">
-        <WeekSwitcher weekStart={weekStart} />
+        <WeekSwitcher weekStart={weekStart} currentWeek={weekStartOf(today)} />
         <RereadButton />
       </div>
-      {!rows ? (
-        <p className="form-text">Abrindo a semana.</p>
-      ) : rows.events.length === 0 && !rows.week && !lastSyncAt ? (
-        <p className="form-text">Buscando os eventos da semana.</p>
-      ) : (
-        <WeekBody rows={rows} sources={sources} now={now} today={today} />
-      )}
+      <div key={weekStart} className={`week-slide week-slide--${slideFrom ?? 'fade'}`}>
+        {!rows ? (
+          <p className="form-text">Abrindo a semana.</p>
+        ) : rows.events.length === 0 && !rows.week && !lastSyncAt ? (
+          <p className="form-text">Buscando os eventos da semana.</p>
+        ) : (
+          <WeekBody rows={rows} sources={sources} now={now} today={today} />
+        )}
+      </div>
     </section>
   );
 }
@@ -194,6 +212,9 @@ export function AvailabilityPanel({ rows, historyRows }: { rows: WeekRows; histo
           <ul className="plain-list availability-list" aria-label="Pessoas disponíveis por função">
             {items.map((it) => (
               <li key={it.jobRoleId} className="availability-item" aria-label={it.name}>
+                <span className="availability-icon">
+                  <AppIcon icon={roleIcon(it.name)} size={26} />
+                </span>
                 <span className="availability-count">{it.people}</span>
                 <span className="availability-role">{it.name}</span>
               </li>
@@ -203,6 +224,52 @@ export function AvailabilityPanel({ rows, historyRows }: { rows: WeekRows; histo
         <p className="page-note" style={{ marginBottom: 0 }}>
           Quem tem mais de uma função conta na que mais fez. Ausências da semana já descontadas.
         </p>
+      </section>
+    </Card>
+  );
+}
+
+const TIME_OFF = {
+  ferias: { label: 'Férias', icon: SuitcaseIcon },
+  folga: { label: 'Folga', icon: SunIcon },
+  ausencia: { label: 'Ausência', icon: ClockCircleIcon },
+} as const;
+
+function spanText(t: TimeOff): string {
+  return t.from === t.to ? dayMonth(t.from) : `${dayMonth(t.from)} a ${dayMonth(t.to)}`;
+}
+
+/** Quem está de folga, férias ou ausente na semana, pelas ausências cadastradas e pela agenda. */
+export function TimeOffPanel({ rows }: { rows: WeekRows }) {
+  const items = useMemo(() => weekTimeOff(rows), [rows]);
+  return (
+    <Card variant="raised" padding={20}>
+      <section aria-labelledby="folgas-title">
+        <h2 id="folgas-title" className="section-title">
+          Folga e férias
+        </h2>
+        {items.length === 0 ? (
+          <p className="form-text" style={{ margin: 0 }}>
+            Ninguém de folga ou férias nesta semana.
+          </p>
+        ) : (
+          <ul className="plain-list timeoff-list" aria-label="Folga e férias">
+            {items.map((t) => (
+              <li key={t.key} className={`timeoff-item timeoff-item--${t.kind}`} aria-label={t.name}>
+                <span className="timeoff-icon">
+                  <AppIcon icon={TIME_OFF[t.kind].icon} size={22} />
+                </span>
+                <span className="list-row-main">
+                  <span className="list-row-title">{t.name}</span>
+                  <span className="list-row-sub">
+                    {TIME_OFF[t.kind].label}, {spanText(t)}
+                    {t.agendaTitle && t.personId ? `. Na agenda: ${t.agendaTitle}` : t.agendaTitle ? '. Pela agenda' : ''}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
     </Card>
   );
@@ -219,6 +286,7 @@ function UnbuiltWeek({ rows, sources, today, past, historyRows }: PartProps & { 
   return (
     <>
       <AvailabilityPanel rows={rows} historyRows={historyRows} />
+      <TimeOffPanel rows={rows} />
       {live.length === 0 ? (
         <Card variant="raised" padding={24}>
           <p className="form-text" style={{ margin: 0 }}>
@@ -239,6 +307,7 @@ function BuiltWeek({ rows, now, today, settings, historyRows }: PartProps & { no
     <>
       <ProposalBar week={week} settings={settings} proposed={schedule.proposed} readOnly={schedule.readOnly} />
       <AvailabilityPanel rows={rows} historyRows={historyRows} />
+      <TimeOffPanel rows={rows} />
       <ScheduleEditor schedule={schedule} today={today} />
     </>
   );

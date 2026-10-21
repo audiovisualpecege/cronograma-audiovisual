@@ -998,38 +998,157 @@ body {
   margin: 0;
 }
 
+/* Pessoas disponíveis por função: um cartão por função, com ícone e o número em destaque. */
 .availability-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space-3);
   margin-top: 0;
 }
 
 .availability-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas: 'icon count' 'role role';
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  transition: border-color 0.2s var(--ease-cine), transform 0.2s var(--ease-cine);
+}
+
+.availability-item:hover {
+  border-color: var(--border-brand);
+  transform: translateY(-2px);
+}
+
+.availability-icon {
+  grid-area: icon;
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-2);
+  justify-content: center;
+  width: 44px;
+  height: 44px;
   border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--chiaro-lavanda);
+}
+
+.availability-count {
+  grid-area: count;
+  justify-self: end;
+  font: var(--weight-black) 30px/1 var(--font-display);
+  background: var(--gradient-chiaro);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.availability-role {
+  grid-area: role;
+  color: var(--text-secondary);
+  font: var(--weight-bold) var(--text-caption) var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+}
+
+/* Folga e férias da semana. */
+.timeoff-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-2);
+  margin-top: 0;
+}
+
+.timeoff-item {
+  --timeoff-color: var(--chiaro-lavanda);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-card);
   background: var(--surface-raised);
   border: 1px solid var(--border-subtle);
 }
 
-.availability-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 32px;
-  height: 32px;
-  padding: 0 var(--space-2);
-  border-radius: var(--radius-pill);
-  background: var(--gradient-chiaro);
-  color: var(--text-on-brand, #fff);
-  font: var(--weight-black) var(--text-body) var(--font-display);
+.timeoff-item--ferias {
+  --timeoff-color: var(--chiaro-pessego);
 }
 
-.availability-role {
-  font-weight: var(--weight-medium);
+.timeoff-item--folga {
+  --timeoff-color: var(--chiaro-areia);
+}
+
+.timeoff-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--timeoff-color) 18%, transparent);
+  color: var(--timeoff-color);
+}
+
+/* Centro do seletor de semana: título e "Semana atual" embaixo. */
+.week-switcher-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.week-relative {
+  color: var(--text-muted);
+  font: var(--weight-bold) var(--text-caption) var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+}
+
+.week-relative.is-current {
+  color: var(--chiaro-pessego);
+}
+
+/* Troca de semana: a nova entra deslizando pelo lado da seta clicada. */
+.week-slide {
+  animation: week-fade 0.28s var(--ease-cine) both;
+}
+
+.week-slide--next {
+  animation-name: week-from-right;
+}
+
+.week-slide--prev {
+  animation-name: week-from-left;
+}
+
+@keyframes week-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes week-from-right {
+  from {
+    opacity: 0;
+    transform: translateX(32px);
+  }
+}
+
+@keyframes week-from-left {
+  from {
+    opacity: 0;
+    transform: translateX(-32px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .week-slide {
+    animation: none;
+  }
 }
 
 .is-missing.preview-event,
@@ -1348,26 +1467,97 @@ body {
   text-decoration: none;
 }
 
+/* Semana atual: moldura no gradiente da Chiaro com brilho, para saltar aos olhos. */
+.week-card-slot--current {
+  padding: 2px;
+  border-radius: calc(var(--radius-card) + 2px);
+  background: var(--gradient-chiaro);
+  box-shadow: var(--shadow-glow);
+}
+
+.week-card--current .week-card-label {
+  color: var(--chiaro-pessego);
+}
+
 .week-card-icon {
   display: inline-flex;
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 52px;
-  height: 52px;
+  width: 56px;
+  height: 56px;
   border-radius: var(--radius-pill);
-  background: var(--surface-raised);
-  color: var(--text-muted);
+}
+
+.week-card-icon--unbuilt {
+  background: rgba(247, 225, 196, 0.14);
+  color: var(--chiaro-areia);
 }
 
 .week-card-icon--building {
-  background: var(--accent-soft);
-  color: var(--text-brand);
+  background: rgba(250, 206, 149, 0.18);
+  color: var(--chiaro-pessego);
 }
 
 .week-card-icon--published {
-  background: var(--gradient-chiaro);
-  color: #fff;
+  background: rgba(46, 155, 107, 0.2);
+  color: var(--success);
+}
+
+/* Avisos da agenda: cor e ícone por tipo de mudança. */
+.notice-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: 0;
+}
+
+.notice {
+  --notice-color: var(--chiaro-lavanda);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-subtle);
+  border-left: 4px solid var(--notice-color);
+  background: var(--surface-card);
+}
+
+.notice--new {
+  --notice-color: var(--success);
+}
+
+.notice--changed {
+  --notice-color: var(--warning);
+}
+
+.notice--cancelled {
+  --notice-color: var(--danger);
+}
+
+.notice-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--notice-color) 18%, transparent);
+  color: var(--notice-color);
+}
+
+.notice-text {
+  flex: 1;
+  min-width: 200px;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.notice-text:hover {
+  color: var(--text-brand);
 }
 
 .week-card-body {
