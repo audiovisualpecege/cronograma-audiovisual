@@ -131,14 +131,41 @@ begin
 end;
 $$;
 
+-- ---------------------------------------------------------------------------------------------
+-- Dados. Tudo o que muda abaixo fica antes numa cópia (public._backup_0013), que o desfazer
+-- (supabase/rollback/0013_down.sql) usa para voltar exatamente ao que era. A tabela fica fechada pela RLS,
+-- sem política: ninguém lê pela API. Pode ser apagada quando a 1.1.0 estiver firme.
+
+create table public._backup_0013 (
+  kind text not null,  -- service_type | crew | created_type | event_type | event_outdated
+  ref uuid not null,
+  data jsonb,
+  saved_at timestamptz not null default now()
+);
+alter table public._backup_0013 enable row level security;
+revoke all on public._backup_0013 from anon, authenticated;
+
+insert into public._backup_0013 (kind, ref, data)
+select 'service_type', t.id, to_jsonb(t) from public.service_types t
+where public.norm_name(t.name) in ('nao escalar', 'disponibilizar');
+
+insert into public._backup_0013 (kind, ref, data)
+select 'crew', c.service_type_id, to_jsonb(c) from public.service_type_crew c
+join public.service_types t on t.id = c.service_type_id
+where public.norm_name(t.name) = 'disponibilizar' and c.archived_at is null;
+
 -- Férias e Folga, sem equipe. Só cria quando ainda não há tipo com o mesmo nome.
-insert into public.service_types (name, keywords, no_team, icon)
-select v.name, v.keywords, true, v.icon
-from (values
-  ('FERIAS', array['ferias'], 'ferias'),
-  ('FOLGA', array['folga', 'folgas', 'day off'], 'folga')
-) as v (name, keywords, icon)
-where not exists (select 1 from public.service_types t where public.norm_name(t.name) = public.norm_name(v.name));
+with created as (
+  insert into public.service_types (name, keywords, no_team, icon)
+  select v.name, v.keywords, true, v.icon
+  from (values
+    ('FERIAS', array['ferias'], 'ferias'),
+    ('FOLGA', array['folga', 'folgas', 'day off'], 'folga')
+  ) as v (name, keywords, icon)
+  where not exists (select 1 from public.service_types t where public.norm_name(t.name) = public.norm_name(v.name))
+  returning id
+)
+insert into public._backup_0013 (kind, ref) select 'created_type', id from created;
 
 -- As palavras saem do NAO ESCALAR, senão o título empata entre dois tipos e fica sem tipo.
 update public.service_types
@@ -151,6 +178,10 @@ do $$
 declare t uuid;
 begin
   for t in select id from public.service_types where public.norm_name(name) = 'disponibilizar' and not no_team loop
+    insert into public._backup_0013 (kind, ref)
+    select 'event_outdated', e.id from public.events e
+    where e.service_type_id = t and not e.crew_outdated and public.event_has_people(e.id)
+      and not public.is_week_past(e.week_start) and exists (select 1 from public.weeks w where w.week_start = e.week_start);
     update public.service_types set no_team = true, icon = coalesce(icon, 'enviar') where id = t;
     update public.service_type_crew set archived_at = now() where service_type_id = t and archived_at is null;
     perform public.apply_crew_change(t);
@@ -159,12 +190,21 @@ end;
 $$;
 
 -- Eventos de agora em diante que caíram no NAO ESCALAR por "férias" ou "folga" no título vão para o tipo novo.
-update public.events e
-set service_type_id = t.id, type_source = 'keyword', type_certainty = 'alta'
-from public.service_types t, public.service_types n
-where public.norm_name(n.name) = 'nao escalar' and e.service_type_id = n.id
-  and e.week_start >= public.monday_of(current_date)
-  and (
+with moved as (
+  select e.id, t.id as new_type,
+    jsonb_build_object('service_type_id', e.service_type_id, 'type_source', e.type_source, 'type_certainty', e.type_certainty) as old
+  from public.events e
+  join public.service_types n on n.id = e.service_type_id and public.norm_name(n.name) = 'nao escalar'
+  join public.service_types t on (
     (public.norm_name(t.name) = 'ferias' and public.norm_name(e.title) ~ '\mferias\M')
     or (public.norm_name(t.name) = 'folga' and public.norm_name(e.title) ~ '\mfolgas?\M' and public.norm_name(e.title) !~ '\mferias\M')
-  );
+  )
+  where e.week_start >= public.monday_of(current_date)
+),
+saved as (
+  insert into public._backup_0013 (kind, ref, data) select 'event_type', id, old from moved
+)
+update public.events e
+set service_type_id = m.new_type, type_source = 'keyword', type_certainty = 'alta'
+from moved m
+where e.id = m.id;
