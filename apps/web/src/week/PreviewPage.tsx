@@ -4,7 +4,6 @@ import type { SyncEngine } from '../sync/syncEngine';
 import { useSyncEngine, useSyncState } from '../sync/SyncProvider';
 import { formatStamp } from '../ui/format';
 import { Select } from '../ui/Select';
-import { PenIcon } from '@solar-icons/react/linear';
 import { HighlightToggle } from './HighlightToggle';
 import { AppIcon } from '../ui/AppIcon';
 import { typeIcon } from '../ui/typeIcons';
@@ -53,10 +52,13 @@ interface RowProps {
   onType: (e: EventRow, typeId: string | null) => void;
   /** Abre os detalhes numa janela, em vez de ir para a página do evento. */
   onOpen?: (e: EventRow) => void;
+  selected: boolean;
+  /** Botão direito marca ou desmarca o evento para definir o tipo em massa. */
+  onSelect?: (e: EventRow) => void;
 }
 
 /** Uma linha da prévia; memorizada para semanas com 100 eventos ou mais (US-010 EC-8). */
-const PreviewEvent = memo(function PreviewEvent({ event, types, crew, roles, sourceLabel, today, readOnly, pending, highlight, suggestion, onType, onOpen }: RowProps) {
+const PreviewEvent = memo(function PreviewEvent({ event, types, crew, roles, sourceLabel, today, readOnly, pending, highlight, suggestion, onType, onOpen, selected, onSelect }: RowProps) {
   const [editing, setEditing] = useState(false);
   // Funções na ordem do código (R1, R2...), como no cadastro do tipo.
   const code = (id: string) => roles.get(id)?.code ?? '';
@@ -72,8 +74,17 @@ const PreviewEvent = memo(function PreviewEvent({ event, types, crew, roles, sou
   const titleClass = `list-row-title${event.status === 'cancelled' ? ' is-cancelled' : ''}`;
   return (
     <li
-      className={`preview-event${missing ? ' is-missing' : ''}${marker ? ' is-marker' : ''}${event.highlighted ? ' is-highlighted' : ''}`}
+      className={`preview-event${missing ? ' is-missing' : ''}${marker ? ' is-marker' : ''}${event.highlighted ? ' is-highlighted' : ''}${selected ? ' is-selected' : ''}`}
       aria-label={event.title || 'Sem título'}
+      data-selected={selected || undefined}
+      onContextMenu={
+        onSelect && !readOnly && event.status !== 'cancelled'
+          ? (ev) => {
+              ev.preventDefault();
+              onSelect(event);
+            }
+          : undefined
+      }
     >
       <HighlightToggle event={event} readOnly={readOnly} />
       <span className="list-row-main">
@@ -125,7 +136,7 @@ const PreviewEvent = memo(function PreviewEvent({ event, types, crew, roles, sou
               {!readOnly && event.status !== 'cancelled' && (
                 // Botão simples, sem estado: a prévia tem 100 eventos ou mais (US-010 EC-8).
                 <button type="button" className="pen-button" onClick={() => setEditing(true)} aria-label={`Trocar o tipo de ${event.title || 'Sem título'}`} title="Trocar o tipo">
-                  <AppIcon icon={PenIcon} size={16} />
+                  <span className="mask-icon mask-icon--sm mask-pen" aria-hidden="true" />
                 </button>
               )}
             </span>
@@ -160,18 +171,22 @@ interface PreviewListProps {
   /** Tipo sugerido pelo histórico, por evento. */
   suggestions?: ReadonlyMap<string, ServiceTypeRow>;
   onOpenEvent?: (e: EventRow) => void;
+  /** Mostra só os eventos que passam no filtro (por exemplo, os sem tipo). */
+  filter?: (e: EventRow) => boolean;
+  selected?: ReadonlySet<string>;
+  onSelect?: (e: EventRow) => void;
 }
 
 /**
  * Eventos da semana sem montagem por dia (US-010): origem, tipo previsto, certeza e equipe estimada, com
  * a troca de tipo. Só eventos com tipo ganham vagas ao montar.
  */
-export function PreviewList({ rows, sources, today, readOnly, highlight = false, suggestions, onOpenEvent }: PreviewListProps) {
+export function PreviewList({ rows, sources, today, readOnly, highlight = false, suggestions, onOpenEvent, filter, selected, onSelect }: PreviewListProps) {
   const engine = useSyncEngine();
   const { pendingRows } = useSyncState();
   const roles = useMemo(() => new Map(rows.roles.map((r) => [r.id, r])), [rows.roles]);
   const sourceLabels = useMemo(() => new Map(sources.map((s) => [s.id, s.label])), [sources]);
-  const visible = useMemo(() => rows.events.filter((e) => !e.ignored), [rows.events]);
+  const visible = useMemo(() => rows.events.filter((e) => !e.ignored && (!filter || filter(e))), [rows.events, filter]);
   const byDay = useMemo(() => eventsByDay(rows.weekStart, visible), [rows.weekStart, visible]);
   const onType = useMemo(() => (e: EventRow, typeId: string | null) => void changeType(engine, e, typeId), [engine]);
 
@@ -201,6 +216,8 @@ export function PreviewList({ rows, sources, today, readOnly, highlight = false,
                   suggestion={suggestions?.get(e.id)}
                   onType={onType}
                   onOpen={onOpenEvent}
+                  selected={selected?.has(e.id) ?? false}
+                  onSelect={onSelect}
                 />
               ))}
             </ul>

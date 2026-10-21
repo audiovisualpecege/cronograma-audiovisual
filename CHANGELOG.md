@@ -24,6 +24,14 @@ PATCH para um conserto, MINOR para algo novo, MAJOR quando o jeito de usar muda.
   do histórico e o Gemini). Os que faltarem ficam em destaque, com sugestões do histórico para usar com um clique.
   Passo 2: a semana é montada, a IA propõe as pessoas e a revisão acontece ali mesmo (aceitar, trocar,
   descartar), com as vagas vazias em destaque.
+- Menu novo: Painel, Semana e Equipe soltos; **Dados** (Pessoas, Funções, Setores, Tipos de serviço,
+  Ausências, Padrões) e **Configurações** (Geral, Importar, Agenda pessoal, Preferências, Sobre) com submenu.
+  O grupo da tela aberta já vem aberto.
+- Os avisos do administrador viraram uma aba do Painel (Resumo e Avisos); o sino no topo continua.
+- Propor escala, passo 1: botão **Só os sem tipo** para ver só o que falta; botão direito seleciona vários
+  eventos e a barra que aparece define o tipo de todos de uma vez. A janela de detalhes abre na hora (as
+  sugestões do histórico eram recalculadas a cada clique e travavam a tela).
+- No Painel, o cartão da semana clareia ao passar o mouse, sem sublinhar o texto.
 - Na tela Propor escala, clicar num evento abre os detalhes numa janela, sem sair da tela (quando, local,
   origem, tipo, equipe e a descrição da agenda). A página completa do evento fica a um clique.
 - Tipo de serviço em negrito, com o ícone do tipo; para trocar, o lápis ao lado.

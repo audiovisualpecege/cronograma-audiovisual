@@ -85,6 +85,34 @@ describe('ProposalPage: passo 1, tipos de serviço', () => {
     expect(window.location.hash).not.toBe('#/evento/ea');
   });
 
+  it('"Só os sem tipo" filtra a lista; botão direito seleciona e "Definir tipo" vale para todos os selecionados', async () => {
+    const user = userEvent.setup();
+    const semA = eventRow('xa', { title: 'Xpto especial A', service_type_id: null, type_certainty: 'baixa', type_source: 'admin' });
+    const semB = eventRow('xb', { title: 'Xpto especial B', service_type_id: null, type_certainty: 'baixa', type_source: 'admin' });
+    const remote = weekRemote({ events: [AULA, semA, semB], slots: [slotWith('ea', 'r1')] });
+    await page(remote);
+
+    await user.click(await screen.findByRole('button', { name: 'Só os sem tipo (2)' }));
+    await waitFor(() => expect(screen.queryByRole('listitem', { name: 'Gravação aula Biologia' })).toBeNull());
+    const a = screen.getByRole('listitem', { name: 'Xpto especial A' });
+    const b = screen.getByRole('listitem', { name: 'Xpto especial B' });
+
+    await user.pointer({ keys: '[MouseRight]', target: a });
+    await user.pointer({ keys: '[MouseRight]', target: b });
+    expect(a).toHaveAttribute('data-selected', 'true');
+    const bar = screen.getByRole('region', { name: 'Eventos selecionados' });
+    expect(bar).toHaveTextContent('2 eventos selecionados');
+    await user.selectOptions(within(bar).getByLabelText('Tipo para os selecionados'), 't2');
+    await user.click(within(bar).getByRole('button', { name: 'Definir tipo' }));
+    await waitFor(() =>
+      expect(ops(remote).filter((o) => o.kind === 'event.update_extras').map((o) => o.payload)).toEqual([
+        { id: 'xa', service_type_id: 't2' },
+        { id: 'xb', service_type_id: 't2' },
+      ]),
+    );
+    expect(screen.queryByRole('region', { name: 'Eventos selecionados' })).toBeNull();
+  });
+
   it('semana sem montagem é montada ao seguir para o passo 2', async () => {
     const user = userEvent.setup();
     const remote = weekRemote({ week: null, events: [AULA] });

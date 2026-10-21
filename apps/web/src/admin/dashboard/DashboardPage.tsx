@@ -9,7 +9,9 @@ import {
   RestartIcon,
 } from '@solar-icons/react/bold-duotone';
 import { DangerTriangleIcon } from '@solar-icons/react/linear';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { NotificationList } from '../../notifications/NotificationList';
+import { recentNotifications, useNotifications } from '../../notifications/useNotifications';
 import {
   useTable,
   type AssignmentRow,
@@ -24,7 +26,7 @@ import { PageTitle } from '../../layout/PageTitle';
 import { useSettings } from '../../settings/jobs';
 import { useSyncState } from '../../sync/SyncProvider';
 import { AppIcon } from '../../ui/AppIcon';
-import { Badge, Card } from '../../ui/chiaro';
+import { Badge, Card, Tabs } from '../../ui/chiaro';
 import { formatStamp } from '../../ui/format';
 import { dayMonth } from '../../week/model';
 import { SourceAlerts } from '../../week/PreviewPage';
@@ -97,10 +99,38 @@ function WeekCardView({ card, label, current }: { card: WeekCard; label: string;
 }
 
 /**
- * Painel do administrador (US-001 AC-2): as próximas 3 semanas em cartões, os avisos da agenda dessas
- * semanas e, por último, as pendências; mais a saúde do serviço de fundo e das agendas.
+ * Painel do administrador (US-001 AC-2). Aba Resumo: as próximas 3 semanas em cartões, os avisos da agenda
+ * dessas semanas e, por último, as pendências, mais a saúde do serviço de fundo e das agendas. Aba Avisos:
+ * as notificações do administrador (que também abrem pelo sino do topo).
  */
 export function DashboardPage() {
+  const now = useNow();
+  const [tab, setTab] = useState<'resumo' | 'avisos'>('resumo');
+  const notifications = useNotifications();
+  const unread = useMemo(() => recentNotifications(notifications ?? [], now).filter((n) => !n.read_at).length, [notifications, now]);
+
+  return (
+    <section className="page dashboard-page">
+      <div className="page-head">
+        <PageTitle light="PAINEL DA" black="SEMANA" />
+        <RereadButton />
+      </div>
+      <Tabs
+        variant="pill"
+        items={[
+          { value: 'resumo', label: 'Resumo' },
+          { value: 'avisos', label: unread > 0 ? `Avisos (${unread})` : 'Avisos' },
+        ]}
+        value={tab}
+        onChange={(v) => setTab(v as 'resumo' | 'avisos')}
+      />
+      {tab === 'avisos' ? <NotificationList /> : <DashboardSummary />}
+    </section>
+  );
+}
+
+/** Aba Resumo do Painel: semanas, avisos da agenda e pendências. */
+function DashboardSummary() {
   const now = useNow();
   const settings = useSettings();
   const { lastSyncAt } = useSyncState();
@@ -127,11 +157,7 @@ export function DashboardPage() {
   const loading = !ready || (!lastSyncAt && (events?.length ?? 0) === 0);
 
   return (
-    <section className="page dashboard-page">
-      <div className="page-head">
-        <PageTitle light="PAINEL DA" black="SEMANA" />
-        <RereadButton />
-      </div>
+    <>
       {worker && (
         <p className="form-message form-message--alert worker-alert" role="alert">
           <AppIcon icon={DangerTriangleIcon} size={18} /> {worker}
@@ -194,6 +220,6 @@ export function DashboardPage() {
           )}
         </section>
       </Card>
-    </section>
+    </>
   );
 }

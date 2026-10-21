@@ -87,6 +87,16 @@ describe('DashboardPage', () => {
     expect(notices.compareDocumentPosition(pending) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it('os avisos do administrador ficam numa aba do Painel', async () => {
+    const user = userEvent.setup();
+    renderWithSync(<DashboardPage />, { remote: weekRemote({ settings: { worker_seen_at: minutesAgo(1) } }) });
+    expect(await screen.findByRole('tab', { name: 'Resumo' })).toHaveAttribute('aria-selected', 'true');
+    await user.click(screen.getByRole('tab', { name: /^Avisos/ }));
+    expect(screen.queryByRole('list', { name: 'Próximas semanas' })).toBeNull();
+    await user.click(screen.getByRole('tab', { name: 'Resumo' }));
+    expect(await screen.findByRole('list', { name: 'Próximas semanas' })).toBeInTheDocument();
+  });
+
   it('"Reler agora" pede confirmação por causa do limite diário antes de pedir a leitura', async () => {
     const user = userEvent.setup();
     const remote = weekRemote({ settings: { worker_seen_at: minutesAgo(1) } });

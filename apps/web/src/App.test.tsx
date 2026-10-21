@@ -121,8 +121,27 @@ describe('moldura de navegação', () => {
     render(<App remote={signedIn(ADMIN_ME)} />);
     const side = await screen.findByRole('navigation', { name: 'Menu principal' });
     expect(within(side).getByRole('link', { name: 'Painel' })).toHaveAttribute('aria-current', 'page');
-    expect(within(side).getByRole('link', { name: 'Pessoas' })).toBeInTheDocument();
+    // Avisos saiu do menu do administrador: fica numa aba do Painel e no sino.
+    expect(within(side).queryByRole('link', { name: 'Avisos' })).toBeNull();
+    // Cadastros e Padrões ficam no grupo Dados, fechado fora dessas telas.
+    const dados = within(side).getByRole('button', { name: 'Dados' });
+    expect(dados).toHaveAttribute('aria-expanded', 'false');
+    expect(within(side).queryByRole('link', { name: 'Pessoas' })).toBeNull();
+    await userEvent.click(dados);
+    const lista = within(side).getByRole('list', { name: 'Dados' });
+    expect(within(lista).getAllByRole('link').map((l) => l.textContent)).toEqual(['Pessoas', 'Funções', 'Setores', 'Tipos de serviço', 'Ausências', 'Padrões']);
     expect(within(side).getByText(`v${__APP_VERSION__}`)).toBeInTheDocument();
+  });
+
+  it('grupo do menu abre sozinho quando a tela atual está nele', async () => {
+    goTo('#/admin/configuracao');
+    render(<App remote={signedIn(ADMIN_ME)} />);
+    const side = await screen.findByRole('navigation', { name: 'Menu principal' });
+    const config = within(side).getByRole('button', { name: 'Configurações' });
+    expect(config).toHaveAttribute('aria-expanded', 'true');
+    const lista = within(side).getByRole('list', { name: 'Configurações' });
+    expect(within(lista).getAllByRole('link').map((l) => l.textContent)).toEqual(['Geral', 'Importar', 'Agenda pessoal', 'Preferências', 'Sobre']);
+    expect(within(lista).getByRole('link', { name: 'Geral' })).toHaveAttribute('aria-current', 'page');
   });
 
   it('Equipe não vê telas de administrador no menu', async () => {
@@ -139,7 +158,8 @@ describe('moldura de navegação', () => {
     const bottom = await screen.findByRole('navigation', { name: 'Menu do celular' });
     await userEvent.click(within(bottom).getByRole('button', { name: 'Mais' }));
     const more = screen.getByRole('dialog', { name: 'Mais' });
-    expect(within(more).getByRole('link', { name: 'Configuração' })).toBeInTheDocument();
+    await userEvent.click(within(more).getByRole('button', { name: 'Configurações' }));
+    expect(within(more).getByRole('link', { name: 'Geral' })).toHaveAttribute('href', '#/admin/configuracao');
     const last = more.lastElementChild;
     expect(last).toHaveTextContent(`v${__APP_VERSION__}`);
     await userEvent.click(within(more).getByRole('button', { name: 'Sair' }));

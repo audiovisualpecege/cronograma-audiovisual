@@ -1,12 +1,10 @@
-import { StarIcon as StarOn } from '@solar-icons/react/bold';
-import { StarIcon as StarOff } from '@solar-icons/react/linear';
 import type { EventRow } from '../data/catalog';
 import { useSyncEngine } from '../sync/SyncProvider';
-import { AppIcon } from '../ui/AppIcon';
 
 /**
  * Estrela de "atividade principal da semana", marcada por quem monta a escala. Fica gravada no evento
- * (events.highlighted); o jeito de mostrar no cronograma final ainda vai ser definido.
+ * (events.highlighted); o jeito de mostrar no cronograma final ainda vai ser definido. O ícone é a estrela do
+ * Solar como máscara de CSS (app.css, .mask-star), para não pesar nas listas longas.
  */
 export function HighlightToggle({ event, readOnly }: { event: EventRow; readOnly: boolean }) {
   const engine = useSyncEngine();
@@ -31,7 +29,7 @@ export function HighlightToggle({ event, readOnly }: { event: EventRow; readOnly
         )
       }
     >
-      <AppIcon icon={on ? StarOn : StarOff} size={20} />
+      <span className={`mask-icon ${on ? 'mask-star-on' : 'mask-star'}`} aria-hidden="true" />
     </button>
   );
 }

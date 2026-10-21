@@ -1,5 +1,5 @@
-import { classifyTitle, isWeekPast, localDate, type TitleIndex } from '@cronograma/core';
-import { useEffect, useRef, useState } from 'react';
+import { classifyTitle, isWeekPast, jaccard, JACCARD_MIN, localDate, titleWords } from '@cronograma/core';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useTable, type CalendarSourceRow, type EventRow, type HistoryFactRow, type ServiceTypeRow } from '../data/catalog';
 import { EventQuickView } from './EventQuickView';
 import { useHistory } from '../data/history';
@@ -10,6 +10,7 @@ import { useSyncEngine, useSyncState } from '../sync/SyncProvider';
 import { OnlineButton } from '../sync/OnlineButton';
 import { Button, Card } from '../ui/chiaro';
 import { Dialog } from '../ui/Dialog';
+import { Select } from '../ui/Select';
 import { dayMonth, publishSummary, type WeekRows } from './model';
 import { changeType, NO_EVENTS, PreviewList, SourceAlerts } from './PreviewPage';
 import { AI_OFF, isRunning, ProposalActions, ProposalMessage, useProposalRequest } from './ProposalBar';
@@ -20,25 +21,53 @@ import { buildWeek, useBuildPending, useNow, useWeekRows } from './useWeek';
 
 const plural = (n: number, one: string, many: string) => (n === 1 ? `1 ${one}` : `${n} ${many}`);
 
-/** Tipo sugerido pelo histórico (títulos parecidos) para cada evento ainda sem tipo. */
-export function typeSuggestions(rows: WeekRows, history: readonly HistoryFactRow[] | null): Map<string, ServiceTypeRow> {
-  const out = new Map<string, ServiceTypeRow>();
-  const missing = rows.events.filter((e) => !e.ignored && e.status !== 'cancelled' && !e.service_type_id);
-  if (missing.length === 0) return out;
-  const types = rows.types.filter((t) => !t.archived_at);
-  const like = types.map((t) => ({ id: t.id, code: t.code, keywords: t.keywords ?? [] }));
+export interface TitleWords {
+  words: Set<string>;
+  typeId: string;
+}
+
+/**
+ * Palavras de cada título do histórico, uma vez por título. Feito uma vez só quando o histórico chega: são
+ * dezenas de milhares de linhas, e refazer isso a cada clique travava a tela.
+ */
+export function buildTitleIndex(history: readonly HistoryFactRow[] | null): TitleWords[] {
   const seen = new Set<string>();
-  const index: TitleIndex = [];
+  const out: TitleWords[] = [];
   for (const h of history ?? []) {
     if (!h.service_type_id || !h.title) continue;
     const key = `${h.service_type_id}|${h.title}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    index.push({ title: h.title, serviceTypeId: h.service_type_id });
+    out.push({ words: titleWords(h.title), typeId: h.service_type_id });
   }
+  return out;
+}
+
+/** Tipo sugerido para cada evento ainda sem tipo: palavra-chave primeiro, depois o título mais parecido do histórico. */
+export function typeSuggestions(rows: WeekRows, index: readonly TitleWords[]): Map<string, ServiceTypeRow> {
+  const out = new Map<string, ServiceTypeRow>();
+  const missing = rows.events.filter((e) => !e.ignored && e.status !== 'cancelled' && !e.service_type_id);
+  if (missing.length === 0) return out;
+  const types = rows.types.filter((t) => !t.archived_at);
+  const byId = new Map(types.map((t) => [t.id, t]));
+  const like = types.map((t) => ({ id: t.id, code: t.code, keywords: t.keywords ?? [] }));
   for (const e of missing) {
-    const c = classifyTitle(e.title, like, index);
-    const type = c.typeId ? types.find((t) => t.id === c.typeId) : undefined;
+    const c = classifyTitle(e.title, like, []);
+    let typeId = c.typeId;
+    if (!typeId) {
+      const target = titleWords(e.title);
+      let best = 0;
+      for (const h of index) {
+        if (!byId.has(h.typeId)) continue;
+        const score = jaccard(target, h.words);
+        if (score > best) {
+          best = score;
+          typeId = h.typeId;
+        }
+      }
+      if (best < JACCARD_MIN) typeId = null;
+    }
+    const type = typeId ? byId.get(typeId) : undefined;
     if (type) out.set(e.id, type);
   }
   return out;
@@ -73,7 +102,9 @@ export function ProposalPage({ params }: RouteProps) {
   const [step, setStep] = useState<1 | 2>(1);
   const [viewing, setViewing] = useState<string | null>(null);
   const viewed = viewing ? rows?.events.find((e) => e.id === viewing) : undefined;
-  const open = (e: EventRow) => setViewing(e.id);
+  // Função estável: as linhas da lista são memorizadas e não se redesenham ao abrir a janela.
+  const open = useCallback((e: EventRow) => setViewing(e.id), []);
+  const titleIndex = useMemo(() => buildTitleIndex(history.rows), [history.rows]);
 
   return (
     <section className="page week-page proposal-page">
@@ -88,7 +119,7 @@ export function ProposalPage({ params }: RouteProps) {
       {!rows ? (
         <p className="form-text">Abrindo a semana.</p>
       ) : step === 1 ? (
-        <TypesStep rows={rows} sources={sources} today={today} now={now} historyRows={history.rows} onNext={() => setStep(2)} onOpenEvent={open} />
+        <TypesStep rows={rows} sources={sources} today={today} now={now} titleIndex={titleIndex} onNext={() => setStep(2)} onOpenEvent={open} />
       ) : (
         <PeopleStep rows={rows} now={now} today={today} historyRows={history.rows} onBack={() => setStep(1)} onOpenEvent={open} />
       )}
@@ -102,18 +133,41 @@ interface TypesProps {
   sources: readonly CalendarSourceRow[];
   today: string;
   now: Date;
-  historyRows: readonly HistoryFactRow[] | null;
+  titleIndex: readonly TitleWords[];
   onNext: () => void;
   onOpenEvent: (e: EventRow) => void;
 }
 
-function TypesStep({ rows, sources, today, now, historyRows, onNext, onOpenEvent }: TypesProps) {
+const isUntyped = (e: EventRow) => !e.service_type_id && e.status !== 'cancelled';
+
+const EMPTY: ReadonlySet<string> = new Set();
+
+/** Seleção pelo botão direito: o evento entra ou sai; 'clear' limpa. */
+function selection(s: ReadonlySet<string>, action: EventRow | 'clear'): ReadonlySet<string> {
+  if (action === 'clear') return EMPTY;
+  const next = new Set(s);
+  if (next.has(action.id)) next.delete(action.id);
+  else next.add(action.id);
+  return next;
+}
+
+function TypesStep({ rows, sources, today, now, titleIndex, onNext, onOpenEvent }: TypesProps) {
   const engine = useSyncEngine();
   const past = isWeekPast(rows.weekStart, now);
   const live = rows.events.filter((e) => !e.ignored && e.status !== 'cancelled');
   const missing = live.filter((e) => !e.service_type_id);
-  const suggestions = typeSuggestions(rows, historyRows);
+  const suggestions = useMemo(() => typeSuggestions(rows, titleIndex), [rows, titleIndex]);
   const id = useIdentifyTypes(rows, !past);
+  const [onlyMissing, setOnlyMissing] = useState(false);
+  // O dispatch do reducer é estável: as linhas memorizadas da lista não se redesenham à toa.
+  const [selected, toggle] = useReducer(selection, EMPTY);
+  const [bulkType, setBulkType] = useState('');
+  function applyBulk() {
+    if (!bulkType) return;
+    for (const e of rows.events) if (selected.has(e.id) && e.status !== 'cancelled') void changeType(engine, e, bulkType);
+    toggle('clear');
+    setBulkType('');
+  }
   const notes: string[] = [];
   if (id.byKeyword) notes.push(`${plural(id.byKeyword, 'evento identificado', 'eventos identificados')} pelas palavras-chave.`);
   if (id.job && !isFinished(id.job)) notes.push('Identificando os outros pelo histórico e pela IA.');
@@ -139,6 +193,11 @@ function TypesStep({ rows, sources, today, now, historyRows, onNext, onOpenEvent
               : `${live.length - missing.length} de ${live.length} eventos com tipo. ${plural(missing.length, 'evento sem tipo está', 'eventos sem tipo estão')} em destaque: escolha o tipo para seguir.`}
           </p>
           <span className="week-actions-buttons">
+            {(missing.length > 0 || onlyMissing) && (
+              <Button variant={onlyMissing ? 'primary' : 'secondary'} size="sm" aria-pressed={onlyMissing} onClick={() => setOnlyMissing(!onlyMissing)}>
+                {onlyMissing ? 'Mostrar todos' : `Só os sem tipo (${missing.length})`}
+              </Button>
+            )}
             {!past && missing.length > 0 && (
               <OnlineButton variant="ghost" size="sm" disabled={id.running} onClick={() => void id.identify()}>
                 {id.running ? 'Identificando' : 'Identificar de novo'}
@@ -164,8 +223,45 @@ function TypesStep({ rows, sources, today, now, historyRows, onNext, onOpenEvent
             {id.error}
           </p>
         )}
+        {!past && <p className="page-note">Dica: clique com o botão direito nos eventos para selecionar vários e definir o tipo de uma vez.</p>}
       </Card>
-      <PreviewList rows={rows} sources={sources} today={today} readOnly={past} highlight suggestions={suggestions} onOpenEvent={onOpenEvent} />
+      {onlyMissing && missing.length === 0 && (
+        <p className="form-text" role="note">
+          Nenhum evento sem tipo. Tudo pronto para o próximo passo.
+        </p>
+      )}
+      <PreviewList
+        rows={rows}
+        sources={sources}
+        today={today}
+        readOnly={past}
+        highlight
+        suggestions={suggestions}
+        onOpenEvent={onOpenEvent}
+        filter={onlyMissing ? isUntyped : undefined}
+        selected={selected}
+        onSelect={toggle}
+      />
+      {selected.size > 0 && (
+        <div className="bulk-bar" role="region" aria-label="Eventos selecionados">
+          <span className="bulk-count">{plural(selected.size, 'evento selecionado', 'eventos selecionados')}</span>
+          <Select
+            label="Tipo"
+            aria-label="Tipo para os selecionados"
+            value={bulkType}
+            placeholder="Escolha o tipo"
+            options={rows.types.filter((t) => !t.archived_at).map((t) => ({ value: t.id, label: t.name }))}
+            onChange={(e) => setBulkType(e.target.value)}
+            style={{ minWidth: 200 }}
+          />
+          <Button size="sm" disabled={!bulkType} onClick={applyBulk}>
+            Definir tipo
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => toggle('clear')}>
+            Limpar seleção
+          </Button>
+        </div>
+      )}
     </>
   );
 }

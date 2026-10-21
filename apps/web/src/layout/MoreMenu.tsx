@@ -5,10 +5,11 @@ import type { Me } from '../supabase';
 import { AppIcon } from '../ui/AppIcon';
 import { AppVersion } from '../ui/AppVersion';
 import { IconButton } from '../ui/IconButton';
-import { isActive, type NavItem } from './nav';
+import type { NavEntry } from './nav';
+import { NavList } from './NavList';
 
 /** Menu "Mais" do celular: o resto das telas, Sair e a versão no fim. */
-export function MoreMenu({ open, onClose, items, path, me }: { open: boolean; onClose: () => void; items: NavItem[]; path: string; me: Me }) {
+export function MoreMenu({ open, onClose, entries, path, me }: { open: boolean; onClose: () => void; entries: NavEntry[]; path: string; me: Me }) {
   const { signOut } = useSession();
   useEffect(() => {
     if (!open) return;
@@ -30,14 +31,7 @@ export function MoreMenu({ open, onClose, items, path, me }: { open: boolean; on
           <IconButton icon={CloseIcon} label="Fechar" size={40} onClick={onClose} />
         </div>
         <ul className="sheet-list">
-          {items.map((item) => (
-            <li key={item.to}>
-              <a className="nav-link" href={`#${item.to}`} aria-current={isActive(item, path) ? 'page' : undefined}>
-                <AppIcon icon={item.icon} size={20} />
-                <span>{item.label}</span>
-              </a>
-            </li>
-          ))}
+          <NavList entries={entries} path={path} />
           <li>
             <button type="button" className="nav-link" onClick={() => void signOut()}>
               <AppIcon icon={LogoutIcon} size={20} />
