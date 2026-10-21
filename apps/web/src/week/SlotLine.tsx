@@ -44,8 +44,10 @@ export function SlotLine({ model, event, slot, readOnly, onPick, extra }: SlotLi
   const role = model.roleName(slot.job_role_id);
   const who = state === 'open' ? 'Vaga aberta' : model.personName(a?.person_id);
   const locked = event.status === 'cancelled' || readOnly || !a;
+  // Vaga ainda sem ninguém fica em destaque, para saltar aos olhos na revisão da escala.
+  const missing = state === 'open' && event.status !== 'cancelled';
   return (
-    <li className="slot-line" aria-label={`${role}: ${who}`}>
+    <li className={`slot-line${missing ? ' is-missing' : ''}`} aria-label={`${role}: ${who}`}>
       <span className="list-row-main">
         <span className="list-row-title">
           <span className="slot-role">{role}</span> {who}

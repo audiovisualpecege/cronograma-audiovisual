@@ -1,10 +1,8 @@
 import { useState } from 'react';
 import type { AssignmentRow, JobRow, SettingsRow, WeekRow } from '../data/catalog';
 import { RemoteError } from '../supabase';
-import { OnlineButton } from '../sync/OnlineButton';
 import { useLocalQuery, useSyncEngine } from '../sync/SyncProvider';
 import { Button, Card } from '../ui/chiaro';
-import { Dialog } from '../ui/Dialog';
 import { acceptProposal, discardProposal } from './useWeek';
 
 export const AI_OFF = 'A pré-escala pela IA está desligada; monte a escala à mão.';
@@ -12,8 +10,9 @@ export const NO_HISTORY = 'Sem histórico, proposta por equilíbrio de carga.';
 const AI_SILENT = 'A IA não respondeu agora; monte à mão ou tente mais tarde.';
 
 /** Último pedido de proposta da semana, visto pela tabela jobs. */
-function useProposeJob(weekId: string): JobRow | undefined {
+export function useProposeJob(weekId: string | undefined): JobRow | undefined {
   return useLocalQuery(async (store) => {
+    if (!weekId) return undefined;
     const jobs = (await store.mirror('jobs').toArray()) as unknown as JobRow[];
     return jobs
       .filter((j) => j.kind === 'propose' && j.payload?.week_id === weekId)
@@ -23,7 +22,11 @@ function useProposeJob(weekId: string): JobRow | undefined {
 
 const num = (v: unknown) => (typeof v === 'number' ? v : 0);
 
-function jobMessage(job: JobRow): { tone: 'status' | 'alert'; text: string } {
+export function isRunning(job: JobRow | undefined): boolean {
+  return job?.status === 'queued' || job?.status === 'running';
+}
+
+export function jobMessage(job: JobRow): { tone: 'status' | 'alert'; text: string } {
   const r = job.result ?? {};
   if (job.status === 'queued') return { tone: 'status', text: 'Pedido enviado. Aguardando o serviço de fundo.' };
   if (job.status === 'running') {
@@ -38,27 +41,16 @@ function jobMessage(job: JobRow): { tone: 'status' | 'alert'; text: string } {
   return { tone: num(r.without_proposal) > 0 ? 'alert' : 'status', text: parts.join(' ') };
 }
 
-interface ProposalBarProps {
-  week: WeekRow;
-  settings: SettingsRow | undefined;
-  proposed: readonly AssignmentRow[];
-  readOnly: boolean;
-}
-
-/** "Propor escala" e a revisão da semana inteira (US-013, US-014). Nada da IA vale sem a ação do administrador. */
-export function ProposalBar({ week, settings, proposed, readOnly }: ProposalBarProps) {
+/** Pedido de proposta à IA pela fila do serviço de fundo (US-013). */
+export function useProposalRequest(week: WeekRow | null) {
   const engine = useSyncEngine();
-  const job = useProposeJob(week.id);
-  const [asking, setAsking] = useState(false);
+  const job = useProposeJob(week?.id);
   const [sending, setSending] = useState(false);
   const [requestedHere, setRequestedHere] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  if (!settings) return null;
-  const running = job?.status === 'queued' || job?.status === 'running';
-
   async function request(replacePending: boolean) {
-    setAsking(false);
+    if (!week) return;
     setSending(true);
     setError(null);
     try {
@@ -72,75 +64,73 @@ export function ProposalBar({ week, settings, proposed, readOnly }: ProposalBarP
     }
   }
 
-  function start() {
-    if (proposed.length > 0) setAsking(true);
-    else void request(true);
-  }
+  return { job, request, sending, requestedHere, error };
+}
 
-  const message = job && (running || job.id === requestedHere) ? jobMessage(job) : null;
+/** Situação do último pedido de proposta, enquanto roda ou quando foi feito nesta tela. */
+export function ProposalMessage({ job, requestedHere }: { job: JobRow | undefined; requestedHere?: string | null }) {
+  const message = job && (isRunning(job) || job.id === requestedHere) ? jobMessage(job) : null;
+  if (!message) return null;
+  return (
+    <p className={`form-message${message.tone === 'alert' ? ' form-message--alert' : ''}`} role={message.tone}>
+      {message.text}
+    </p>
+  );
+}
+
+/** Aceitar ou descartar de uma vez as propostas pendentes da semana. */
+export function ProposalActions({ proposed }: { proposed: readonly AssignmentRow[] }) {
+  const engine = useSyncEngine();
+  return (
+    <>
+      <Button variant="secondary" size="sm" onClick={() => proposed.forEach((a) => void acceptProposal(engine, a))}>
+        Aceitar todas da semana
+      </Button>
+      <Button variant="ghost" size="sm" onClick={() => proposed.forEach((a) => void discardProposal(engine, a))}>
+        Descartar todas da semana
+      </Button>
+    </>
+  );
+}
+
+interface ProposalBarProps {
+  week: WeekRow;
+  settings: SettingsRow | undefined;
+  proposed: readonly AssignmentRow[];
+  readOnly: boolean;
+}
+
+/**
+ * Pré-escala na tela da semana (US-013, US-014): propostas pendentes, situação do pedido e o aviso de IA
+ * desligada. O pedido em si sai da tela "Propor escala". Nada da IA vale sem a ação do administrador.
+ */
+export function ProposalBar({ week, settings, proposed, readOnly }: ProposalBarProps) {
+  const job = useProposeJob(week.id);
+  if (!settings) return null;
   const aiOn = settings.ai_proposal_enabled;
-  if (!aiOn && proposed.length === 0) {
-    return (
-      <Card variant="raised" padding={20}>
-        <p className="form-text" role="note" style={{ margin: 0 }}>
-          {AI_OFF}
-        </p>
-      </Card>
-    );
-  }
-
+  if (aiOn && proposed.length === 0 && !isRunning(job)) return null;
   return (
     <Card variant="raised" padding={20}>
       <section aria-label="Pré-escala" className="proposal-bar">
         {!aiOn && (
-          <p className="form-text" role="note">
+          <p className="form-text" role="note" style={{ margin: 0 }}>
             {AI_OFF}
           </p>
         )}
-        <div className="dialog-actions" style={{ justifyContent: 'flex-start', marginTop: 0 }}>
-          {aiOn && !readOnly && (
-            <OnlineButton onClick={start} disabled={running || sending}>
-              {running || sending ? 'Propondo escala' : 'Propor escala'}
-            </OnlineButton>
-          )}
-          {proposed.length > 0 && !readOnly && (
-            <>
-              <Button variant="secondary" onClick={() => proposed.forEach((a) => void acceptProposal(engine, a))}>
-                Aceitar todas da semana
-              </Button>
-              <Button variant="ghost" onClick={() => proposed.forEach((a) => void discardProposal(engine, a))}>
-                Descartar todas da semana
-              </Button>
-            </>
-          )}
-        </div>
-        {proposed.length > 0 && <p className="form-text">{proposed.length === 1 ? '1 proposta pendente. A equipe não vê propostas.' : `${proposed.length} propostas pendentes. A equipe não vê propostas.`}</p>}
-        {message && (
-          <p className={`form-message${message.tone === 'alert' ? ' form-message--alert' : ''}`} role={message.tone}>
-            {message.text}
-          </p>
+        {proposed.length > 0 && (
+          <div className="week-actions">
+            <p className="form-text" style={{ margin: 0 }}>
+              {proposed.length === 1 ? '1 proposta pendente. A equipe não vê propostas.' : `${proposed.length} propostas pendentes. A equipe não vê propostas.`}
+            </p>
+            {!readOnly && (
+              <span className="week-actions-buttons">
+                <ProposalActions proposed={proposed} />
+              </span>
+            )}
+          </div>
         )}
-        {error && (
-          <p className="form-message form-message--alert" role="alert">
-            {error}
-          </p>
-        )}
+        <ProposalMessage job={job} />
       </section>
-      <Dialog
-        open={asking}
-        onClose={() => setAsking(false)}
-        title="Propor escala"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => void request(false)}>
-              Manter as pendentes
-            </Button>
-            <Button onClick={() => void request(true)}>Substituir</Button>
-          </>
-        }
-      >
-        <p style={{ margin: 0 }}>{proposed.length === 1 ? 'Substituir a proposta pendente?' : `Substituir as ${proposed.length} propostas pendentes?`} As alocações aceitas não mudam.</p>
-      </Dialog>
     </Card>
   );
 }

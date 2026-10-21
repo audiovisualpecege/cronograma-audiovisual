@@ -105,3 +105,17 @@ export async function sendAndRefresh(engine: SyncEngine, tables: TableName[]): P
 }
 
 export const WEEK_TABLES: TableName[] = ['weeks', 'events', 'slots', 'assignments', 'published_assignments', 'publications'];
+
+/** "Montar semana" (US-012): cria as vagas pelos tipos dos eventos, pela fila (`week.build`). */
+export async function buildWeek(engine: SyncEngine, weekStart: string): Promise<void> {
+  await engine.enqueue('week.build', { week_start: weekStart });
+  await sendAndRefresh(engine, WEEK_TABLES);
+}
+
+/** Montagem da semana ainda na fila de envio (sem internet). */
+export function useBuildPending(weekStart: string): boolean | undefined {
+  return useLocalQuery(
+    async (store) => (await store.outbox.toArray()).some((op) => op.kind === 'week.build' && (op.payload as { week_start?: string }).week_start === weekStart),
+    [weekStart],
+  );
+}

@@ -1,18 +1,16 @@
 // Regras de tela da semana do administrador, puras: contexto das regras do core a partir das linhas da cópia
-// local, equipe estimada, falta por função, contagens de publicação e alterações não publicadas.
+// local, equipe estimada, pessoas disponíveis por função, contagens de publicação e alterações não publicadas.
 import {
   addDays,
+  availableHours,
   daysOf,
-  demandFromSlots,
-  eventHours,
   localDate,
   localTime,
-  roleDemandSupply,
   type AbsenceLike,
   type AssignmentLike,
   type EventLike,
+  type HistoryFact,
   type PersonLike,
-  type RoleBalance,
   type SlotLike,
   type WeekContext,
 } from '@cronograma/core';
@@ -158,29 +156,38 @@ export function estimatedCrew(e: EventRow, types: readonly ServiceTypeRow[], cre
   return crewOf(type, crew);
 }
 
+export interface RoleAvailability {
+  jobRoleId: string;
+  name: string;
+  people: number;
+}
+
 /**
- * Pedido e oferta de horas por função (US-010 AC-3): na prévia, pela equipe estimada dos tipos; com a
- * semana montada, pelas vagas ativas.
+ * Pessoas disponíveis na semana por função: ativas e com horas livres depois das ausências. Quem tem
+ * mais de uma função conta uma vez só, na que mais fez no histórico; sem histórico (ou empate), na
+ * primeira pelo código da função. Da função com mais gente para a com menos.
  */
-export function roleBalance(rows: WeekRows, mode: 'preview' | 'built'): RoleBalance[] {
-  const events = rows.events.filter((e) => !e.ignored).map((e) => toEventLike(e, rows.types));
-  let demand: { jobRoleId: string; hours: number }[];
-  if (mode === 'built') {
-    demand = demandFromSlots(events, activeSlots(rows).map((s, i) => ({ id: s.id, code: `V${i + 1}`, eventId: s.event_id, jobRoleId: s.job_role_id })));
-  } else {
-    demand = rows.events.flatMap((e) => {
-      const hours = eventHours(toEventLike(e, rows.types));
-      return estimatedCrew(e, rows.types, rows.crew).flatMap((c) => Array.from({ length: c.quantity }, () => ({ jobRoleId: c.job_role_id, hours })));
-    });
+export function availabilityByRole(rows: WeekRows, facts: readonly Pick<HistoryFact, 'personId' | 'jobRoleId'>[]): RoleAvailability[] {
+  const done = new Map<string, number>();
+  for (const f of facts) {
+    if (f.personId && f.jobRoleId) done.set(`${f.personId}|${f.jobRoleId}`, (done.get(`${f.personId}|${f.jobRoleId}`) ?? 0) + 1);
   }
-  const balance = roleDemandSupply({
-    weekStart: rows.weekStart,
-    demand,
-    people: rows.people.map((p) => toPersonLike(p, rows.personRoles)),
-    absences: rows.absences.map(toAbsenceLike),
-  });
-  // Só as funções pedidas na semana; as demais não ajudam a decidir.
-  return balance.filter((b) => b.demandHours > 0);
+  const roles = new Map(rows.roles.filter((r) => !r.archived_at).map((r) => [r.id, r]));
+  const byCode = (a: string, b: string) => (roles.get(a)?.code ?? '').localeCompare(roles.get(b)?.code ?? '', 'en', { numeric: true });
+  const absences = rows.absences.map(toAbsenceLike);
+  const count = new Map<string, number>();
+  for (const p of rows.people) {
+    if (!p.active) continue;
+    const person = toPersonLike(p, rows.personRoles);
+    const enabled = person.roleIds.filter((r) => roles.has(r)).sort(byCode);
+    if (enabled.length === 0 || availableHours(person, absences, rows.weekStart) <= 0) continue;
+    const times = (r: string) => done.get(`${p.id}|${r}`) ?? 0;
+    const main = enabled.reduce((best, r) => (times(r) > times(best) ? r : best));
+    count.set(main, (count.get(main) ?? 0) + 1);
+  }
+  return [...count]
+    .map(([jobRoleId, people]) => ({ jobRoleId, name: roles.get(jobRoleId)?.name ?? 'Função', people }))
+    .sort((a, b) => b.people - a.people || a.name.localeCompare(b.name, 'pt-BR'));
 }
 
 /** Eventos de cada dia da semana; evento de vários dias aparece em cada dia que ocupa (US-010 EC-4). */
@@ -257,40 +264,6 @@ export function unpublishedChanges(rows: WeekRows): number {
     if ((events.get(eventId)?.notes ?? null) !== published) n += 1;
   }
   return n;
-}
-
-export interface PersonLoadRow {
-  personId: string;
-  name: string;
-  hours: number;
-  count: number;
-  limit: number;
-  over: boolean;
-}
-
-/** Carga da semana de cada pessoa ativa (US-014 AC-4), de quem tem mais horas para quem tem menos. */
-export function loadRows(rows: WeekRows, ctx: WeekContext): PersonLoadRow[] {
-  const events = new Map(ctx.events.map((e) => [e.id, e]));
-  const acc = new Map<string, { hours: number; seen: Set<string> }>();
-  for (const a of ctx.assignments) {
-    const e = events.get(a.eventId);
-    if (!e || e.status === 'cancelled' || e.weekStart !== ctx.weekStart) continue;
-    const cur = acc.get(a.personId) ?? { hours: 0, seen: new Set<string>() };
-    if (!cur.seen.has(e.id)) {
-      cur.seen.add(e.id);
-      cur.hours += eventHours(e);
-    }
-    acc.set(a.personId, cur);
-  }
-  return rows.people
-    .filter((p) => p.active)
-    .map((p) => {
-      const cur = acc.get(p.id);
-      const hours = cur?.hours ?? 0;
-      const limit = Number(p.weekly_limit_hours);
-      return { personId: p.id, name: p.name, hours, count: cur?.seen.size ?? 0, limit, over: hours > limit };
-    })
-    .sort((a, b) => b.hours - a.hours || a.name.localeCompare(b.name, 'pt-BR'));
 }
 
 /** Horas em texto: "12 h" ou "2,5 h". */

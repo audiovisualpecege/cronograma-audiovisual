@@ -917,7 +917,6 @@ body {
   gap: var(--space-3);
 }
 
-.week-columns,
 .event-columns {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -925,7 +924,6 @@ body {
   align-items: start;
 }
 
-.week-side,
 .event-main,
 .event-side {
   display: flex;
@@ -933,11 +931,183 @@ body {
   gap: var(--space-4);
 }
 
-@media (min-width: 1100px) {
-  .week-columns {
-    grid-template-columns: minmax(0, 1fr) 320px;
+/* Topo da semana: "< Semana de 19/10 >" no centro, vizinhas esmaecidas e o "Reler agora" à direita. */
+.week-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  gap: var(--space-3);
+}
+
+.week-switcher {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.week-switcher-title {
+  margin: 0;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.week-switcher-side {
+  display: none;
+  padding: 0 var(--space-2);
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font: var(--weight-bold) var(--text-body) var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  white-space: nowrap;
+  cursor: pointer;
+  opacity: 0.45;
+  transition: opacity 0.2s var(--ease-cine);
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 70%);
+  mask-image: linear-gradient(to right, transparent, #000 70%);
+}
+
+.week-switcher-side:last-child {
+  -webkit-mask-image: linear-gradient(to left, transparent, #000 70%);
+  mask-image: linear-gradient(to left, transparent, #000 70%);
+}
+
+.week-switcher-side:hover {
+  opacity: 0.8;
+}
+
+.week-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.week-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.week-status .form-text {
+  margin: 0;
+}
+
+.availability-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: 0;
+}
+
+.availability-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+}
+
+.availability-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--gradient-chiaro);
+  color: var(--text-on-brand, #fff);
+  font: var(--weight-black) var(--text-body) var(--font-display);
+}
+
+.availability-role {
+  font-weight: var(--weight-medium);
+}
+
+.is-missing.preview-event,
+.is-missing.slot-line {
+  border: 1.5px dashed var(--chiaro-pessego);
+  background: rgba(250, 206, 149, 0.08);
+}
+
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-2);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+}
+
+.step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+  font: var(--weight-black) var(--text-body-s) var(--font-display);
+}
+
+.step-label {
+  font: var(--weight-bold) var(--text-body-s) var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+}
+
+.step.is-current {
+  border-color: var(--border-brand);
+  color: var(--text-primary);
+}
+
+.step.is-current .step-number {
+  background: var(--gradient-chiaro);
+  color: #fff;
+}
+
+.step.is-done {
+  color: var(--text-secondary);
+}
+
+@media (min-width: 900px) {
+  .week-head {
+    grid-template-columns: 1fr auto 1fr;
   }
 
+  .week-switcher {
+    grid-column: 2;
+  }
+
+  .week-head .reread {
+    grid-column: 3;
+    justify-self: end;
+  }
+
+  .week-switcher-side {
+    display: inline-block;
+  }
+}
+
+@media (min-width: 1100px) {
   .event-columns {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
@@ -963,8 +1133,6 @@ body {
 .preview-list,
 .slot-list,
 .picker-list,
-.load-list,
-.balance-list,
 .pending-list {
   margin-top: 0;
 }
@@ -1030,119 +1198,6 @@ body {
   flex-wrap: wrap;
   gap: var(--space-2);
   margin-left: auto;
-}
-
-.schedule-grid-scroll {
-  max-height: 70vh;
-  overflow: auto;
-}
-
-.schedule-grid {
-  width: 100%;
-  min-width: 960px;
-  border-collapse: separate;
-  border-spacing: 4px;
-  font-size: var(--text-body-s);
-}
-
-.schedule-grid thead th {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  padding: var(--space-2);
-  background: var(--surface-card);
-  color: var(--text-secondary);
-  font: var(--weight-bold) var(--text-caption) var(--font-display);
-  text-transform: uppercase;
-  text-align: left;
-  white-space: nowrap;
-}
-
-.schedule-grid tbody th {
-  padding: var(--space-2);
-  color: var(--text-primary);
-  font-weight: var(--weight-medium);
-  text-align: left;
-  white-space: nowrap;
-}
-
-.schedule-grid td {
-  min-width: 120px;
-  padding: 4px;
-  vertical-align: top;
-  background: var(--surface-raised);
-  border-radius: var(--radius-sm);
-}
-
-.schedule-grid-open th {
-  color: var(--text-brand);
-}
-
-.grid-chip {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  width: 100%;
-  margin-bottom: 4px;
-  padding: 6px 8px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  background: var(--surface-card);
-  color: var(--text-primary);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.grid-chip:hover,
-.grid-chip:focus-visible {
-  border-color: var(--border-brand);
-  outline: none;
-}
-
-.grid-chip--proposed {
-  border-style: dashed;
-  border-color: var(--accent);
-}
-
-.grid-chip--open {
-  background: var(--accent-soft);
-}
-
-.grid-chip-title {
-  font-weight: var(--weight-medium);
-}
-
-.grid-chip-role {
-  color: var(--text-secondary);
-  font-size: var(--text-caption);
-}
-
-.load-item,
-.balance-item {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) 0;
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.load-item.is-over,
-.balance-item.is-short {
-  color: var(--chiaro-pessego);
-}
-
-.load-name {
-  flex: 1;
-  min-width: 120px;
-  font-weight: var(--weight-medium);
-}
-
-.load-hours {
-  color: var(--text-secondary);
-  font-size: var(--text-body-s);
 }
 
 .picker-item {
@@ -1272,12 +1327,79 @@ body {
   gap: var(--space-2);
 }
 
-.week-shortcut {
+/* Painel: as próximas 3 semanas em cartões, lado a lado no computador. */
+.dashboard-weeks {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+@media (min-width: 900px) {
+  .dashboard-weeks {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.week-card {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+  align-items: flex-start;
+  gap: var(--space-4);
   color: inherit;
   text-decoration: none;
+}
+
+.week-card-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+  color: var(--text-muted);
+}
+
+.week-card-icon--building {
+  background: var(--accent-soft);
+  color: var(--text-brand);
+}
+
+.week-card-icon--published {
+  background: var(--gradient-chiaro);
+  color: #fff;
+}
+
+.week-card-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.week-card-body .form-text {
+  margin: 0;
+}
+
+.week-card-label {
+  color: var(--text-muted);
+  font: var(--weight-bold) var(--text-caption) var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+}
+
+.week-card-detail {
+  margin-top: var(--space-1);
+  color: var(--text-secondary);
+  font-size: var(--text-body-s);
+}
+
+.notice-time {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  white-space: nowrap;
 }
 
 /* Ação discreta em linha, para listas longas (prévia com 100 eventos ou mais). */

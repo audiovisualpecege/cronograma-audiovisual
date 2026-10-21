@@ -3,6 +3,22 @@
 Cada versão nova entra no topo, com a data e o que mudou para quem usa.
 PATCH para um conserto, MINOR para algo novo, MAJOR quando o jeito de usar muda.
 
+## 1.1.0 (21/10/2026)
+
+- Painel mais visual: no topo, cartões da semana atual e das 2 seguintes, com ícone e situação (sem montagem, em
+  montagem ou publicada) e o que falta em cada uma. Logo abaixo, os **Avisos da agenda**: as últimas mudanças
+  vindas das agendas nessas 3 semanas (novo, mudou o horário ou o local, cancelado). As pendências vêm por último.
+- **Reler agora** pede confirmação antes, porque existe um limite de sincronizações por dia. Vale no Painel e na
+  Semana.
+- Tela da Semana reorganizada: "< Semana de 19/10 >" no centro, com a anterior e a seguinte esmaecidas dos lados
+  (clique nas setas ou nelas para trocar). Embaixo, a situação da semana e os botões numa linha só (Nova atividade
+  interna, Montar semana, Publicar, Propor escala), depois quantas pessoas estão disponíveis em cada função (quem
+  tem mais de uma conta na que mais fez) e a lista de eventos. Saíram a grade por pessoa e os quadros de horas e de
+  carga da lateral. Vaga ainda vazia aparece em destaque.
+- **Propor escala** abre uma tela própria em 2 passos. Passo 1: os tipos de serviço dos eventos, com os que faltam
+  em destaque e sugestões tiradas do histórico para usar com um clique. Passo 2: a semana é montada, a IA propõe
+  as pessoas e a revisão acontece ali mesmo (aceitar, trocar, descartar), com as vagas vazias em destaque.
+
 ## 1.0.1 (19/10/2026)
 
 - Configuração > Google Agendas: cada agenda ganhou **Editar** e **Remover**. Errou o ID ao adicionar? Edite e a
