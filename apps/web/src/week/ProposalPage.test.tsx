@@ -132,6 +132,8 @@ describe('ProposalPage: passo 2, pessoas', () => {
     remote.rpcHandler = (fn) => (fn === 'request_job' ? { job_id: 'job-1' } : {});
     await page(remote);
     await user.click(await screen.findByRole('button', { name: 'Próximo passo' }));
+    // A IA não é chamada sozinha: só pelo botão.
+    await user.click(await screen.findByRole('button', { name: 'Pedir à IA' }));
     const dialog = await screen.findByRole('dialog', { name: 'Propor escala' });
     expect(dialog).toHaveTextContent('Substituir as 2 propostas pendentes?');
     expect(dialog).toHaveTextContent('As alocações aceitas não mudam.');
@@ -140,15 +142,36 @@ describe('ProposalPage: passo 2, pessoas', () => {
     await waitFor(() => expect(remote.rpcCalls).toContainEqual({ fn: 'request_job', args: { kind: 'propose', payload: { week_id: 'w-b', replace_pending: true } } }));
   });
 
-  it('sem propostas pendentes pede à IA na hora e mostra as vagas vazias em destaque', async () => {
+  it('sugere a escala pelo histórico na hora, sem a IA; "Aceitar todas as sugestões" grava cada uma', async () => {
     const user = userEvent.setup();
-    const remote = weekRemote({ events: [AULA], slots: [slotWith('ea', 'r1'), slotWith('ea', 'r5', 'p17')] });
-    remote.rpcHandler = (fn) => (fn === 'request_job' ? { job_id: 'job-2' } : {});
+    const open = slotWith('ea', 'r1');
+    const remote = weekRemote({ events: [AULA], slots: [open, slotWith('ea', 'r5', 'p17')] });
     await page(remote);
     await user.click(await screen.findByRole('button', { name: 'Próximo passo' }));
-    await waitFor(() => expect(remote.rpcCalls).toContainEqual({ fn: 'request_job', args: { kind: 'propose', payload: { week_id: 'w-b', replace_pending: true } } }));
-    const region = screen.getByRole('region', { name: 'Proposta de pessoas' });
-    expect(region).toHaveTextContent('1 vaga confirmada, 0 propostas para revisar e 1 vaga vazia, em destaque na lista.');
-    expect(await screen.findByRole('listitem', { name: 'Câmera: Vaga aberta' })).toHaveClass('is-missing');
+
+    const region = await screen.findByRole('region', { name: 'Proposta de pessoas' });
+    await waitFor(() => expect(region).toHaveTextContent('1 vaga confirmada, 1 sugestão para revisar e 0 vagas vazias.'));
+    const item = screen.getByRole('listitem', { name: /^Câmera: Pessoa Exemplo/ });
+    expect(item).toHaveClass('is-draft');
+    expect(item).toHaveTextContent('sugestão');
+    expect(item).toHaveTextContent('sem histórico neste tipo; menor carga (0 h na semana)');
+    expect(remote.rpcCalls).toHaveLength(0);
+
+    await user.click(within(region).getByRole('button', { name: 'Aceitar todas as sugestões' }));
+    await waitFor(() =>
+      expect(ops(remote).find((o) => o.kind === 'assignment.set')).toMatchObject({ payload: { slot_id: open.slot.id, override: false } }),
+    );
+  });
+
+  it('com histórico, a sugestão vai para quem mais fez a função naquele tipo', async () => {
+    const user = userEvent.setup();
+    const remote = weekRemote({ events: [AULA], slots: [slotWith('ea', 'r1')] });
+    const fact = (person: string, n: number) =>
+      Array.from({ length: n }, (_, i) => ({ event_id: `import:${person}-${i}`, week_start: '2025-10-20', event_date: '2025-10-20', title: 'Aula', service_type_id: 't1', service_type_name: 'Gravação de aula', job_role_id: 'r1', job_role_name: 'Câmera', person_id: person, person_name: null, raw_name: null, hours: 3, source: 'import' }));
+    remote.views.history_facts = [...fact('p8', 12), ...fact('p4', 2)];
+    await page(remote);
+    await user.click(await screen.findByRole('button', { name: 'Próximo passo' }));
+    const item = await screen.findByRole('listitem', { name: 'Câmera: Pessoa Exemplo 08' });
+    expect(item).toHaveTextContent('fez 12 vezes esta função neste tipo; 0 h na semana');
   });
 });

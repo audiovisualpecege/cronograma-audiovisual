@@ -11,13 +11,14 @@ import { OnlineButton } from '../sync/OnlineButton';
 import { Button, Card } from '../ui/chiaro';
 import { Dialog } from '../ui/Dialog';
 import { Select } from '../ui/Select';
-import { dayMonth, publishSummary, type WeekRows } from './model';
+import { DraftContext, proposeByHistory, type Draft, type DraftApi } from './historyProposal';
+import { dayMonth, publishSummary, slotState, type WeekRows } from './model';
 import { changeType, NO_EVENTS, PreviewList, SourceAlerts } from './PreviewPage';
 import { AI_OFF, isRunning, ProposalActions, ProposalMessage, useProposalRequest } from './ProposalBar';
 import { ScheduleEditor, useSchedule } from './ScheduleEditor';
 import { routeWeek } from './WeekPage';
 import { useIdentifyTypes } from './useIdentifyTypes';
-import { buildWeek, useBuildPending, useNow, useWeekRows } from './useWeek';
+import { buildWeek, setPerson, useBuildPending, useNow, useWeekRows } from './useWeek';
 
 const plural = (n: number, one: string, many: string) => (n === 1 ? `1 ${one}` : `${n} ${many}`);
 
@@ -121,7 +122,15 @@ export function ProposalPage({ params }: RouteProps) {
       ) : step === 1 ? (
         <TypesStep rows={rows} sources={sources} today={today} now={now} titleIndex={titleIndex} onNext={() => setStep(2)} onOpenEvent={open} />
       ) : (
-        <PeopleStep rows={rows} now={now} today={today} historyRows={history.rows} onBack={() => setStep(1)} onOpenEvent={open} />
+        <PeopleStep
+          rows={rows}
+          now={now}
+          today={today}
+          historyRows={history.rows}
+          historyLoading={history.rows === null && history.status === 'loading'}
+          onBack={() => setStep(1)}
+          onOpenEvent={open}
+        />
       )}
       {rows && viewed && <EventQuickView event={viewed} rows={rows} sources={sources} today={today} onClose={() => setViewing(null)} />}
     </section>
@@ -271,11 +280,13 @@ interface PeopleProps {
   now: Date;
   today: string;
   historyRows: readonly HistoryFactRow[] | null;
+  /** O histórico ainda está chegando: a sugestão espera por ele (sem internet, segue sem). */
+  historyLoading: boolean;
   onBack: () => void;
   onOpenEvent: (e: EventRow) => void;
 }
 
-function PeopleStep({ rows, now, today, historyRows, onBack, onOpenEvent }: PeopleProps) {
+function PeopleStep({ rows, now, today, historyRows, historyLoading, onBack, onOpenEvent }: PeopleProps) {
   const engine = useSyncEngine();
   const settings = useSettings();
   const { online } = useSyncState();
@@ -289,73 +300,128 @@ function PeopleStep({ rows, now, today, historyRows, onBack, onOpenEvent }: Peop
     void buildWeek(engine, rows.weekStart);
   }, [engine, rows.weekStart]);
 
-  if (!rows.week || !settings) {
+  if (!rows.week || !settings || historyLoading) {
     return (
       <Card variant="raised" padding={20}>
         <p className="form-text" role="status" style={{ margin: 0 }}>
-          {rows.week ? 'Abrindo a proposta.' : building && !online ? 'Montagem a enviar: conecte-se à internet para montar a semana e pedir a proposta.' : 'Montando a semana.'}
+          {!rows.week
+            ? building && !online
+              ? 'Montagem a enviar: conecte-se à internet para montar a semana e pedir a proposta.'
+              : 'Montando a semana.'
+            : historyLoading
+              ? 'Lendo o histórico da equipe para sugerir a escala.'
+              : 'Abrindo a proposta.'}
         </p>
       </Card>
     );
   }
-  return <ProposeAndReview rows={rows} now={now} today={today} historyRows={historyRows} aiOn={settings.ai_proposal_enabled} onBack={onBack} onOpenEvent={onOpenEvent} />;
+  return (
+    <ProposeAndReview
+      rows={rows}
+      now={now}
+      today={today}
+      historyRows={historyRows}
+      historyLoading={false}
+      aiOn={settings.ai_proposal_enabled}
+      onBack={onBack}
+      onOpenEvent={onOpenEvent}
+    />
+  );
 }
 
 function ProposeAndReview({ rows, now, today, historyRows, aiOn, onBack, onOpenEvent }: PeopleProps & { aiOn: boolean }) {
+  const engine = useSyncEngine();
   const week = rows.week as NonNullable<WeekRows['week']>;
   const schedule = useSchedule(rows, now, today, historyRows);
   const { job, request, sending, requestedHere, error } = useProposalRequest(week);
   const pending = schedule.proposed.length;
-  const canPropose = aiOn && !schedule.readOnly;
-  // Ao chegar: sem propostas pendentes, pede à IA na hora; com pendentes, pergunta antes se substitui.
-  const [arrival] = useState(() => (canPropose ? (pending > 0 ? 'ask' : 'request') : 'none'));
-  const [asking, setAsking] = useState(arrival === 'ask');
-  const requested = useRef(false);
-  useEffect(() => {
-    if (arrival !== 'request' || requested.current) return;
-    requested.current = true;
-    void request(true);
-  }, [arrival, request]);
+  const [asking, setAsking] = useState(false);
+  // A escala sai do histórico na hora, no próprio app: a IA é só um pedido a mais, se quiserem.
+  const [drafts, setDrafts] = useState<ReadonlyMap<string, Draft>>(() =>
+    schedule.readOnly ? new Map() : proposeByHistory(schedule.ctx, schedule.index),
+  );
+  // Sugestão vale só enquanto a vaga segue aberta (aceita, trocada à mão ou preenchida pela IA, ela some).
+  const open = new Map([...drafts].filter(([slotId]) => slotState(schedule.model.bySlot.get(slotId)) === 'open'));
+  const without = (slotId: string) => setDrafts((d) => new Map([...d].filter(([id]) => id !== slotId)));
+  const draftApi: DraftApi = {
+    drafts: open,
+    accept: (slotId, a) => {
+      const d = open.get(slotId);
+      if (d) void setPerson(engine, a, d.personId, [], false);
+      without(slotId);
+    },
+    discard: without,
+  };
+  function acceptAll() {
+    for (const [slotId, d] of open) {
+      const a = schedule.model.bySlot.get(slotId);
+      if (a) void setPerson(engine, a, d.personId, [], false);
+    }
+    setDrafts(new Map());
+  }
 
   const summary = publishSummary(rows);
+  const empty = Math.max(0, summary.open - open.size);
   const running = sending || isRunning(job);
   return (
     <>
       <Card variant="raised" padding={20}>
         <section aria-label="Proposta de pessoas" className="proposal-bar">
-          {!aiOn && (
-            <p className="form-text" role="note" style={{ margin: 0 }}>
-              {AI_OFF}
-            </p>
-          )}
+          <p className="form-text" role="status" style={{ margin: 0 }}>
+            {open.size > 0
+              ? `${plural(open.size, 'sugestão', 'sugestões')} pelo histórico: quem mais fez cada função em cada tipo de serviço, livre no horário e dentro do limite de horas.`
+              : 'Nenhuma sugestão nova: as vagas abertas não têm ninguém apto (função, horário, ausência ou limite de horas).'}
+          </p>
+          <p className="form-text" style={{ margin: 0 }}>
+            {plural(summary.filled, 'vaga confirmada', 'vagas confirmadas')}, {plural(open.size, 'sugestão para revisar', 'sugestões para revisar')}
+            {pending > 0 ? `, ${plural(pending, 'proposta da IA', 'propostas da IA')}` : ''} e {plural(empty, 'vaga vazia', 'vagas vazias')}
+            {empty > 0 ? ', em destaque na lista.' : '.'}
+          </p>
           <ProposalMessage job={job} requestedHere={requestedHere} />
           {error && (
             <p className="form-message form-message--alert" role="alert">
               {error}
             </p>
           )}
-          <p className="form-text" style={{ margin: 0 }}>
-            {plural(summary.filled, 'vaga confirmada', 'vagas confirmadas')}, {plural(summary.proposed, 'proposta para revisar', 'propostas para revisar')} e{' '}
-            {plural(summary.open, 'vaga vazia', 'vagas vazias')}
-            {summary.open > 0 ? ', em destaque na lista.' : '.'}
-          </p>
           <div className="week-actions-buttons">
             <Button variant="ghost" size="sm" onClick={onBack}>
               Voltar aos tipos
             </Button>
+            {open.size > 0 && !schedule.readOnly && (
+              <>
+                <Button size="sm" onClick={acceptAll}>
+                  Aceitar todas as sugestões
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setDrafts(new Map())}>
+                  Descartar as sugestões
+                </Button>
+              </>
+            )}
+            {!schedule.readOnly && (
+              <Button size="sm" variant="secondary" onClick={() => setDrafts(proposeByHistory(schedule.ctx, schedule.index))}>
+                Sugerir de novo
+              </Button>
+            )}
             {pending > 0 && !schedule.readOnly && <ProposalActions proposed={schedule.proposed} />}
             {aiOn && !schedule.readOnly && (
-              <OnlineButton variant="secondary" size="sm" disabled={running} onClick={() => (pending > 0 ? setAsking(true) : void request(true))}>
-                {running ? 'Propondo escala' : 'Propor de novo'}
+              <OnlineButton variant="ghost" size="sm" disabled={running} onClick={() => (pending > 0 ? setAsking(true) : void request(true))}>
+                {running ? 'A IA está propondo' : 'Pedir à IA'}
               </OnlineButton>
             )}
-            <Button size="sm" onClick={() => navigate(`/semana/${rows.weekStart}`)}>
+            <Button size="sm" variant="secondary" onClick={() => navigate(`/semana/${rows.weekStart}`)}>
               Concluir
             </Button>
           </div>
+          {!aiOn && (
+            <p className="page-note" role="note">
+              {AI_OFF}
+            </p>
+          )}
         </section>
       </Card>
-      <ScheduleEditor schedule={schedule} today={today} onOpenEvent={onOpenEvent} />
+      <DraftContext.Provider value={draftApi}>
+        <ScheduleEditor schedule={schedule} today={today} onOpenEvent={onOpenEvent} />
+      </DraftContext.Provider>
       <Dialog
         open={asking}
         onClose={() => setAsking(false)}
