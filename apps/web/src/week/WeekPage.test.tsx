@@ -83,6 +83,25 @@ describe('WeekPage: escala manual', () => {
     expect(screen.queryByRole('list', { name: 'Carga por pessoa' })).toBeNull();
   });
 
+  it('férias, folga e reservas (tipo sem equipe) aparecem à parte, no fim do dia', async () => {
+    const reserva = eventRow('er', { title: 'Não marcar nada', service_type_id: 't4', starts_at: '2026-10-26T08:00:00-03:00', ends_at: '2026-10-26T09:00:00-03:00' });
+    await page(weekRemote({ events: [reserva, AULA], slots: [slotWith('ea', 'r1')] }));
+    const day = await screen.findByRole('region', { name: 'segunda, 26/10' });
+    await waitFor(() => expect(within(day).getAllByRole('article').map((a) => a.getAttribute('aria-label'))).toEqual(['Gravação aula Biologia', 'Não marcar nada']));
+    expect(within(day).getByRole('article', { name: 'Não marcar nada' })).toHaveClass('marker-event');
+  });
+
+  it('a estrela destaca a atividade principal da semana', async () => {
+    const user = userEvent.setup();
+    const remote = weekRemote({ events: [AULA], slots: [slotWith('ea', 'r1')] });
+    await page(remote);
+    const star = await screen.findByRole('button', { name: 'Destacar Gravação aula Biologia como atividade principal' });
+    expect(star).toHaveAttribute('aria-pressed', 'false');
+    await user.click(star);
+    await waitFor(() => expect(ops(remote).find((o) => o.kind === 'event.update_extras')).toMatchObject({ payload: { id: 'ea', highlighted: true } }));
+    expect(await screen.findByRole('button', { name: 'Tirar o destaque de Gravação aula Biologia' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
   it('vaga aberta fica em destaque na lista', async () => {
     await page(weekRemote({ events: [AULA], slots: [slotWith('ea', 'r1'), slotWith('ea', 'r5', 'p17')] }));
     const open = await screen.findByRole('listitem', { name: 'Câmera: Vaga aberta' });

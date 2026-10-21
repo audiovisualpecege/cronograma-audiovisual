@@ -1,6 +1,6 @@
 import { buildHistoryIndex, isWeekPast } from '@cronograma/core';
 import { useMemo, useState } from 'react';
-import { toFact, type HistoryFactRow } from '../data/catalog';
+import { toFact, type EventRow, type HistoryFactRow } from '../data/catalog';
 import { slotState, weekContext, type WeekRows } from './model';
 import { PersonPicker } from './PersonPicker';
 import { scheduleModel } from './schedule';
@@ -19,10 +19,11 @@ export function useSchedule(rows: WeekRows, now: Date, today: string, historyRow
 interface EditorProps {
   schedule: ReturnType<typeof useSchedule>;
   today: string;
+  onOpenEvent?: (e: EventRow) => void;
 }
 
 /** Lista por evento com a escolha de pessoa (US-014, US-015). */
-export function ScheduleEditor({ schedule, today }: EditorProps) {
+export function ScheduleEditor({ schedule, today, onOpenEvent }: EditorProps) {
   const { model, ctx, index, readOnly } = schedule;
   const [picking, setPicking] = useState<string | null>(null);
   const pickSlot = picking ? model.rows.slots.find((s) => s.id === picking) : undefined;
@@ -30,7 +31,7 @@ export function ScheduleEditor({ schedule, today }: EditorProps) {
   const pickEvent = pickSlot ? model.rows.events.find((e) => e.id === pickSlot.event_id) : undefined;
   return (
     <>
-      <ScheduleList model={model} readOnly={readOnly} today={today} onPick={setPicking} />
+      <ScheduleList model={model} readOnly={readOnly} today={today} onPick={setPicking} onOpenEvent={onOpenEvent} />
       {pickSlot && pickAssignment && pickEvent && (
         <PersonPicker
           ctx={ctx}

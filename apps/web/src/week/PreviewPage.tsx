@@ -4,7 +4,11 @@ import type { SyncEngine } from '../sync/syncEngine';
 import { useSyncEngine, useSyncState } from '../sync/SyncProvider';
 import { formatStamp } from '../ui/format';
 import { Select } from '../ui/Select';
-import { CERTAINTY_LABEL, estimatedCrew, eventsByDay, eventSpan, weekDays, type WeekRows } from './model';
+import { PenIcon } from '@solar-icons/react/linear';
+import { HighlightToggle } from './HighlightToggle';
+import { AppIcon } from '../ui/AppIcon';
+import { typeIcon } from '../ui/typeIcons';
+import { CERTAINTY_LABEL, estimatedCrew, eventsByDay, eventSpan, isMarker, markersLast, weekDays, type WeekRows } from './model';
 import { EventSeals } from './ScheduleList';
 import { Seal } from './Seal';
 
@@ -47,27 +51,41 @@ interface RowProps {
   /** Tipo sugerido pelo histórico para o evento sem tipo. */
   suggestion?: ServiceTypeRow;
   onType: (e: EventRow, typeId: string | null) => void;
+  /** Abre os detalhes numa janela, em vez de ir para a página do evento. */
+  onOpen?: (e: EventRow) => void;
 }
 
 /** Uma linha da prévia; memorizada para semanas com 100 eventos ou mais (US-010 EC-8). */
-const PreviewEvent = memo(function PreviewEvent({ event, types, crew, roles, sourceLabel, today, readOnly, pending, highlight, suggestion, onType }: RowProps) {
+const PreviewEvent = memo(function PreviewEvent({ event, types, crew, roles, sourceLabel, today, readOnly, pending, highlight, suggestion, onType, onOpen }: RowProps) {
   const [editing, setEditing] = useState(false);
   // Funções na ordem do código (R1, R2...), como no cadastro do tipo.
   const code = (id: string) => roles.get(id)?.code ?? '';
   const estimated = [...estimatedCrew(event, types, crew)].sort((a, b) => code(a.job_role_id).localeCompare(code(b.job_role_id), 'en', { numeric: true }));
-  const typeName = types.find((t) => t.id === event.service_type_id)?.name;
+  const type = types.find((t) => t.id === event.service_type_id);
   // O seletor só nasce quando a pessoa vai trocar: semanas com 100 eventos ou mais abrem sem travar.
   const options = editing
     ? [{ value: TYPE_UNDEFINED, label: 'a definir' }, ...types.filter((t) => !t.archived_at || t.id === event.service_type_id).map((t) => ({ value: t.id, label: t.name }))]
     : [];
   const noTeam = event.no_team || types.find((t) => t.id === event.service_type_id)?.no_team;
   const missing = highlight && !event.service_type_id && event.status !== 'cancelled';
+  const marker = isMarker(event, types);
+  const titleClass = `list-row-title${event.status === 'cancelled' ? ' is-cancelled' : ''}`;
   return (
-    <li className={`preview-event${missing ? ' is-missing' : ''}`} aria-label={event.title || 'Sem título'}>
+    <li
+      className={`preview-event${missing ? ' is-missing' : ''}${marker ? ' is-marker' : ''}${event.highlighted ? ' is-highlighted' : ''}`}
+      aria-label={event.title || 'Sem título'}
+    >
+      <HighlightToggle event={event} readOnly={readOnly} />
       <span className="list-row-main">
-        <a className={`list-row-title${event.status === 'cancelled' ? ' is-cancelled' : ''}`} href={`#/evento/${event.id}`}>
-          {event.title || 'Sem título'}
-        </a>
+        {onOpen ? (
+          <button type="button" className={`${titleClass} title-button`} onClick={() => onOpen(event)}>
+            {event.title || 'Sem título'}
+          </button>
+        ) : (
+          <a className={titleClass} href={`#/evento/${event.id}`}>
+            {event.title || 'Sem título'}
+          </a>
+        )}
         <span className="list-row-sub">
           {eventSpan(event)}
           {event.location ? `, ${event.location}` : ''}. {event.origin === 'internal' ? 'Atividade interna' : `Agenda ${sourceLabel}`}
@@ -98,11 +116,28 @@ const PreviewEvent = memo(function PreviewEvent({ event, types, crew, roles, sou
         />
       ) : (
         <span className="preview-type">
-          <span className="list-row-sub">{typeName ?? 'Tipo a definir'}</span>
-          {!readOnly && event.status !== 'cancelled' && (
-            <button type="button" className="text-button" onClick={() => setEditing(true)} aria-label={`Trocar o tipo de ${event.title || 'Sem título'}`}>
-              {event.service_type_id ? 'Trocar tipo' : 'Escolher tipo'}
-            </button>
+          {type ? (
+            <span className="type-chip">
+              <span className="type-icon type-icon--sm">
+                <AppIcon icon={typeIcon(type).icon} size={18} />
+              </span>
+              <strong className="type-name">{type.name}</strong>
+              {!readOnly && event.status !== 'cancelled' && (
+                // Botão simples, sem estado: a prévia tem 100 eventos ou mais (US-010 EC-8).
+                <button type="button" className="pen-button" onClick={() => setEditing(true)} aria-label={`Trocar o tipo de ${event.title || 'Sem título'}`} title="Trocar o tipo">
+                  <AppIcon icon={PenIcon} size={16} />
+                </button>
+              )}
+            </span>
+          ) : (
+            <>
+              <span className="list-row-sub">Tipo a definir</span>
+              {!readOnly && event.status !== 'cancelled' && (
+                <button type="button" className="text-button" onClick={() => setEditing(true)} aria-label={`Trocar o tipo de ${event.title || 'Sem título'}`}>
+                  Escolher tipo
+                </button>
+              )}
+            </>
           )}
           {!readOnly && suggestion && !event.service_type_id && (
             <button type="button" className="text-button" onClick={() => onType(event, suggestion.id)} aria-label={`Usar ${suggestion.name} em ${event.title || 'Sem título'}`}>
@@ -124,13 +159,14 @@ interface PreviewListProps {
   highlight?: boolean;
   /** Tipo sugerido pelo histórico, por evento. */
   suggestions?: ReadonlyMap<string, ServiceTypeRow>;
+  onOpenEvent?: (e: EventRow) => void;
 }
 
 /**
  * Eventos da semana sem montagem por dia (US-010): origem, tipo previsto, certeza e equipe estimada, com
  * a troca de tipo. Só eventos com tipo ganham vagas ao montar.
  */
-export function PreviewList({ rows, sources, today, readOnly, highlight = false, suggestions }: PreviewListProps) {
+export function PreviewList({ rows, sources, today, readOnly, highlight = false, suggestions, onOpenEvent }: PreviewListProps) {
   const engine = useSyncEngine();
   const { pendingRows } = useSyncState();
   const roles = useMemo(() => new Map(rows.roles.map((r) => [r.id, r])), [rows.roles]);
@@ -142,7 +178,7 @@ export function PreviewList({ rows, sources, today, readOnly, highlight = false,
   return (
     <div className="week-preview">
       {weekDays(rows.weekStart).map((day) => {
-        const events = byDay.get(day.date) ?? [];
+        const events = markersLast(byDay.get(day.date) ?? [], rows.types);
         if (events.length === 0) return null;
         return (
           <section key={day.date} className="day-group" aria-label={day.label}>
@@ -164,6 +200,7 @@ export function PreviewList({ rows, sources, today, readOnly, highlight = false,
                   highlight={highlight}
                   suggestion={suggestions?.get(e.id)}
                   onType={onType}
+                  onOpen={onOpenEvent}
                 />
               ))}
             </ul>

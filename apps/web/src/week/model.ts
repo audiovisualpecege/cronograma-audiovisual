@@ -85,6 +85,19 @@ export function typeNoTeam(types: readonly ServiceTypeRow[], typeId: string | nu
   return Boolean(typeId && types.find((t) => t.id === typeId)?.no_team);
 }
 
+/**
+ * Marcação da agenda que não pede equipe (férias, folga, horário reservado): aparece à parte, no fim do dia.
+ * Evento cancelado continua na ordem normal, riscado; evento com estrela de destaque também.
+ */
+export function isMarker(e: EventRow, types: readonly ServiceTypeRow[]): boolean {
+  return e.status !== 'cancelled' && !e.highlighted && (Boolean(e.no_team) || typeNoTeam(types, e.service_type_id));
+}
+
+/** Os eventos do dia com as marcações no fim, mantendo a ordem de cada grupo. */
+export function markersLast(events: readonly EventRow[], types: readonly ServiceTypeRow[]): EventRow[] {
+  return [...events.filter((e) => !isMarker(e, types)), ...events.filter((e) => isMarker(e, types))];
+}
+
 /** Evento que entra na escala: ativo, não ignorado e que exige equipe. */
 export function needsTeam(e: EventRow, types: readonly ServiceTypeRow[]): boolean {
   return e.status !== 'cancelled' && !e.ignored && !e.no_team && !typeNoTeam(types, e.service_type_id);
@@ -235,7 +248,7 @@ function personInTitle(title: string, people: readonly PersonRow[]): PersonRow |
 
 /**
  * Quem está de folga, férias ou ausente na semana: as ausências cadastradas e os eventos da agenda com
- * "férias", "folga" ou "ausente" no título (com a pessoa reconhecida pelo nome, quando dá).
+ * "férias", "folga" ou "ausente" no título ou no tipo (com a pessoa reconhecida pelo nome, quando dá).
  */
 export function weekTimeOff(rows: WeekRows): TimeOff[] {
   const ws = rows.weekStart;
@@ -255,8 +268,10 @@ export function weekTimeOff(rows: WeekRows): TimeOff[] {
   }
   for (const e of rows.events) {
     if (e.ignored || e.status === 'cancelled') continue;
-    const title = nameTokens(e.title).join(' ');
-    const kind = TIME_OFF_WORD.find(([re]) => re.test(title))?.[1];
+    // Pelo título ou pelo tipo do evento (FERIAS, FOLGA).
+    const typeName = rows.types.find((t) => t.id === e.service_type_id)?.name ?? '';
+    const words = nameTokens(`${e.title} ${typeName}`).join(' ');
+    const kind = TIME_OFF_WORD.find(([re]) => re.test(words))?.[1];
     if (!kind) continue;
     const span = clip(e.starts_at, e.ends_at);
     if (!span.inWeek) continue;

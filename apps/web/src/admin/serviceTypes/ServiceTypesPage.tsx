@@ -10,6 +10,7 @@ import { Button, Card, Checkbox, Input, Tag } from '../../ui/chiaro';
 import { Dialog } from '../../ui/Dialog';
 import { IconButton } from '../../ui/IconButton';
 import { Select } from '../../ui/Select';
+import { TYPE_ICONS, typeIcon } from '../../ui/typeIcons';
 import { useCatalogSuggestions } from '../suggestions';
 
 interface CrewDraft {
@@ -20,6 +21,43 @@ interface CrewDraft {
 
 export function crewText(crew: readonly CrewItem[], roleName: Map<string, string>): string {
   return crew.map((c) => `${c.quantity} ${roleName.get(c.job_role_id) ?? '?'}`).join(', ');
+}
+
+/** Banco de ícones do tipo; "Automático" deixa o app escolher pelo nome. */
+function IconPicker({ name, value, onChange }: { name: string; value: string; onChange: (key: string) => void }) {
+  const auto = typeIcon({ name });
+  return (
+    <fieldset className="check-group">
+      <legend className="field-label">Ícone</legend>
+      <div className="icon-bank" role="radiogroup" aria-label="Ícone do tipo">
+        <button
+          type="button"
+          role="radio"
+          aria-checked={value === ''}
+          className={`icon-choice icon-choice--auto${value === '' ? ' is-selected' : ''}`}
+          onClick={() => onChange('')}
+          title={`Automático (${auto.label})`}
+        >
+          <AppIcon icon={auto.icon} size={24} />
+          <span className="icon-choice-label">Automático</span>
+        </button>
+        {TYPE_ICONS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            role="radio"
+            aria-checked={value === t.key}
+            aria-label={t.label}
+            title={t.label}
+            className={`icon-choice${value === t.key ? ' is-selected' : ''}`}
+            onClick={() => onChange(t.key)}
+          >
+            <AppIcon icon={t.icon} size={24} />
+          </button>
+        ))}
+      </div>
+    </fieldset>
+  );
 }
 
 function ServiceTypeForm({
@@ -44,6 +82,7 @@ function ServiceTypeForm({
   const [name, setName] = useState(type?.name ?? initialName ?? '');
   const [keywords, setKeywords] = useState((type?.keywords ?? []).join(', '));
   const [noTeam, setNoTeam] = useState(type?.no_team ?? false);
+  const [icon, setIcon] = useState(type?.icon ?? '');
   const [rows, setRows] = useState<CrewDraft[]>(() =>
     (type ? crewOf(type, crew) : []).map((c) => ({ key: crypto.randomUUID(), jobRoleId: c.job_role_id, quantity: String(c.quantity) })),
   );
@@ -70,8 +109,8 @@ function ServiceTypeForm({
     const crewPayload = v.crew.map((c) => ({ job_role_id: c.jobRoleId, quantity: c.quantity }));
     await engine.enqueue(
       'service_type.upsert',
-      { id, name: v.name, keywords: v.keywords, no_team: v.noTeam, crew: crewPayload },
-      { target: { table: 'service_types', id, changes: { name: v.name, keywords: v.keywords, no_team: v.noTeam, crew: crewPayload, code: type?.code ?? '' } } },
+      { id, name: v.name, keywords: v.keywords, no_team: v.noTeam, icon: icon || null, crew: crewPayload },
+      { target: { table: 'service_types', id, changes: { name: v.name, keywords: v.keywords, no_team: v.noTeam, icon: icon || null, crew: crewPayload, code: type?.code ?? '' } } },
     );
     onClose();
   }
@@ -92,6 +131,7 @@ function ServiceTypeForm({
           onChange={(e) => setKeywords(e.target.value)}
           hint="Separadas por vírgula. Um título com a palavra recebe este tipo com certeza alta."
         />
+        <IconPicker name={name} value={icon} onChange={setIcon} />
         <Checkbox label="Não exige equipe (não gera vagas e não aparece para a equipe)" checked={noTeam} onChange={setNoTeam} />
 
         {!noTeam && (
@@ -210,6 +250,9 @@ export function ServiceTypesPage() {
           return (
             <li key={t.id} className="catalog-item">
               <button type="button" className="list-row" onClick={() => setOpen({ id: t.id })} aria-label={`Abrir ${t.name}`}>
+                <span className="type-icon">
+                  <AppIcon icon={typeIcon(t).icon} size={24} />
+                </span>
                 <span className="list-row-main">
                   <span className="list-row-title">
                     {t.name}

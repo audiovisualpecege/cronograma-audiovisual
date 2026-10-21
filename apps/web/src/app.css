@@ -1446,6 +1446,214 @@ body {
   gap: var(--space-2);
 }
 
+/* Tipo de serviço: ícone do banco, nome em negrito e o lápis para trocar. */
+.type-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--chiaro-lavanda);
+}
+
+.type-icon--sm {
+  width: 30px;
+  height: 30px;
+}
+
+.type-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.type-name {
+  color: var(--text-primary);
+  font-weight: var(--weight-bold);
+}
+
+.pen-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.pen-button:hover,
+.pen-button:focus-visible {
+  background: var(--accent-soft);
+  color: var(--text-brand);
+  outline: none;
+}
+
+/* Estrela de atividade principal da semana. */
+.star-toggle {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.2s var(--ease-cine), transform 0.2s var(--ease-cine);
+}
+
+.star-toggle:hover:not(:disabled),
+.star-toggle:focus-visible {
+  color: var(--chiaro-pessego);
+  outline: none;
+  transform: scale(1.1);
+}
+
+.star-toggle.is-on {
+  color: var(--chiaro-pessego);
+}
+
+.star-toggle:disabled {
+  cursor: default;
+}
+
+.preview-event.is-highlighted {
+  border-color: var(--chiaro-pessego);
+  box-shadow: 0 0 0 1px var(--chiaro-pessego);
+}
+
+.schedule-event.is-highlighted .schedule-event-title {
+  color: var(--chiaro-pessego);
+}
+
+/* Título que abre a janela de detalhes, com a cara do link. */
+.title-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.preview-event .title-button {
+  color: var(--text-primary);
+}
+
+.title-button:hover,
+.title-button:focus-visible {
+  color: var(--text-brand);
+  outline: none;
+  text-decoration: underline;
+}
+
+/* Férias, folga e horários reservados: à parte, no fim do dia, discretos. */
+.preview-event.is-marker {
+  border-style: dashed;
+  background: transparent;
+  opacity: 0.75;
+}
+
+.marker-event {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-pill);
+  border: 1px dashed var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+.marker-title {
+  color: var(--text-secondary);
+  font-weight: var(--weight-bold);
+  text-decoration: none;
+}
+
+.marker-event .type-icon {
+  background: rgba(247, 225, 196, 0.12);
+  color: var(--chiaro-areia);
+}
+
+/* Banco de ícones do cadastro de tipos. */
+.icon-bank {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+  gap: var(--space-2);
+}
+
+.icon-choice {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 48px;
+  padding: var(--space-2);
+  border: 1.5px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.icon-choice--auto {
+  grid-column: span 2;
+}
+
+.icon-choice-label {
+  font: var(--weight-bold) 10px var(--font-display);
+  text-transform: uppercase;
+}
+
+.icon-choice:hover,
+.icon-choice:focus-visible {
+  border-color: var(--border-brand);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.icon-choice.is-selected {
+  border-color: var(--chiaro-lavanda);
+  background: var(--accent-soft);
+  color: var(--chiaro-lavanda);
+}
+
+/* Janela de detalhes do evento. */
+.quick-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.quick-view-crew li {
+  padding: 2px 0;
+}
+
+.quick-view-crew li.is-open {
+  color: var(--chiaro-pessego);
+}
+
+.quick-view-description {
+  max-height: 220px;
+  margin: 0;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  color: var(--text-secondary);
+}
+
 /* Painel: as próximas 3 semanas em cartões, lado a lado no computador. */
 .dashboard-weeks {
   display: grid;

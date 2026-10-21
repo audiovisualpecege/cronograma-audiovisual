@@ -24,6 +24,16 @@ PATCH para um conserto, MINOR para algo novo, MAJOR quando o jeito de usar muda.
   do histórico e o Gemini). Os que faltarem ficam em destaque, com sugestões do histórico para usar com um clique.
   Passo 2: a semana é montada, a IA propõe as pessoas e a revisão acontece ali mesmo (aceitar, trocar,
   descartar), com as vagas vazias em destaque.
+- Na tela Propor escala, clicar num evento abre os detalhes numa janela, sem sair da tela (quando, local,
+  origem, tipo, equipe e a descrição da agenda). A página completa do evento fica a um clique.
+- Tipo de serviço em negrito, com o ícone do tipo; para trocar, o lápis ao lado.
+- Cada tipo tem um ícone. No cadastro de tipos há um banco de ícones para escolher; sem escolha, o app usa um
+  pelo nome do tipo.
+- Tipos novos **FERIAS** e **FOLGA**, sem equipe. O **NAO ESCALAR** fica para os horários reservados ("não
+  marcar nada", pré-reserva). Esses eventos aparecem à parte, discretos, no fim de cada dia.
+- **\*DISPONIBILIZAR** e **\*REDISPONIBILIZAR** não pedem mais ninguém escalado: viram lembrete.
+- **Estrela de destaque**: quem monta a escala marca as atividades principais da semana com um clique. Por
+  enquanto ela aparece nas telas de montagem; o visual no cronograma final ainda vai ser definido.
 - Conserto: os eventos lidos da agenda antes de o tipo de serviço existir ficavam "a definir" para sempre, porque
   o serviço de fundo só identifica o tipo do evento novo. Agora dá para pedir a identificação de novo, e "Montar
   semana" numa semana já montada cria as vagas dos eventos que ganharam tipo depois.

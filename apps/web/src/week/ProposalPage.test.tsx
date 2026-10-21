@@ -70,6 +70,21 @@ describe('ProposalPage: passo 1, tipos de serviço', () => {
     expect(screen.getByRole('button', { name: 'Trocar o tipo de Xpto especial' })).toBeInTheDocument();
   });
 
+  it('o tipo aparece em negrito com o lápis; clicar no evento abre os detalhes numa janela, sem sair da tela', async () => {
+    const user = userEvent.setup();
+    const remote = weekRemote({ events: [{ ...AULA, description: 'Professor: Ana<br>Sala 3' }], slots: [slotWith('ea', 'r1')] });
+    await page(remote);
+    const item = await screen.findByRole('listitem', { name: 'Gravação aula Biologia' });
+    expect(within(item).getByText('Gravação de aula').tagName).toBe('STRONG');
+    expect(within(item).getByRole('button', { name: 'Trocar o tipo de Gravação aula Biologia' })).toBeInTheDocument();
+    await user.click(within(item).getByRole('button', { name: 'Gravação aula Biologia' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Gravação aula Biologia' });
+    expect(dialog).toHaveTextContent('segunda, 26/10, 09:00 às 12:00');
+    expect(dialog).toHaveTextContent('Professor: Ana');
+    expect(dialog).not.toHaveTextContent('<br>');
+    expect(window.location.hash).not.toBe('#/evento/ea');
+  });
+
   it('semana sem montagem é montada ao seguir para o passo 2', async () => {
     const user = userEvent.setup();
     const remote = weekRemote({ week: null, events: [AULA] });

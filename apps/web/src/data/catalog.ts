@@ -45,6 +45,8 @@ export interface ServiceTypeRow extends Row {
   name: string;
   keywords: string[];
   no_team: boolean;
+  /** Chave do banco de ícones (ui/typeIcons); nulo usa um ícone pelo nome. */
+  icon?: string | null;
   archived_at: string | null;
   crew?: CrewItem[];
 }
@@ -141,6 +143,8 @@ export interface EventRow extends Row {
   notes?: string | null;
   crew_outdated?: boolean;
   source_disconnected?: boolean;
+  /** Atividade principal da semana (estrela de quem monta a escala). */
+  highlighted?: boolean;
 }
 
 export interface SlotRow extends Row {

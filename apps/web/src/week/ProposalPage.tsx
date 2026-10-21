@@ -1,6 +1,7 @@
 import { classifyTitle, isWeekPast, localDate, type TitleIndex } from '@cronograma/core';
 import { useEffect, useRef, useState } from 'react';
-import { useTable, type CalendarSourceRow, type HistoryFactRow, type ServiceTypeRow } from '../data/catalog';
+import { useTable, type CalendarSourceRow, type EventRow, type HistoryFactRow, type ServiceTypeRow } from '../data/catalog';
+import { EventQuickView } from './EventQuickView';
 import { useHistory } from '../data/history';
 import { PageTitle } from '../layout/PageTitle';
 import { navigate, type RouteProps } from '../router';
@@ -70,6 +71,9 @@ export function ProposalPage({ params }: RouteProps) {
   const sources = useTable<CalendarSourceRow>('calendar_sources') ?? [];
   const history = useHistory();
   const [step, setStep] = useState<1 | 2>(1);
+  const [viewing, setViewing] = useState<string | null>(null);
+  const viewed = viewing ? rows?.events.find((e) => e.id === viewing) : undefined;
+  const open = (e: EventRow) => setViewing(e.id);
 
   return (
     <section className="page week-page proposal-page">
@@ -84,10 +88,11 @@ export function ProposalPage({ params }: RouteProps) {
       {!rows ? (
         <p className="form-text">Abrindo a semana.</p>
       ) : step === 1 ? (
-        <TypesStep rows={rows} sources={sources} today={today} now={now} historyRows={history.rows} onNext={() => setStep(2)} />
+        <TypesStep rows={rows} sources={sources} today={today} now={now} historyRows={history.rows} onNext={() => setStep(2)} onOpenEvent={open} />
       ) : (
-        <PeopleStep rows={rows} now={now} today={today} historyRows={history.rows} onBack={() => setStep(1)} />
+        <PeopleStep rows={rows} now={now} today={today} historyRows={history.rows} onBack={() => setStep(1)} onOpenEvent={open} />
       )}
+      {rows && viewed && <EventQuickView event={viewed} rows={rows} sources={sources} today={today} onClose={() => setViewing(null)} />}
     </section>
   );
 }
@@ -99,9 +104,10 @@ interface TypesProps {
   now: Date;
   historyRows: readonly HistoryFactRow[] | null;
   onNext: () => void;
+  onOpenEvent: (e: EventRow) => void;
 }
 
-function TypesStep({ rows, sources, today, now, historyRows, onNext }: TypesProps) {
+function TypesStep({ rows, sources, today, now, historyRows, onNext, onOpenEvent }: TypesProps) {
   const engine = useSyncEngine();
   const past = isWeekPast(rows.weekStart, now);
   const live = rows.events.filter((e) => !e.ignored && e.status !== 'cancelled');
@@ -159,7 +165,7 @@ function TypesStep({ rows, sources, today, now, historyRows, onNext }: TypesProp
           </p>
         )}
       </Card>
-      <PreviewList rows={rows} sources={sources} today={today} readOnly={past} highlight suggestions={suggestions} />
+      <PreviewList rows={rows} sources={sources} today={today} readOnly={past} highlight suggestions={suggestions} onOpenEvent={onOpenEvent} />
     </>
   );
 }
@@ -170,9 +176,10 @@ interface PeopleProps {
   today: string;
   historyRows: readonly HistoryFactRow[] | null;
   onBack: () => void;
+  onOpenEvent: (e: EventRow) => void;
 }
 
-function PeopleStep({ rows, now, today, historyRows, onBack }: PeopleProps) {
+function PeopleStep({ rows, now, today, historyRows, onBack, onOpenEvent }: PeopleProps) {
   const engine = useSyncEngine();
   const settings = useSettings();
   const { online } = useSyncState();
@@ -195,10 +202,10 @@ function PeopleStep({ rows, now, today, historyRows, onBack }: PeopleProps) {
       </Card>
     );
   }
-  return <ProposeAndReview rows={rows} now={now} today={today} historyRows={historyRows} aiOn={settings.ai_proposal_enabled} onBack={onBack} />;
+  return <ProposeAndReview rows={rows} now={now} today={today} historyRows={historyRows} aiOn={settings.ai_proposal_enabled} onBack={onBack} onOpenEvent={onOpenEvent} />;
 }
 
-function ProposeAndReview({ rows, now, today, historyRows, aiOn, onBack }: Omit<PeopleProps, 'onBack'> & { aiOn: boolean; onBack: () => void }) {
+function ProposeAndReview({ rows, now, today, historyRows, aiOn, onBack, onOpenEvent }: PeopleProps & { aiOn: boolean }) {
   const week = rows.week as NonNullable<WeekRows['week']>;
   const schedule = useSchedule(rows, now, today, historyRows);
   const { job, request, sending, requestedHere, error } = useProposalRequest(week);
@@ -252,7 +259,7 @@ function ProposeAndReview({ rows, now, today, historyRows, aiOn, onBack }: Omit<
           </div>
         </section>
       </Card>
-      <ScheduleEditor schedule={schedule} today={today} />
+      <ScheduleEditor schedule={schedule} today={today} onOpenEvent={onOpenEvent} />
       <Dialog
         open={asking}
         onClose={() => setAsking(false)}
