@@ -86,6 +86,7 @@ export class GeminiProvider implements AiProvider {
     const ai = this.client();
     for (let attempt = 0; ; attempt++) {
       let text: string | undefined;
+      let finish: string | undefined;
       try {
         const res = await ai.models.generateContent({
           model: this.opts.model,
@@ -98,6 +99,7 @@ export class GeminiProvider implements AiProvider {
           },
         });
         text = res.text;
+        finish = res.candidates?.[0]?.finishReason;
       } catch (e) {
         const err = toAiError(e);
         if (err.kind === 'quota' && attempt === 0 && e instanceof ApiError) {
@@ -109,7 +111,8 @@ export class GeminiProvider implements AiProvider {
       try {
         return JSON.parse(text ?? '');
       } catch {
-        throw new AiError('invalid_response', 'A IA devolveu um texto que não é JSON.');
+        // O motivo do fim (MAX_TOKENS, SAFETY...) vai junto: é ele que diz por que a resposta veio cortada ou vazia.
+        throw new AiError('invalid_response', `A IA devolveu um texto que não é JSON${finish && finish !== 'STOP' ? ` (fim: ${finish})` : ''}.`);
       }
     }
   }

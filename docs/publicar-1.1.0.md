@@ -7,7 +7,7 @@ primeiro passo que não der o resultado esperado.
 
 - **Código**: branch `ajuste/painel-e-semana`, pull request #2 (`audiovisualpecege/cronograma-audiovisual`).
   Ainda **sem merge**: o app publicado no GitHub Pages continua na 1.0.1.
-- **Banco**: três migrações novas, **ainda não aplicadas** na produção:
+- **Banco**: quatro migrações novas, **ainda não aplicadas** na produção:
   - `supabase/migrations/0012_request_classify.sql`: o app passa a poder pedir o job `classify` (identificar os
     tipos pelo histórico e pelo Gemini), e "Montar semana" numa semana já montada cria as vagas dos eventos
     que o serviço de fundo tipou depois da montagem. Não mexe em dados.
@@ -19,9 +19,18 @@ primeiro passo que não der o resultado esperado.
   - `supabase/migrations/0014_local_ai.sql`: colunas `ai_local_url` e `ai_local_model` na configuração, e
     `op_settings_update` aceitando o fornecedor `local` (IA na rede da empresa, como o MiniCPM5; ver
     `docs/ia-local.md`). Não mexe em dados.
-- **Desfazer**: `supabase/rollback/0014_down.sql`, `0013_down.sql` e `0012_down.sql` (fora da pasta de
-  migrações, para o `db push` não rodá-los).
-- **Serviço de fundo (NAS)**: **muda**. Ganhou o fornecedor de IA local (`apps/worker/src/ai/local.ts`). Depois
+  - `supabase/migrations/0015_meetings_by_sector.sql`: reuniões por setor. **Mexe em dados da produção**:
+    - cria REUNIAO EDICAO, PRODUCAO e PLANEJAMENTO;
+    - a equipe típica das reuniões de setor (incluindo TECNICA AULAS e MEDIADORES) passa a ter uma vaga por
+      pessoa ativa do setor;
+    - a REUNIAO INTERNA deixa de pedir equipe;
+    - as reuniões futuras são reclassificadas pelo título e as vagas das semanas montadas são refeitas.
+    Antes de mudar, guarda o que era em `public._backup_0015`. Motivo: a REUNIAO INTERNA pedia 47 vagas por
+    reunião (329 das 685 vagas da semana de 19/10) e a proposta da IA falhava no primeiro lote.
+- **Desfazer**: `supabase/rollback/0015_down.sql`, `0014_down.sql`, `0013_down.sql` e `0012_down.sql` (fora da
+  pasta de migrações, para o `db push` não rodá-los).
+- **Serviço de fundo (NAS)**: **muda**. Ganhou o fornecedor de IA local (`apps/worker/src/ai/local.ts`), lotes
+  de 25 vagas (eram 60), resposta da IA aproveitada item por item e o motivo exato da falha guardado no pedido. Depois
   do merge, o NAS precisa de `docker compose pull && docker compose up -d` na pasta
   `docker/cronograma-audiovisual`. O worker novo funciona com o banco antigo e o antigo com o banco novo; só a
   IA local precisa dos dois atualizados.
@@ -50,7 +59,8 @@ primeiro passo que não der o resultado esperado.
    ```
    npx supabase db push --dry-run
    ```
-   Deve listar **só** `0012_request_classify.sql`, `0013_type_icon_and_highlight.sql` e `0014_local_ai.sql`.
+   Deve listar **só** `0012_request_classify.sql`, `0013_type_icon_and_highlight.sql`, `0014_local_ai.sql` e
+   `0015_meetings_by_sector.sql`.
    Se listar também as antigas (0001 a 0011), o histórico de migrações do banco não registrou que elas já
    foram aplicadas. **Não rode o push.** Confira com `npx supabase migration list`. Depois de confirmar que o
    esquema existe (as tabelas `people`, `events`, `weeks` estão lá), marque as antigas como aplicadas com
@@ -68,6 +78,9 @@ primeiro passo que não der o resultado esperado.
    select column_name from information_schema.columns
     where table_name = 'events' and column_name = 'highlighted';                  -- 1 linha
    select ai_provider, ai_local_url, ai_local_model from public.settings;         -- minicpm5 de padrão
+   select t.name, t.no_team, sum(c.quantity) as vagas from public.service_types t
+     left join public.service_type_crew c on c.service_type_id = t.id and c.archived_at is null
+    where t.name like 'REUNIAO%' group by t.name, t.no_team order by t.name;   -- interna sem equipe, setores com vagas
    ```
 4. **CI verde e merge**: `gh pr checks 2` tudo verde; depois `gh pr merge 2 --merge`. O merge publica o app
    no GitHub Pages sozinho. Em poucos minutos o rodapé do menu mostra `v1.1.0`.
@@ -84,7 +97,7 @@ primeiro passo que não der o resultado esperado.
    - Tipos de serviço: abrir um tipo, escolher um ícone no banco de ícones, salvar, recarregar, o ícone fica.
    - Se for usar o MiniCPM5: Configurações > Geral, fornecedor "Modelo local", endereço e modelo, "Testar
      conexão" deve dizer "Conexão aceita". Depois um Propor escala de verdade numa semana futura.
-7. Depois de alguns dias sem problema: `drop table public._backup_0013;` e apague esta seção de pendência
+7. Depois de alguns dias sem problema: `drop table public._backup_0013; drop table public._backup_0015;` e apague esta seção de pendência
    do `CLAUDE.md`.
 
 ## Desfazer
@@ -103,14 +116,16 @@ que deu problema.
 2. **Serviço de fundo**: no NAS, volte a imagem anterior. Antes, troque o fornecedor para Gemini na tela, porque
    o worker antigo não conhece o local. Ou deixe como está: o worker novo funciona com o banco antigo.
 3. **Banco**, nesta ordem. Rode cada arquivo inteiro no SQL Editor do painel; cada um roda numa transação só:
-   1. `supabase/rollback/0014_down.sql`: volta o fornecedor para Gemini e tira as colunas da IA local.
-   2. `supabase/rollback/0013_down.sql`: volta os eventos que mudaram de tipo, o NAO ESCALAR e o
+   1. `supabase/rollback/0015_down.sql`: volta as reuniões como eram (REUNIAO INTERNA com a equipe inteira) e
+      refaz as vagas dos eventos de reunião sem ninguém escalado.
+   2. `supabase/rollback/0014_down.sql`: volta o fornecedor para Gemini e tira as colunas da IA local.
+   3. `supabase/rollback/0013_down.sql`: volta os eventos que mudaram de tipo, o NAO ESCALAR e o
       DISPONIBILIZAR (equipe típica e vagas), apaga FERIAS e FOLGA se ninguém os usou e tira as colunas
       novas. Estrelas e ícones escolhidos depois da 1.1.0 se perdem.
-   3. `supabase/rollback/0012_down.sql`: volta `request_job` e `build_week_internal`.
-   4. Registre no histórico de migrações:
-      `npx supabase migration repair --status reverted 0014 0013 0012`.
-   5. Confira com `select name, no_team, keywords from public.service_types order by name;`. Depois de
-      conferir, apague a cópia: `drop table public._backup_0013;`.
+   4. `supabase/rollback/0012_down.sql`: volta `request_job` e `build_week_internal`.
+   5. Registre no histórico de migrações:
+      `npx supabase migration repair --status reverted 0015 0014 0013 0012`.
+   6. Confira com `select name, no_team, keywords from public.service_types order by name;`. Depois de
+      conferir, apague as cópias: `drop table public._backup_0013; drop table public._backup_0015;`.
 4. Os tipos que a identificação gravou nos eventos (por palavra-chave, histórico ou IA) **não** são desfeitos:
    são tipos certos, e o administrador pode trocar qualquer um na tela.

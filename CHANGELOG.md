@@ -24,6 +24,13 @@ PATCH para um conserto, MINOR para algo novo, MAJOR quando o jeito de usar muda.
   do histórico e o Gemini). Os que faltarem ficam em destaque, com sugestões do histórico para usar com um clique.
   Passo 2: a semana é montada, a IA propõe as pessoas e a revisão acontece ali mesmo (aceitar, trocar,
   descartar), com as vagas vazias em destaque.
+- Conserto da proposta da IA, que falhava toda vez:
+  - **Reuniões por setor**: a REUNIAO INTERNA pedia a equipe inteira (47 vagas por reunião, metade das vagas da
+    semana), inclusive em reuniões de um setor só. Agora as reuniões de Edição, Produção, Planejamento, Técnica e
+    Mediação pedem só as pessoas do setor, e as reuniões gerais só marcam o horário.
+  - A IA recebe lotes menores (25 vagas).
+  - Uma linha fora do formato na resposta não derruba mais o lote inteiro.
+  - Quando falha, a tela mostra o motivo exato.
 - **IA local**: em Configurações > Geral dá para trocar o Google Gemini por um modelo rodando na rede da
   empresa, como o MiniCPM5 (pelo Ollama ou similar). Informe o endereço do servidor e o nome do modelo e use
   "Testar conexão". Os dados não saem da empresa e não há cota do Google. Como subir o modelo:

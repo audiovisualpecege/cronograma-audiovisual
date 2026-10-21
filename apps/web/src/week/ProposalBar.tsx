@@ -33,10 +33,12 @@ export function jobMessage(job: JobRow): { tone: 'status' | 'alert'; text: strin
     const total = num(r.batches_total);
     return { tone: 'status', text: total > 0 ? `Montando a proposta: lote ${num(r.batches_done) + 1} de ${total}.` : 'Montando a proposta.' };
   }
-  if (job.status === 'failed') return { tone: 'alert', text: job.error || AI_SILENT };
+  // O serviço de fundo guarda o motivo exato (error_detail); sem ele, ninguém sabe se foi cota, queda ou formato.
+  const why = typeof r.error_detail === 'string' && r.error_detail ? ` Motivo: ${r.error_detail}` : '';
+  if (job.status === 'failed') return { tone: 'alert', text: `${job.error || AI_SILENT}${why}` };
   const parts = [num(r.proposed) === 1 ? '1 proposta para revisar.' : `${num(r.proposed)} propostas para revisar.`];
   if (num(r.discarded) > 0) parts.push(num(r.discarded) === 1 ? '1 vaga ficou aberta: a IA não achou alguém apto.' : `${num(r.discarded)} vagas ficaram abertas: a IA não achou alguém apto.`);
-  if (num(r.without_proposal) > 0) parts.push(`${num(r.without_proposal)} vagas ficaram sem proposta. ${AI_SILENT}`);
+  if (num(r.without_proposal) > 0) parts.push(`${num(r.without_proposal)} vagas ficaram sem proposta. ${AI_SILENT}${why}`);
   if (r.noHistory) parts.push(NO_HISTORY);
   return { tone: num(r.without_proposal) > 0 ? 'alert' : 'status', text: parts.join(' ') };
 }

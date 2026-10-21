@@ -65,7 +65,16 @@ describe('LocalProvider (MiniCPM5 ou outro modelo na rede)', () => {
     expect(await run(new Response('', { status: 404 }))).toBe('unavailable');
     expect(await run(new Response('', { status: 401 }))).toBe('invalid_key');
     expect(await run(chat('não sei'))).toBe('invalid_response');
-    expect(await run(chat('{"items":[{"slot":"V1"}]}'))).toBe('invalid_response');
+    expect(await run(chat('{"items":[{"vaga":"V1"}]}'))).toBe('invalid_response');
+  });
+
+  it('item fora do formato fica de fora sem derrubar o lote; "" vira ninguém', async () => {
+    const f = fakeFetch(chat('{"items":[{"slot":"V1","person":"P5","reason":"ok"},{"vaga":"V2"},{"slot":"V3","person":""}]}'));
+    const p = new LocalProvider({ url: 'http://nas:11434', model: 'minicpm5', fetch: f.fn });
+    expect(await p.propose(batch)).toEqual([
+      { slot: 'V1', person: 'P5', reason: 'ok' },
+      { slot: 'V3', person: null, reason: '' },
+    ]);
   });
 
   it('teste de conexão confere que o servidor tem o modelo', async () => {
