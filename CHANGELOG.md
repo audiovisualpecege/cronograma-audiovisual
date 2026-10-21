@@ -24,6 +24,10 @@ PATCH para um conserto, MINOR para algo novo, MAJOR quando o jeito de usar muda.
   do histórico e o Gemini). Os que faltarem ficam em destaque, com sugestões do histórico para usar com um clique.
   Passo 2: a semana é montada, a IA propõe as pessoas e a revisão acontece ali mesmo (aceitar, trocar,
   descartar), com as vagas vazias em destaque.
+- **IA local**: em Configurações > Geral dá para trocar o Google Gemini por um modelo rodando na rede da
+  empresa, como o MiniCPM5 (pelo Ollama ou similar). Informe o endereço do servidor e o nome do modelo e use
+  "Testar conexão". Os dados não saem da empresa e não há cota do Google. Como subir o modelo:
+  `docs/ia-local.md`.
 - Menu novo: Painel, Semana e Equipe soltos; **Dados** (Pessoas, Funções, Setores, Tipos de serviço,
   Ausências, Padrões) e **Configurações** (Geral, Importar, Agenda pessoal, Preferências, Sobre) com submenu.
   O grupo da tela aberta já vem aberto.

@@ -7,7 +7,7 @@ primeiro passo que não der o resultado esperado.
 
 - **Código**: branch `ajuste/painel-e-semana`, pull request #2 (`audiovisualpecege/cronograma-audiovisual`).
   Ainda **sem merge**: o app publicado no GitHub Pages continua na 1.0.1.
-- **Banco**: duas migrações novas, **ainda não aplicadas** na produção:
+- **Banco**: três migrações novas, **ainda não aplicadas** na produção:
   - `supabase/migrations/0012_request_classify.sql`: o app passa a poder pedir o job `classify` (identificar os
     tipos pelo histórico e pelo Gemini), e "Montar semana" numa semana já montada cria as vagas dos eventos
     que o serviço de fundo tipou depois da montagem. Não mexe em dados.
@@ -16,9 +16,15 @@ primeiro passo que não der o resultado esperado.
     FOLGA, tira "ferias" e "folga" das palavras-chave do NAO ESCALAR, deixa o DISPONIBILIZAR sem equipe (as
     vagas vazias dele somem das semanas montadas) e passa os eventos futuros de férias e folga para os tipos
     novos. Antes de mudar, guarda o que era em `public._backup_0013`.
-- **Desfazer**: `supabase/rollback/0013_down.sql` e `supabase/rollback/0012_down.sql` (fora da pasta de
+  - `supabase/migrations/0014_local_ai.sql`: colunas `ai_local_url` e `ai_local_model` na configuração, e
+    `op_settings_update` aceitando o fornecedor `local` (IA na rede da empresa, como o MiniCPM5; ver
+    `docs/ia-local.md`). Não mexe em dados.
+- **Desfazer**: `supabase/rollback/0014_down.sql`, `0013_down.sql` e `0012_down.sql` (fora da pasta de
   migrações, para o `db push` não rodá-los).
-- **Serviço de fundo (NAS)**: não muda. O job `classify` já existe nele desde a 1.0.0.
+- **Serviço de fundo (NAS)**: **muda**. Ganhou o fornecedor de IA local (`apps/worker/src/ai/local.ts`). Depois
+  do merge, o NAS precisa de `docker compose pull && docker compose up -d` na pasta
+  `docker/cronograma-audiovisual`. O worker novo funciona com o banco antigo e o antigo com o banco novo; só a
+  IA local precisa dos dois atualizados.
 - O que muda para quem usa está no topo do `CHANGELOG.md`.
 
 ## Antes de começar
@@ -44,7 +50,7 @@ primeiro passo que não der o resultado esperado.
    ```
    npx supabase db push --dry-run
    ```
-   Deve listar **só** `0012_request_classify.sql` e `0013_type_icon_and_highlight.sql`.
+   Deve listar **só** `0012_request_classify.sql`, `0013_type_icon_and_highlight.sql` e `0014_local_ai.sql`.
    Se listar também as antigas (0001 a 0011), o histórico de migrações do banco não registrou que elas já
    foram aplicadas. **Não rode o push.** Confira com `npx supabase migration list`. Depois de confirmar que o
    esquema existe (as tabelas `people`, `events`, `weeks` estão lá), marque as antigas como aplicadas com
@@ -61,10 +67,14 @@ primeiro passo que não der o resultado esperado.
    select kind, count(*) from public._backup_0013 group by kind;                  -- a cópia existe
    select column_name from information_schema.columns
     where table_name = 'events' and column_name = 'highlighted';                  -- 1 linha
+   select ai_provider, ai_local_url, ai_local_model from public.settings;         -- minicpm5 de padrão
    ```
 4. **CI verde e merge**: `gh pr checks 2` tudo verde; depois `gh pr merge 2 --merge`. O merge publica o app
    no GitHub Pages sozinho. Em poucos minutos o rodapé do menu mostra `v1.1.0`.
-5. **Testar no app publicado**, com a conta de administrador:
+5. **Serviço de fundo no NAS** (quem tem acesso ao NAS, como o Henrique): na pasta
+   `docker/cronograma-audiovisual`, `docker compose pull && docker compose up -d`. Para usar o MiniCPM5, siga
+   antes `docs/ia-local.md` (subir o Ollama e baixar o modelo).
+6. **Testar no app publicado**, com a conta de administrador:
    - Painel: 3 cartões (semana atual em destaque), avisos com ícone e cor, pendências por último.
    - Semana: troca de semana com animação, "Semana atual" sob o título, cartões por função, Folga e férias.
    - Propor escala na semana atual: o passo 1 identifica os tipos sozinho. Primeiro pelas palavras-chave;
@@ -72,7 +82,9 @@ primeiro passo que não der o resultado esperado.
      identificaram mais N eventos". Se aparecer "ainda não foi liberada no servidor", a 0012 não entrou.
    - Estrela: marcar um evento, recarregar a página, a estrela continua.
    - Tipos de serviço: abrir um tipo, escolher um ícone no banco de ícones, salvar, recarregar, o ícone fica.
-6. Depois de alguns dias sem problema: `drop table public._backup_0013;` e apague esta seção de pendência
+   - Se for usar o MiniCPM5: Configurações > Geral, fornecedor "Modelo local", endereço e modelo, "Testar
+     conexão" deve dizer "Conexão aceita". Depois um Propor escala de verdade numa semana futura.
+7. Depois de alguns dias sem problema: `drop table public._backup_0013;` e apague esta seção de pendência
    do `CLAUDE.md`.
 
 ## Desfazer
@@ -88,14 +100,17 @@ que deu problema.
    git revert -m 1 <commit do merge do PR #2>
    ```
    Isso vai num branch e num PR, como qualquer ajuste. O merge publica de novo.
-2. **Banco**, nesta ordem. Rode cada arquivo inteiro no SQL Editor do painel; cada um roda numa transação só:
-   1. `supabase/rollback/0013_down.sql`: volta os eventos que mudaram de tipo, o NAO ESCALAR e o
+2. **Serviço de fundo**: no NAS, volte a imagem anterior. Antes, troque o fornecedor para Gemini na tela, porque
+   o worker antigo não conhece o local. Ou deixe como está: o worker novo funciona com o banco antigo.
+3. **Banco**, nesta ordem. Rode cada arquivo inteiro no SQL Editor do painel; cada um roda numa transação só:
+   1. `supabase/rollback/0014_down.sql`: volta o fornecedor para Gemini e tira as colunas da IA local.
+   2. `supabase/rollback/0013_down.sql`: volta os eventos que mudaram de tipo, o NAO ESCALAR e o
       DISPONIBILIZAR (equipe típica e vagas), apaga FERIAS e FOLGA se ninguém os usou e tira as colunas
       novas. Estrelas e ícones escolhidos depois da 1.1.0 se perdem.
-   2. `supabase/rollback/0012_down.sql`: volta `request_job` e `build_week_internal`.
-   3. Registre no histórico de migrações:
-      `npx supabase migration repair --status reverted 0013 0012`.
-   4. Confira com `select name, no_team, keywords from public.service_types order by name;`. Depois de
+   3. `supabase/rollback/0012_down.sql`: volta `request_job` e `build_week_internal`.
+   4. Registre no histórico de migrações:
+      `npx supabase migration repair --status reverted 0014 0013 0012`.
+   5. Confira com `select name, no_team, keywords from public.service_types order by name;`. Depois de
       conferir, apague a cópia: `drop table public._backup_0013;`.
-3. Os tipos que a identificação gravou nos eventos (por palavra-chave, histórico ou IA) **não** são desfeitos:
+4. Os tipos que a identificação gravou nos eventos (por palavra-chave, histórico ou IA) **não** são desfeitos:
    são tipos certos, e o administrador pode trocar qualquer um na tela.

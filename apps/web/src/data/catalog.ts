@@ -86,6 +86,9 @@ export interface SettingsRow extends Row {
   ai_provider: string;
   ai_model: string;
   ai_key_hint: string | null;
+  /** Modelo local (MiniCPM5 ou outro): endereço do servidor e nome do modelo nele. */
+  ai_local_url?: string | null;
+  ai_local_model?: string;
   push_enabled_global: boolean;
   worker_seen_at?: string | null;
 }

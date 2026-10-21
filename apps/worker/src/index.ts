@@ -1,6 +1,6 @@
 // Partida do contêiner no NAS: lê o .env, conecta ao Supabase com a service_role e sobe o worker.
 import { createClient } from '@supabase/supabase-js';
-import { geminiFactory } from './ai/gemini.ts';
+import { providerFactory } from './ai/factory.ts';
 import { supabaseAuthApi } from './auth/admin.ts';
 import { GoogleCalendar } from './calendar/google.ts';
 import { systemClock } from './clock.ts';
@@ -28,7 +28,7 @@ const worker = new Worker({
   version,
   appUrl: config.appUrl,
   google: config.googleServiceAccount ? new GoogleCalendar(config.googleServiceAccount, systemClock) : null,
-  providerFactory: geminiFactory(systemClock),
+  providerFactory: providerFactory(systemClock),
   pushSender: config.vapid ? webPushSender(config.vapid) : null,
   authApi: supabaseAuthApi(db),
   queuePollMs: config.queuePollMs,

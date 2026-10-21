@@ -6,7 +6,8 @@ repositório; a forja do Task Forge não mexe mais nele. O guia de como trabalha
 e o guia técnico (configuração, publicação, problemas) em `docs/como-usar.md`.
 
 ## Publicação pendente
-A 1.1.0 (PR #2, branch `ajuste/painel-e-semana`) tem duas migrações ainda não aplicadas e ainda não teve merge.
+A 1.1.0 (PR #2, branch `ajuste/painel-e-semana`) tem migrações ainda não aplicadas (0012 a 0014), muda o
+serviço de fundo (IA local) e ainda não teve merge.
 Antes de publicar, ou se for preciso desfazer, siga `docs/publicar-1.1.0.md`. Apague esta seção quando a 1.1.0
 estiver no ar e firme.
 

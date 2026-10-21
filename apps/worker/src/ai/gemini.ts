@@ -12,52 +12,10 @@ import {
   type ProposalAnswer,
   type ProposalBatch,
 } from './provider.ts';
+import { CLASSIFY_INSTRUCTION, CLASSIFY_SCHEMA, PROPOSE_INSTRUCTION, PROPOSE_SCHEMA } from './prompts.ts';
 
 /** Espera quando o 429 não diz quanto esperar. */
 export const DEFAULT_RETRY_MS = 30_000;
-
-const PROPOSE_INSTRUCTION = [
-  'Você monta a pré-escala de uma equipe de audiovisual.',
-  'Recebe vagas (slot) com função (role), tipo de serviço (type), horário e até 5 candidatos já conferidos:',
-  'todos têm a função, estão sem ausência e cabem no limite de horas. Pessoas, funções e tipos vêm só como códigos.',
-  'Escolha um candidato por vaga, ou null se nenhum servir. Prefira quem tem mais histórico (hist) naquela função',
-  'e tipo; em empate próximo (inTieGroup), quem tem menos carga (loadHours, depois loadCount).',
-  'Não ponha a mesma pessoa em vagas com horários sobrepostos e não passe do limitHours somando as horas escolhidas.',
-  'Para cada vaga, devolva { slot, person, reason }, com reason curta em português (até 80 caracteres),',
-  'por exemplo "costuma fazer T1; 12 h na semana". Use só os códigos recebidos.',
-].join(' ');
-
-const CLASSIFY_INSTRUCTION = [
-  'Classifique cada evento da agenda de uma equipe de audiovisual em um dos tipos de serviço dados, pelo título.',
-  'Devolva { id, type, certainty } para cada item: type é o código do tipo (por exemplo T1) ou null quando nenhum',
-  'serve; certainty é "media" quando o título deixa claro e "baixa" quando é um palpite.',
-].join(' ');
-
-const PROPOSE_SCHEMA = {
-  type: 'array',
-  items: {
-    type: 'object',
-    properties: {
-      slot: { type: 'string' },
-      person: { type: ['string', 'null'] },
-      reason: { type: 'string' },
-    },
-    required: ['slot', 'person', 'reason'],
-  },
-};
-
-const CLASSIFY_SCHEMA = {
-  type: 'array',
-  items: {
-    type: 'object',
-    properties: {
-      id: { type: 'string' },
-      type: { type: ['string', 'null'] },
-      certainty: { type: 'string', enum: ['alta', 'media', 'baixa'] },
-    },
-    required: ['id', 'type', 'certainty'],
-  },
-};
 
 interface GoogleErrorBody {
   error?: { code?: number; message?: string; status?: string; details?: { '@type'?: string; reason?: string; retryDelay?: string }[] };

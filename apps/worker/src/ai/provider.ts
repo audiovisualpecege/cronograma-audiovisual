@@ -1,5 +1,5 @@
-// Provedor de IA trocável (ADR-001, ADR-012 item 6). Nesta entrega só existe o GeminiProvider; outro
-// fornecedor entra implementando a mesma interface, sem mudar a pré-escala nem a classificação.
+// Provedor de IA trocável (ADR-001, ADR-012 item 6): GeminiProvider (Google) e LocalProvider (modelo na rede da
+// empresa, como o MiniCPM5). Os dois seguem a mesma interface; a pré-escala e a classificação não mudam.
 import type { Certainty, ProposalBatch } from '@cronograma/core';
 import type { Clock } from '../clock.ts';
 
@@ -14,7 +14,7 @@ export type ClassifyAnswer = { id: string; type: string | null; certainty: Certa
 export type ProposalAnswer = { slot: string; person: string | null; reason: string }[];
 
 export interface AiProvider {
-  readonly id: 'gemini';
+  readonly id: 'gemini' | 'local';
   testKey(key: string): Promise<{ ok: true } | { ok: false; reason: 'invalid_key' | 'unavailable' }>;
   classify(req: ClassifyRequest): Promise<ClassifyAnswer>;
   propose(req: ProposalBatch): Promise<ProposalAnswer>;
@@ -34,6 +34,8 @@ export interface ProviderOptions {
   provider: string;
   model: string;
   key: string;
+  /** Endereço do servidor do modelo local (só para provider 'local'). */
+  url?: string;
 }
 
 export type ProviderFactory = (opts: ProviderOptions) => AiProvider;

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { row, SETTINGS } from '../../test/catalogRows';
 import { FakeRemote } from '../../test/fakeRemote';
 import { renderWithSync } from '../../test/helpers';
-import { FREE_PLAN_NOTICE } from './AiSettings';
+import { FREE_PLAN_NOTICE, LOCAL_NOTICE } from './AiSettings';
 import { SettingsPage } from './SettingsPage';
 
 const KEY = 'AIzaSyD-chave-secreta-de-teste-a1b2';
@@ -20,6 +20,29 @@ function remoteWith(settings = SETTINGS) {
   };
   return remote;
 }
+
+describe('SettingsPage: IA local', () => {
+  it('com o modelo local, pede endereço e modelo em vez da chave e grava pelo settings.update', async () => {
+    const user = userEvent.setup();
+    const remote = remoteWith({ ...SETTINGS, ai_provider: 'local', ai_local_url: null, ai_local_model: 'minicpm5' });
+    renderWithSync(<SettingsPage />, { remote });
+    expect(await screen.findByText(LOCAL_NOTICE)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Chave da API|Trocar a chave/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Testar conexão' })).toBeDisabled();
+
+    const url = screen.getByLabelText(/^Endereço do servidor/);
+    await user.type(url, 'nas:11434');
+    await user.tab();
+    expect(await screen.findByText(/Comece com http:\/\/ ou https:\/\//)).toBeInTheDocument();
+    await user.clear(url);
+    await user.type(url, 'http://172.16.52.30:11434');
+    await user.tab();
+    await waitFor(() =>
+      expect(remote.applyCalls.flat().find((o) => o.kind === 'settings.update')).toMatchObject({ payload: { ai_local_url: 'http://172.16.52.30:11434' } }),
+    );
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Testar conexão' })).toBeEnabled());
+  });
+});
 
 describe('SettingsPage', () => {
   it('UT-112 configuração da IA mostra só ai_key_hint ("...a1b2"), nunca a chave', async () => {
