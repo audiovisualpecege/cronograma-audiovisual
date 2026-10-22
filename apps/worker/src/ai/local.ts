@@ -55,8 +55,15 @@ function unwrap(x: unknown): unknown {
   return x;
 }
 
+/**
+ * Vagas por chamada no modelo local: um lote de 25 passa de 5 mil tokens, mais do que o contexto padrão do
+ * Ollama (4.096) e pesado para um modelo de 2B. Com 10, cabe com folga e a resposta sai mais certa.
+ */
+export const LOCAL_BATCH_SIZE = 10;
+
 export class LocalProvider implements AiProvider {
   readonly id = 'local' as const;
+  readonly batchSize = LOCAL_BATCH_SIZE;
 
   constructor(
     private opts: { url: string; model: string; key?: string; fetch?: FetchLike; timeoutMs?: number },
@@ -78,7 +85,11 @@ export class LocalProvider implements AiProvider {
     if (res.status === 429) throw new AiError('quota', 'O servidor da IA local está ocupado.');
     if (res.status === 404) throw new AiError('unavailable', `O servidor da IA local não tem o modelo "${this.opts.model}" ou o endereço está errado.`);
     if (res.status >= 500) throw new AiError('unavailable', `A IA local está fora do ar (${res.status}).`);
-    if (!res.ok) throw new AiError('invalid_response', `A IA local recusou o pedido (${res.status}).`);
+    if (!res.ok) {
+      // O servidor costuma dizer o porquê (contexto curto, formato não suportado): vai junto, cortado.
+      const why = (await res.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 200);
+      throw new AiError('invalid_response', `A IA local recusou o pedido (${res.status})${why ? `: ${why}` : ''}.`);
+    }
     return res;
   }
 

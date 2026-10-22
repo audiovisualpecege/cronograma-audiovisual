@@ -15,6 +15,8 @@ export type ProposalAnswer = { slot: string; person: string | null; reason: stri
 
 export interface AiProvider {
   readonly id: 'gemini' | 'local';
+  /** Vagas por chamada da pré-escala; sem valor, BATCH_SIZE. Modelo pequeno pede lotes menores. */
+  readonly batchSize?: number;
   testKey(key: string): Promise<{ ok: true } | { ok: false; reason: 'invalid_key' | 'unavailable' }>;
   classify(req: ClassifyRequest): Promise<ClassifyAnswer>;
   propose(req: ProposalBatch): Promise<ProposalAnswer>;
@@ -65,6 +67,7 @@ export class CallSpacer {
 export function paced(provider: AiProvider, spacer: CallSpacer): AiProvider {
   return {
     id: provider.id,
+    ...(provider.batchSize ? { batchSize: provider.batchSize } : {}),
     testKey: (key) => provider.testKey(key),
     classify: async (req) => {
       await spacer.wait();

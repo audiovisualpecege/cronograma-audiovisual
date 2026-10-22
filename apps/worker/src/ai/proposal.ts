@@ -94,6 +94,7 @@ export class ProposalRunner {
     if (isWeekPast(data.week.week_start, now)) throw new JobFailure('Semana passada fica só para consulta.');
     const provider = await this.providerFor();
     if (!provider) throw new JobFailure('Configure a chave da IA antes de pedir a proposta.');
+    const batchSize = provider.batchSize ?? BATCH_SIZE;
 
     const ctx = weekContext(data, now, payload.replace_pending !== false);
     const history = buildHistoryIndex(
@@ -109,7 +110,7 @@ export class ProposalRunner {
 
     const result: JobResult = {
       week_id: weekId,
-      batches_total: buildProposalBatches(ctx, history, { batchSize: BATCH_SIZE }).length,
+      batches_total: buildProposalBatches(ctx, history, { batchSize }).length,
       batches_done: 0,
       slots_open: initialOpen.size,
       proposed: 0,
@@ -123,7 +124,7 @@ export class ProposalRunner {
 
     for (let index = 0; ; index++) {
       const view: WeekContext = { ...ctx, slots: ctx.slots.filter((s) => !skipped.has(s.id)) };
-      const pending = buildProposalBatches(view, history, { batchSize: BATCH_SIZE, prior: picks });
+      const pending = buildProposalBatches(view, history, { batchSize, prior: picks });
       const batch = pending[0];
       if (!batch) break;
       batch.index = index;

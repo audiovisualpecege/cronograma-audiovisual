@@ -41,14 +41,25 @@ No `docker-compose.yml` da pasta `docker/cronograma-audiovisual`, ao lado do ser
 
 Depois de `docker compose up -d`:
 
-1. Baixe o modelo. Procure o GGUF oficial do MiniCPM5-2B na página da OpenBMB no Hugging Face
-   (huggingface.co/openbmb). Confira o nome exato do repositório lá.
+1. Baixe o modelo oficial (testado em 22/10/2026, cerca de 1,6 GB):
    ```
-   docker compose exec ollama ollama pull hf.co/<repositório GGUF do MiniCPM5-2B>
-   docker compose exec ollama ollama cp hf.co/<repositório GGUF do MiniCPM5-2B> minicpm5
+   docker compose exec ollama ollama pull hf.co/openbmb/MiniCPM5-2B-GGUF:Q4_K_M
    ```
-   O `cp` dá o apelido `minicpm5`, que é o nome padrão na configuração do sistema.
-2. Confira se o modelo aparece: `docker compose exec ollama ollama list`.
+2. **Aumente o contexto e dê o nome `minicpm5`.** O Ollama vem com contexto de 4.096 tokens. Um lote da
+   proposta passa disso, e o pedido é recusado com "exceeds the available context size". Crie um arquivo
+   `Modelfile` com:
+   ```
+   FROM hf.co/openbmb/MiniCPM5-2B-GGUF:Q4_K_M
+   PARAMETER num_ctx 16384
+   PARAMETER temperature 0.2
+   ```
+   e rode `ollama create minicpm5 -f Modelfile`. Dentro do Docker, copie o arquivo para o container antes, ou
+   monte a pasta.
+3. Confira se o modelo aparece e com o contexto certo: `ollama list` e `ollama show minicpm5 --parameters`
+   (`num_ctx 16384`).
+
+O sistema manda lotes de 10 vagas para o modelo local (25 para o Gemini). Num computador sem placa de vídeo,
+cada lote levou perto de 2 minutos no teste.
 
 ## Configurar no sistema
 

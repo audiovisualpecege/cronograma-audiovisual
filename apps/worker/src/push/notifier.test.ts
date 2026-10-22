@@ -15,7 +15,9 @@ afterEach(() => server.resetHandlers());
 const notice = (over: Partial<NotificationRow> = {}): NotificationRow => ({
   id: 'n1', person_id: 'p5', kind: 'event_changed', title: 'Mudou: Gravação aula Matemática',
   body: 'Antes: 22/10 14:00 às 17:00. Agora: 22/10 15:00 às 18:00.', link: '#/evento/e1',
-  dedupe_key: 'calendar:change:e1:abc', pushed_at: null, created_at: '2026-10-21T15:00:00Z', version: 1, ...over,
+  // A varredura olha as últimas 24 h pelo relógio real (created_at é a hora do banco): o aviso nasce agora,
+  // senão o teste para de passar um dia depois da data escrita aqui.
+  dedupe_key: 'calendar:change:e1:abc', pushed_at: null, created_at: new Date(Date.now() - 60_000).toISOString(), version: 1, ...over,
 });
 
 let store: FakeStore;
