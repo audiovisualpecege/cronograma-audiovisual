@@ -1,23 +1,25 @@
 // Regras de tela da semana do administrador, puras: contexto das regras do core a partir das linhas da cópia
-// local, equipe estimada, falta por função, contagens de publicação e alterações não publicadas.
+// local, equipe estimada, pessoas disponíveis por função, contagens de publicação e alterações não publicadas.
 import {
   addDays,
+  availableHours,
   daysOf,
-  demandFromSlots,
-  eventHours,
+  diffDays,
   localDate,
   localTime,
-  roleDemandSupply,
+  nameTokens,
   type AbsenceLike,
   type AssignmentLike,
   type EventLike,
+  type HistoryFact,
   type PersonLike,
-  type RoleBalance,
   type SlotLike,
   type WeekContext,
 } from '@cronograma/core';
 import {
   crewOf,
+  hasRoleOrder,
+  levelsOf,
   rolesOf,
   type AbsenceRow,
   type AssignmentRow,
@@ -85,6 +87,25 @@ export function typeNoTeam(types: readonly ServiceTypeRow[], typeId: string | nu
   return Boolean(typeId && types.find((t) => t.id === typeId)?.no_team);
 }
 
+/**
+ * Marcação da agenda que não pede equipe (férias, folga, horário reservado): aparece à parte, no fim do dia.
+ * Evento cancelado continua na ordem normal, riscado; evento com estrela de destaque também.
+ */
+export function isMarker(e: EventRow, types: readonly ServiceTypeRow[]): boolean {
+  return e.status !== 'cancelled' && !e.highlighted && (Boolean(e.no_team) || typeNoTeam(types, e.service_type_id));
+}
+
+/** Os eventos do dia com as marcações no fim, mantendo a ordem de cada grupo. */
+export function markersLast(events: readonly EventRow[], types: readonly ServiceTypeRow[]): EventRow[] {
+  return [...events.filter((e) => !isMarker(e, types)), ...events.filter((e) => isMarker(e, types))];
+}
+
+/** Reunião, pelo tipo de serviço (REUNIAO EDICAO, REUNIAO MEDIADORES...): na proposta, preenchida por último. */
+export function isMeetingEvent(e: EventRow, types: readonly ServiceTypeRow[]): boolean {
+  const name = types.find((t) => t.id === e.service_type_id)?.name ?? '';
+  return nameTokens(name)[0] === 'reuniao';
+}
+
 /** Evento que entra na escala: ativo, não ignorado e que exige equipe. */
 export function needsTeam(e: EventRow, types: readonly ServiceTypeRow[]): boolean {
   return e.status !== 'cancelled' && !e.ignored && !e.no_team && !typeNoTeam(types, e.service_type_id);
@@ -92,6 +113,8 @@ export function needsTeam(e: EventRow, types: readonly ServiceTypeRow[]): boolea
 
 export function toEventLike(e: EventRow, types: readonly ServiceTypeRow[]): EventLike {
   return {
+    // Trabalho complexo: tipo marcado como complexo ou evento com estrela de atividade principal.
+    complex: Boolean(e.highlighted) || Boolean(types.find((t) => t.id === e.service_type_id)?.complex),
     id: e.id,
     weekStart: e.week_start,
     startsAt: new Date(e.starts_at),
@@ -114,6 +137,9 @@ export function toPersonLike(p: PersonRow, personRoles: readonly PersonRoleRow[]
     active: p.active,
     weeklyLimitHours: Number(p.weekly_limit_hours),
     roleIds: rolesOf(p, personRoles),
+    // A ordem só vale como prioridade quando alguém ordenou; senão é a ordem de cadastro, sem significado.
+    ...(hasRoleOrder(p, personRoles) ? { rolePriority: rolesOf(p, personRoles) } : {}),
+    roleLevels: levelsOf(p, personRoles),
   };
 }
 
@@ -158,29 +184,116 @@ export function estimatedCrew(e: EventRow, types: readonly ServiceTypeRow[], cre
   return crewOf(type, crew);
 }
 
+export interface RoleAvailability {
+  jobRoleId: string;
+  name: string;
+  people: number;
+}
+
 /**
- * Pedido e oferta de horas por função (US-010 AC-3): na prévia, pela equipe estimada dos tipos; com a
- * semana montada, pelas vagas ativas.
+ * Pessoas disponíveis na semana por função: ativas e com horas livres depois das ausências. Quem tem
+ * mais de uma função conta uma vez só, na que mais fez no histórico; sem histórico (ou empate), na
+ * primeira pelo código da função. Da função com mais gente para a com menos.
  */
-export function roleBalance(rows: WeekRows, mode: 'preview' | 'built'): RoleBalance[] {
-  const events = rows.events.filter((e) => !e.ignored).map((e) => toEventLike(e, rows.types));
-  let demand: { jobRoleId: string; hours: number }[];
-  if (mode === 'built') {
-    demand = demandFromSlots(events, activeSlots(rows).map((s, i) => ({ id: s.id, code: `V${i + 1}`, eventId: s.event_id, jobRoleId: s.job_role_id })));
-  } else {
-    demand = rows.events.flatMap((e) => {
-      const hours = eventHours(toEventLike(e, rows.types));
-      return estimatedCrew(e, rows.types, rows.crew).flatMap((c) => Array.from({ length: c.quantity }, () => ({ jobRoleId: c.job_role_id, hours })));
-    });
+export function availabilityByRole(rows: WeekRows, facts: readonly Pick<HistoryFact, 'personId' | 'jobRoleId'>[]): RoleAvailability[] {
+  const done = new Map<string, number>();
+  for (const f of facts) {
+    if (f.personId && f.jobRoleId) done.set(`${f.personId}|${f.jobRoleId}`, (done.get(`${f.personId}|${f.jobRoleId}`) ?? 0) + 1);
   }
-  const balance = roleDemandSupply({
-    weekStart: rows.weekStart,
-    demand,
-    people: rows.people.map((p) => toPersonLike(p, rows.personRoles)),
-    absences: rows.absences.map(toAbsenceLike),
+  const roles = new Map(rows.roles.filter((r) => !r.archived_at).map((r) => [r.id, r]));
+  const byCode = (a: string, b: string) => (roles.get(a)?.code ?? '').localeCompare(roles.get(b)?.code ?? '', 'en', { numeric: true });
+  const absences = rows.absences.map(toAbsenceLike);
+  const count = new Map<string, number>();
+  for (const p of rows.people) {
+    if (!p.active) continue;
+    const person = toPersonLike(p, rows.personRoles);
+    const enabled = person.roleIds.filter((r) => roles.has(r)).sort(byCode);
+    if (enabled.length === 0 || availableHours(person, absences, rows.weekStart) <= 0) continue;
+    const times = (r: string) => done.get(`${p.id}|${r}`) ?? 0;
+    const main = enabled.reduce((best, r) => (times(r) > times(best) ? r : best));
+    count.set(main, (count.get(main) ?? 0) + 1);
+  }
+  return [...count]
+    .map(([jobRoleId, people]) => ({ jobRoleId, name: roles.get(jobRoleId)?.name ?? 'Função', people }))
+    .sort((a, b) => b.people - a.people || a.name.localeCompare(b.name, 'pt-BR'));
+}
+
+/** "Semana atual", "Próxima semana", "Semana passada", "Daqui a 3 semanas", "Há 2 semanas". */
+export function relativeWeekLabel(weekStart: string, currentWeek: string): string {
+  const n = Math.round(diffDays(currentWeek, weekStart) / 7);
+  if (n === 0) return 'Semana atual';
+  if (n === 1) return 'Próxima semana';
+  if (n === -1) return 'Semana passada';
+  return n > 1 ? `Daqui a ${n} semanas` : `Há ${-n} semanas`;
+}
+
+export interface TimeOff {
+  key: string;
+  personId: string | null;
+  /** Nome da pessoa; sem pessoa reconhecida, o título do evento da agenda. */
+  name: string;
+  kind: 'ferias' | 'folga' | 'ausencia';
+  from: string;
+  to: string;
+  /** Título do evento, quando veio da agenda. */
+  agendaTitle: string | null;
+}
+
+const TIME_OFF_WORD: [RegExp, TimeOff['kind']][] = [
+  [/\bferias\b/, 'ferias'],
+  [/\bfolgas?\b/, 'folga'],
+  [/\b(ausente|ausencia)\b/, 'ausencia'],
+];
+
+/** Pessoa ativa citada no título: o primeiro nome basta quando é único; senão, precisa de mais um nome. */
+function personInTitle(title: string, people: readonly PersonRow[]): PersonRow | null {
+  const words = new Set(nameTokens(title));
+  const active = people.filter((p) => p.active);
+  const first = (p: PersonRow) => nameTokens(p.name)[0] ?? '';
+  const hits = active.filter((p) => {
+    const tokens = nameTokens(p.name);
+    if (!words.has(first(p))) return false;
+    const sameFirst = active.filter((o) => first(o) === first(p)).length;
+    return sameFirst === 1 || tokens.slice(1).some((t) => t.length > 2 && words.has(t));
   });
-  // Só as funções pedidas na semana; as demais não ajudam a decidir.
-  return balance.filter((b) => b.demandHours > 0);
+  return hits.length === 1 ? (hits[0] ?? null) : null;
+}
+
+/**
+ * Quem está de folga, férias ou ausente na semana: as ausências cadastradas e os eventos da agenda com
+ * "férias", "folga" ou "ausente" no título ou no tipo (com a pessoa reconhecida pelo nome, quando dá).
+ */
+export function weekTimeOff(rows: WeekRows): TimeOff[] {
+  const ws = rows.weekStart;
+  const we = addDays(ws, 6);
+  const clip = (start: string, end: string) => {
+    const from = localDate(new Date(start));
+    const to = localDate(new Date(Math.max(Date.parse(start), Date.parse(end) - 1)));
+    return { from: from < ws ? ws : from, to: to > we ? we : to, inWeek: from <= we && to >= ws };
+  };
+  const names = new Map(rows.people.map((p) => [p.id, p.name]));
+  const out: TimeOff[] = [];
+  for (const a of rows.absences) {
+    if (a.archived_at) continue;
+    const span = clip(a.starts_at, a.ends_at);
+    if (!span.inWeek) continue;
+    out.push({ key: `a:${a.id}`, personId: a.person_id, name: names.get(a.person_id) ?? 'Pessoa', kind: a.kind, from: span.from, to: span.to, agendaTitle: null });
+  }
+  for (const e of rows.events) {
+    if (e.ignored || e.status === 'cancelled') continue;
+    // Pelo título ou pelo tipo do evento (FERIAS, FOLGA).
+    const typeName = rows.types.find((t) => t.id === e.service_type_id)?.name ?? '';
+    const words = nameTokens(`${e.title} ${typeName}`).join(' ');
+    const kind = TIME_OFF_WORD.find(([re]) => re.test(words))?.[1];
+    if (!kind) continue;
+    const span = clip(e.starts_at, e.ends_at);
+    if (!span.inWeek) continue;
+    const person = personInTitle(e.title, rows.people);
+    // A mesma folga cadastrada e na agenda aparece uma vez só.
+    if (person && out.some((o) => o.personId === person.id && o.kind === kind && o.from <= span.to && span.from <= o.to)) continue;
+    out.push({ key: `e:${e.id}`, personId: person?.id ?? null, name: person?.name ?? e.title, kind, from: span.from, to: span.to, agendaTitle: e.title });
+  }
+  return out.sort((a, b) => a.from.localeCompare(b.from) || a.name.localeCompare(b.name, 'pt-BR'));
 }
 
 /** Eventos de cada dia da semana; evento de vários dias aparece em cada dia que ocupa (US-010 EC-4). */
@@ -257,40 +370,6 @@ export function unpublishedChanges(rows: WeekRows): number {
     if ((events.get(eventId)?.notes ?? null) !== published) n += 1;
   }
   return n;
-}
-
-export interface PersonLoadRow {
-  personId: string;
-  name: string;
-  hours: number;
-  count: number;
-  limit: number;
-  over: boolean;
-}
-
-/** Carga da semana de cada pessoa ativa (US-014 AC-4), de quem tem mais horas para quem tem menos. */
-export function loadRows(rows: WeekRows, ctx: WeekContext): PersonLoadRow[] {
-  const events = new Map(ctx.events.map((e) => [e.id, e]));
-  const acc = new Map<string, { hours: number; seen: Set<string> }>();
-  for (const a of ctx.assignments) {
-    const e = events.get(a.eventId);
-    if (!e || e.status === 'cancelled' || e.weekStart !== ctx.weekStart) continue;
-    const cur = acc.get(a.personId) ?? { hours: 0, seen: new Set<string>() };
-    if (!cur.seen.has(e.id)) {
-      cur.seen.add(e.id);
-      cur.hours += eventHours(e);
-    }
-    acc.set(a.personId, cur);
-  }
-  return rows.people
-    .filter((p) => p.active)
-    .map((p) => {
-      const cur = acc.get(p.id);
-      const hours = cur?.hours ?? 0;
-      const limit = Number(p.weekly_limit_hours);
-      return { personId: p.id, name: p.name, hours, count: cur?.seen.size ?? 0, limit, over: hours > limit };
-    })
-    .sort((a, b) => b.hours - a.hours || a.name.localeCompare(b.name, 'pt-BR'));
 }
 
 /** Horas em texto: "12 h" ou "2,5 h". */

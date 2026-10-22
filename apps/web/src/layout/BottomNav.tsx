@@ -2,16 +2,17 @@ import { MenuDotsIcon } from '@solar-icons/react/linear';
 import { useState } from 'react';
 import type { Me } from '../supabase';
 import { AppIcon } from '../ui/AppIcon';
-import { BOTTOM_COUNT, isActive, navItems } from './nav';
+import { BOTTOM_COUNT, groupActive, isActive, isGroup, navEntries, type NavItem } from './nav';
 import { MoreMenu } from './MoreMenu';
 
 /** Barra inferior do celular: as telas mais usadas e o "Mais" com o resto. */
 export function BottomNav({ me, path }: { me: Me; path: string }) {
   const [moreOpen, setMoreOpen] = useState(false);
-  const items = navItems(me.profile);
-  const main = items.slice(0, BOTTOM_COUNT);
-  const rest = items.slice(BOTTOM_COUNT);
-  const restActive = rest.some((i) => isActive(i, path));
+  const entries = navEntries(me.profile);
+  // As primeiras telas soltas vão na barra; o resto (com os grupos) vai no "Mais".
+  const main = entries.slice(0, BOTTOM_COUNT).filter((e): e is NavItem => !isGroup(e));
+  const rest = entries.slice(main.length);
+  const restActive = rest.some((e) => (isGroup(e) ? groupActive(e, path) : isActive(e, path)));
   return (
     <>
       <nav className="bottom-nav" aria-label="Menu do celular">
@@ -32,7 +33,7 @@ export function BottomNav({ me, path }: { me: Me; path: string }) {
           <span>Mais</span>
         </button>
       </nav>
-      <MoreMenu open={moreOpen} onClose={() => setMoreOpen(false)} items={rest} path={path} me={me} />
+      <MoreMenu open={moreOpen} onClose={() => setMoreOpen(false)} entries={rest} path={path} me={me} />
     </>
   );
 }

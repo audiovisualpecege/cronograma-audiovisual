@@ -4,7 +4,8 @@ import { useSession } from '../auth/session';
 import type { Me } from '../supabase';
 import { AppIcon } from '../ui/AppIcon';
 import { AppVersion } from '../ui/AppVersion';
-import { isActive, navItems } from './nav';
+import { navEntries } from './nav';
+import { NavList } from './NavList';
 
 /** Menu lateral do PC e do Mac, com a versão fixa no rodapé. */
 export function SideNav({ me, path }: { me: Me; path: string }) {
@@ -18,14 +19,7 @@ export function SideNav({ me, path }: { me: Me; path: string }) {
         </span>
       </a>
       <ul className="side-nav-list">
-        {navItems(me.profile).map((item) => (
-          <li key={item.to}>
-            <a className="nav-link" href={`#${item.to}`} aria-current={isActive(item, path) ? 'page' : undefined}>
-              <AppIcon icon={item.icon} size={20} />
-              <span>{item.label}</span>
-            </a>
-          </li>
-        ))}
+        <NavList entries={navEntries(me.profile)} path={path} />
       </ul>
       <div className="side-nav-footer">
         <span className="side-nav-user">{me.name}</span>

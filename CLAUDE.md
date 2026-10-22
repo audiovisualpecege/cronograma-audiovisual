@@ -5,6 +5,13 @@ Desde a 1.0.1 (19/10/2026) o código mora aqui no GitHub e os ajustes são feito
 repositório; a forja do Task Forge não mexe mais nele. O guia de como trabalhar está em `docs/ajustes-de-interface.md`
 e o guia técnico (configuração, publicação, problemas) em `docs/como-usar.md`.
 
+## Publicação pendente
+A 1.1.0 (PR #2, branch `ajuste/painel-e-semana`) tem migrações ainda não aplicadas (0012 a 0016), mais os dados iniciais de prioridade
+(`..\dados-iniciais\aplicar-prioridades.mjs`, fora do repositório), muda o
+serviço de fundo (IA local) e ainda não teve merge.
+Antes de publicar, ou se for preciso desfazer, siga `docs/publicar-1.1.0.md`. Apague esta seção quando a 1.1.0
+estiver no ar e firme.
+
 ## Como trabalhar
 - Quem pede os ajustes conversa com você: pergunte no chat quando faltar uma decisão, mostre o resultado e itere.
 - Cada rodada de ajustes vai num branch próprio (`ajuste/<assunto-curto>`) e entra na `main` por pull request.

@@ -57,51 +57,63 @@ describe('WeekPage: escala manual', () => {
     expect(await within(event).findByText('passa do limite semanal')).toBeInTheDocument();
   });
 
-  it('UT-116 alternar a visualização troca a lista por evento pela grade pessoa por dia, com as mesmas alocações', async () => {
+  it('o topo mostra "< Semana de 26/10 >" com as semanas vizinhas dos lados, e as setas trocam de semana', async () => {
     const user = userEvent.setup();
-    const remote = weekRemote({
-      events: [AULA, TARDE],
-      slots: [slotWith('ea', 'r1', 'p3'), slotWith('ea', 'r5', 'p17', 'proposed'), slotWith('eb', 'r1', 'p4'), slotWith('eb', 'r5')],
-    });
-    await page(remote);
-    await screen.findByRole('listitem', { name: 'Técnico de aula: Vaga aberta' });
-
-    const fromList = new Set<string>();
-    for (const article of screen.getAllByRole('article')) {
-      for (const item of within(article).getAllByRole('listitem')) {
-        const [role, who] = (item.getAttribute('aria-label') ?? '').split(': ');
-        if (who !== 'Vaga aberta') fromList.add(`${who}|${article.getAttribute('aria-label')}|${role}`);
-      }
-    }
-    expect(fromList.size).toBe(3);
-
-    await user.click(screen.getByRole('tab', { name: 'Grade por pessoa' }));
-    const grid = await screen.findByRole('table', { name: 'Grade da semana por pessoa e dia' });
-    const fromGrid = new Set<string>();
-    for (const chip of within(grid).getAllByRole('button')) {
-      const [who, rest] = (chip.getAttribute('aria-label') ?? '').split(': ');
-      const [title, role] = (rest ?? '').split(', ');
-      if (who !== 'Vaga aberta') fromGrid.add(`${who}|${title}|${role}`);
-    }
-    expect(fromGrid).toEqual(fromList);
-    expect(screen.queryByRole('article')).toBeNull();
+    await page(weekRemote({ events: [AULA], slots: [slotWith('ea', 'r1')] }));
+    const nav = await screen.findByRole('navigation', { name: 'Trocar de semana' });
+    expect(within(nav).getByRole('heading', { level: 1 })).toHaveTextContent('SEMANA DE 26/10');
+    expect(nav).toHaveTextContent('Semana de 19/10');
+    expect(nav).toHaveTextContent('Semana de 02/11');
+    // Hoje é 21/10: a semana de 26/10 é a próxima.
+    expect(nav).toHaveTextContent('Próxima semana');
+    await user.click(within(nav).getByRole('button', { name: 'Próxima semana' }));
+    expect(window.location.hash).toBe('#/semana/2026-11-02');
+    await user.click(within(nav).getByRole('button', { name: 'Semana anterior' }));
+    expect(window.location.hash).toBe('#/semana/2026-10-19');
   });
 
-  it('UT-164 o painel de carga marca em destaque quem passa do limite semanal', async () => {
-    const remote = weekRemote({
-      events: [AULA, TARDE],
-      slots: [slotWith('ea', 'r1', 'p3'), slotWith('eb', 'r1', 'p3'), slotWith('eb', 'r5', 'p17')],
-      people: peopleRows(20, { p3: { weekly_limit_hours: 4 } }),
-    });
+  it('situação e ações ficam numa linha só, a lista é por evento e a grade por pessoa saiu', async () => {
+    await page(weekRemote({ events: [AULA], slots: [slotWith('ea', 'r1')] }));
+    expect(await screen.findByText('Em montagem: a equipe ainda não vê esta semana.')).toBeInTheDocument();
+    for (const name of ['Nova atividade interna', 'Publicar', 'Propor escala']) expect(screen.getByRole('button', { name })).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Pessoas disponíveis por função' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Folga e férias' })).toBeInTheDocument();
+    expect(await screen.findByRole('article', { name: 'Gravação aula Biologia' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Grade por pessoa' })).toBeNull();
+    expect(screen.queryByRole('list', { name: 'Carga por pessoa' })).toBeNull();
+  });
+
+  it('férias, folga e reservas (tipo sem equipe) aparecem à parte, no fim do dia', async () => {
+    const reserva = eventRow('er', { title: 'Não marcar nada', service_type_id: 't4', starts_at: '2026-10-26T08:00:00-03:00', ends_at: '2026-10-26T09:00:00-03:00' });
+    await page(weekRemote({ events: [reserva, AULA], slots: [slotWith('ea', 'r1')] }));
+    const day = await screen.findByRole('region', { name: 'segunda, 26/10' });
+    await waitFor(() => expect(within(day).getAllByRole('article').map((a) => a.getAttribute('aria-label'))).toEqual(['Gravação aula Biologia', 'Não marcar nada']));
+    expect(within(day).getByRole('article', { name: 'Não marcar nada' })).toHaveClass('marker-event');
+  });
+
+  it('a estrela destaca a atividade principal da semana', async () => {
+    const user = userEvent.setup();
+    const remote = weekRemote({ events: [AULA], slots: [slotWith('ea', 'r1')] });
     await page(remote);
-    const panel = await screen.findByRole('list', { name: 'Carga por pessoa' });
-    const p3 = await within(panel).findByRole('listitem', { name: 'Pessoa Exemplo 03' });
-    await waitFor(() => expect(p3).toHaveAttribute('data-over', 'true'));
-    expect(p3).toHaveTextContent('6 h de 4 h, 2 atividades');
-    expect(within(p3).getByText('passa do limite')).toBeInTheDocument();
-    const p17 = within(panel).getByRole('listitem', { name: 'Pessoa Exemplo 17' });
-    expect(p17).not.toHaveAttribute('data-over');
-    expect(screen.getByText('1 pessoa passa do limite semanal.')).toBeInTheDocument();
+    const star = await screen.findByRole('button', { name: 'Destacar Gravação aula Biologia como atividade principal' });
+    expect(star).toHaveAttribute('aria-pressed', 'false');
+    await user.click(star);
+    await waitFor(() => expect(ops(remote).find((o) => o.kind === 'event.update_extras')).toMatchObject({ payload: { id: 'ea', highlighted: true } }));
+    expect(await screen.findByRole('button', { name: 'Tirar o destaque de Gravação aula Biologia' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('vaga aberta fica em destaque na lista', async () => {
+    await page(weekRemote({ events: [AULA], slots: [slotWith('ea', 'r1'), slotWith('ea', 'r5', 'p17')] }));
+    const open = await screen.findByRole('listitem', { name: 'Câmera: Vaga aberta' });
+    expect(open).toHaveClass('is-missing');
+    expect(screen.getByRole('listitem', { name: /Pessoa Exemplo 17/ })).not.toHaveClass('is-missing');
+  });
+
+  it('"Propor escala" abre a tela da proposta da semana', async () => {
+    const user = userEvent.setup();
+    await page(weekRemote({ events: [AULA], slots: [slotWith('ea', 'r1')] }));
+    await user.click(await screen.findByRole('button', { name: 'Propor escala' }));
+    expect(window.location.hash).toBe('#/semana/2026-10-26/proposta');
   });
 
   it('UT-165 o seletor de pessoa não lista pessoas inativas', async () => {
@@ -126,7 +138,7 @@ describe('WeekPage: pré-escala', () => {
     expect(screen.queryByRole('button', { name: 'Propor escala' })).toBeNull();
   });
 
-  it('UT-161 vaga sem nenhum apto fica aberta e a função aparece em falta', async () => {
+  it('UT-161 vaga sem nenhum apto fica aberta e em destaque', async () => {
     // Ninguém de P1 a P13 tem a função R4 (Mediação).
     const remote = weekRemote({ events: [AULA], slots: [slotWith('ea', 'r4')], people: peopleRows(13), personRoles: personRoleRows(13) });
     await page(remote);
@@ -134,26 +146,14 @@ describe('WeekPage: pré-escala', () => {
     const slot = await within(event).findByRole('listitem', { name: 'Mediação: Vaga aberta' });
     expect(await within(slot).findByText('ninguém apto')).toBeInTheDocument();
     expect(within(slot).getByText('a definir')).toBeInTheDocument();
-    const balance = screen.getByRole('listitem', { name: 'Mediação' });
-    expect(within(balance).getByText('em falta')).toBeInTheDocument();
-    expect(balance).toHaveTextContent('3 h pedidas, 0 h disponíveis');
+    expect(slot).toHaveClass('is-missing');
   });
 
-  it('UT-162 "Propor escala" com propostas pendentes pergunta se substitui; as aceitas não entram na conta', async () => {
-    const user = userEvent.setup();
-    const remote = weekRemote({
-      events: [AULA, TARDE],
-      slots: [slotWith('ea', 'r1', 'p3', 'proposed'), slotWith('ea', 'r5', 'p17', 'proposed'), slotWith('eb', 'r1', 'p4', 'confirmed'), slotWith('eb', 'r5')],
-    });
-    remote.rpcHandler = (fn) => (fn === 'request_job' ? { job_id: 'job-1' } : {});
+  it('propostas pendentes aparecem na semana com "Aceitar todas da semana"', async () => {
+    const remote = weekRemote({ events: [AULA], slots: [slotWith('ea', 'r1', 'p3', 'proposed')] });
     await page(remote);
-    await user.click(await screen.findByRole('button', { name: 'Propor escala' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Propor escala' });
-    expect(dialog).toHaveTextContent('Substituir as 2 propostas pendentes?');
-    expect(dialog).toHaveTextContent('As alocações aceitas não mudam.');
-    expect(remote.rpcCalls).toHaveLength(0);
-    await user.click(within(dialog).getByRole('button', { name: 'Substituir' }));
-    await waitFor(() => expect(remote.rpcCalls).toContainEqual({ fn: 'request_job', args: { kind: 'propose', payload: { week_id: 'w-b', replace_pending: true } } }));
+    expect(await screen.findByText('1 proposta pendente. A equipe não vê propostas.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Aceitar todas da semana' })).toBeInTheDocument();
   });
 
   it('UT-163 "Trocar pessoa" lista os aptos na ordem de rankCandidates, com horas e atividades na semana', async () => {

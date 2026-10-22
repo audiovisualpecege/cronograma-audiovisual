@@ -2,7 +2,7 @@
 // só por conexões de saída. Novos jobs e avisos chegam pelo Realtime; a consulta a cada 30 s é a reserva.
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
 import { Classifier } from './ai/classifier.ts';
-import { providerResolver, testAiKey } from './ai/key.ts';
+import { providerResolver, testAiKey, type LocalDefaults } from './ai/key.ts';
 import { ProposalRunner } from './ai/proposal.ts';
 import { CallSpacer, paced, type ProviderFactory } from './ai/provider.ts';
 import { AuthAdmin, type AuthApi } from './auth/admin.ts';
@@ -30,6 +30,8 @@ export interface WorkerDeps {
   authApi: AuthApi;
   /** Espaço entre chamadas à IA; 12 s em produção. */
   aiMinIntervalMs?: number;
+  /** Modelo local do .env (AI_LOCAL_URL), quando o banco ainda não tem o endereço. */
+  aiLocal?: LocalDefaults | null;
   queuePollMs?: number;
 }
 
@@ -53,7 +55,7 @@ export class Worker {
   constructor(private deps: WorkerDeps) {
     const { store, clock, log } = deps;
     const spacer = new CallSpacer(clock, deps.aiMinIntervalMs);
-    const providerFor = providerResolver(store, deps.providerFactory, (p) => paced(p, spacer));
+    const providerFor = providerResolver(store, deps.providerFactory, (p) => paced(p, spacer), deps.aiLocal ?? null);
     this.classifier = new Classifier(store, providerFor, log);
     this.calendar = new CalendarSync(store, deps.google, this.classifier, clock, log);
     this.proposals = new ProposalRunner(store, providerFor, clock, log);
@@ -66,7 +68,7 @@ export class Worker {
       calendar_sync: () => this.calendar.run(),
       classify: () => this.classifier.classifyPending(clock.now()),
       propose: (job, progress) => this.proposals.run(job.id, job.payload, progress),
-      test_ai_key: (job) => testAiKey(store, deps.providerFactory, job.payload),
+      test_ai_key: (job) => testAiKey(store, deps.providerFactory, job.payload, deps.aiLocal ?? null),
       invite: (job) => this.auth.invite(personOf(job.payload)),
       auth_ban: (job) => this.auth.ban(personOf(job.payload), true),
       auth_unban: (job) => this.auth.ban(personOf(job.payload), false),

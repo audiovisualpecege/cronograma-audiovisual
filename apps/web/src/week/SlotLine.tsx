@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import { useContext, type ReactNode } from 'react';
+import { DraftContext } from './historyProposal';
 import type { AssignmentRow, EventRow, SlotRow } from '../data/catalog';
 import { useSyncEngine, useSyncState } from '../sync/SyncProvider';
 import { Button } from '../ui/chiaro';
@@ -39,26 +40,44 @@ interface SlotLineProps {
 /** Uma vaga com a pessoa, os selos e as ações da escala (US-014, US-015). */
 export function SlotLine({ model, event, slot, readOnly, onPick, extra }: SlotLineProps) {
   const engine = useSyncEngine();
+  const drafts = useContext(DraftContext);
   const a = model.bySlot.get(slot.id);
   const state = slotState(a);
+  const draft = state === 'open' && event.status !== 'cancelled' ? drafts?.drafts.get(slot.id) : undefined;
   const role = model.roleName(slot.job_role_id);
-  const who = state === 'open' ? 'Vaga aberta' : model.personName(a?.person_id);
+  const who = draft ? model.personName(draft.personId) : state === 'open' ? 'Vaga aberta' : model.personName(a?.person_id);
   const locked = event.status === 'cancelled' || readOnly || !a;
+  // Vaga ainda sem ninguém fica em destaque, para saltar aos olhos na revisão da escala.
+  const missing = state === 'open' && !draft && event.status !== 'cancelled';
   return (
-    <li className="slot-line" aria-label={`${role}: ${who}`}>
+    <li className={`slot-line${missing ? ' is-missing' : ''}${draft ? ' is-draft' : ''}`} aria-label={`${role}: ${who}`}>
       <span className="list-row-main">
         <span className="list-row-title">
           <span className="slot-role">{role}</span> {who}
         </span>
+        {draft && <span className="list-row-sub">{draft.reason}</span>}
         {state === 'proposed' && a?.reason && <span className="list-row-sub">{a.reason}</span>}
-        {state === 'open' && a?.reason && <span className="list-row-sub">{a.reason}</span>}
+        {state === 'open' && !draft && a?.reason && <span className="list-row-sub">{a.reason}</span>}
       </span>
       <span className="list-row-tags">
-        <SlotSeals model={model} slot={slot} assignment={a} />
+        {draft ? <Seal kind="proposta">sugestão</Seal> : <SlotSeals model={model} slot={slot} assignment={a} />}
       </span>
       {!locked && a && (
         <span className="slot-actions">
-          {state === 'open' && (
+          {draft && drafts && (
+            <>
+              <Button size="sm" onClick={() => drafts.accept(slot.id, a)}>
+                Aceitar
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => onPick(slot.id)}>
+                Trocar pessoa
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => drafts.discard(slot.id)}>
+                Descartar
+              </Button>
+            </>
+          )}
+          {state === 'open' && !draft && (
             <Button size="sm" variant="secondary" onClick={() => onPick(slot.id)}>
               Escalar
             </Button>

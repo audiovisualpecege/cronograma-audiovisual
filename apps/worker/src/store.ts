@@ -25,6 +25,9 @@ export interface SettingsRow {
   ai_classification_enabled: boolean;
   ai_provider: string;
   ai_model: string;
+  /** Endereço do servidor do modelo local (Ollama e similares); nulo até alguém configurar. */
+  ai_local_url?: string | null;
+  ai_local_model?: string;
   push_enabled_global: boolean;
 }
 

@@ -11,7 +11,7 @@ import { LocalStore } from '../sync/localStore';
 import { SyncEngine } from '../sync/syncEngine';
 import { SyncProvider } from '../sync/SyncProvider';
 import type { WeekRows } from './model';
-import { NO_EVENTS, PreviewPage } from './PreviewPage';
+import { NO_EVENTS, PreviewList } from './PreviewPage';
 import { WeekPage } from './WeekPage';
 
 beforeEach(() => {
@@ -29,7 +29,7 @@ async function page(remote: FakeRemote) {
   return view;
 }
 
-describe('PreviewPage', () => {
+describe('Prévia da semana sem montagem', () => {
   it('UT-154 trocar o tipo de T1 para T2 muda a equipe estimada para 2 R1, 1 R2, 1 R6', async () => {
     const user = userEvent.setup();
     const remote = weekRemote({ week: null, events: [eventRow('b1', { title: 'Gravação aula Biologia' })] });
@@ -47,8 +47,6 @@ describe('PreviewPage', () => {
     await waitFor(() =>
       expect(remote.applyCalls.flat().find((o) => o.kind === 'event.update_extras')).toMatchObject({ payload: { id: 'b1', service_type_id: 't2' }, baseVersion: 1 }),
     );
-    // Horas por função no topo, pela equipe estimada: 6 h de Câmera pedidas.
-    expect(screen.getByRole('listitem', { name: 'Câmera' })).toHaveTextContent('6 h pedidas');
   });
 
   it('UT-155 semana sem eventos mostra "Nenhum evento nesta semana" sem o botão "Montar semana"', async () => {
@@ -82,7 +80,7 @@ describe('PreviewPage', () => {
     const started = performance.now();
     render(
       <SyncProvider engine={engine}>
-        <PreviewPage rows={rows} sources={SOURCES as unknown as CalendarSourceRow[]} now={NOW} today="2026-10-21" />
+        <PreviewList rows={rows} sources={SOURCES as unknown as CalendarSourceRow[]} today="2026-10-21" readOnly={false} />
       </SyncProvider>,
     );
     const elapsed = performance.now() - started;

@@ -9,6 +9,7 @@ export * from './classify.ts';
 export * from './names.ts';
 export * from './validate.ts';
 export * from './patterns.ts';
+export * from './aiPrompts.ts';
 export { sha256Hex } from './sha256.ts';
 export * from './import/types.ts';
 export { parseDayCell, parseDayTitle, parseTimeCell, splitNames, inferYear } from './import/cells.ts';

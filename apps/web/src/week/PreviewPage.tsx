@@ -1,16 +1,15 @@
-import { isWeekPast } from '@cronograma/core';
 import { memo, useMemo, useState } from 'react';
 import type { CalendarSourceRow, CrewRow, EventRow, JobRoleRow, ServiceTypeRow } from '../data/catalog';
-import { useLocalQuery, useSyncEngine, useSyncState } from '../sync/SyncProvider';
-import { Button, Card } from '../ui/chiaro';
+import type { SyncEngine } from '../sync/syncEngine';
+import { useSyncEngine, useSyncState } from '../sync/SyncProvider';
 import { formatStamp } from '../ui/format';
 import { Select } from '../ui/Select';
-import { CERTAINTY_LABEL, estimatedCrew, eventsByDay, eventSpan, roleBalance, weekDays, type WeekRows } from './model';
-import { InternalEventForm } from '../event/InternalEventForm';
-import { RoleBalancePanel } from './RoleBalancePanel';
+import { HighlightToggle } from './HighlightToggle';
+import { AppIcon } from '../ui/AppIcon';
+import { typeIcon } from '../ui/typeIcons';
+import { CERTAINTY_LABEL, estimatedCrew, eventsByDay, eventSpan, isMarker, markersLast, weekDays, type WeekRows } from './model';
 import { EventSeals } from './ScheduleList';
 import { Seal } from './Seal';
-import { sendAndRefresh, WEEK_TABLES } from './useWeek';
 
 export const NO_EVENTS = 'Nenhum evento nesta semana';
 
@@ -31,6 +30,12 @@ export function SourceAlerts({ sources }: { sources: readonly CalendarSourceRow[
 
 const TYPE_UNDEFINED = '';
 
+/** Troca o tipo de serviço do evento pela fila; o tipo escolhido à mão vale com certeza alta. */
+export function changeType(engine: SyncEngine, e: EventRow, typeId: string | null) {
+  const changes = { service_type_id: typeId, type_certainty: typeId ? 'alta' : 'baixa', type_source: 'admin' };
+  return engine.enqueue('event.update_extras', { id: e.id, service_type_id: typeId }, { baseVersion: e.version, target: { table: 'events', id: e.id, changes } });
+}
+
 interface RowProps {
   event: EventRow;
   types: readonly ServiceTypeRow[];
@@ -40,27 +45,58 @@ interface RowProps {
   today: string;
   readOnly: boolean;
   pending: boolean;
+  /** Destaca o evento sem tipo (passo 1 da proposta). */
+  highlight: boolean;
+  /** Tipo sugerido pelo histórico para o evento sem tipo. */
+  suggestion?: ServiceTypeRow;
   onType: (e: EventRow, typeId: string | null) => void;
+  /** Abre os detalhes numa janela, em vez de ir para a página do evento. */
+  onOpen?: (e: EventRow) => void;
+  selected: boolean;
+  /** Botão direito marca ou desmarca o evento para definir o tipo em massa. */
+  onSelect?: (e: EventRow) => void;
 }
 
 /** Uma linha da prévia; memorizada para semanas com 100 eventos ou mais (US-010 EC-8). */
-const PreviewEvent = memo(function PreviewEvent({ event, types, crew, roles, sourceLabel, today, readOnly, pending, onType }: RowProps) {
+const PreviewEvent = memo(function PreviewEvent({ event, types, crew, roles, sourceLabel, today, readOnly, pending, highlight, suggestion, onType, onOpen, selected, onSelect }: RowProps) {
   const [editing, setEditing] = useState(false);
   // Funções na ordem do código (R1, R2...), como no cadastro do tipo.
   const code = (id: string) => roles.get(id)?.code ?? '';
   const estimated = [...estimatedCrew(event, types, crew)].sort((a, b) => code(a.job_role_id).localeCompare(code(b.job_role_id), 'en', { numeric: true }));
-  const typeName = types.find((t) => t.id === event.service_type_id)?.name;
+  const type = types.find((t) => t.id === event.service_type_id);
   // O seletor só nasce quando a pessoa vai trocar: semanas com 100 eventos ou mais abrem sem travar.
   const options = editing
     ? [{ value: TYPE_UNDEFINED, label: 'a definir' }, ...types.filter((t) => !t.archived_at || t.id === event.service_type_id).map((t) => ({ value: t.id, label: t.name }))]
     : [];
   const noTeam = event.no_team || types.find((t) => t.id === event.service_type_id)?.no_team;
+  const missing = highlight && !event.service_type_id && event.status !== 'cancelled';
+  const marker = isMarker(event, types);
+  const titleClass = `list-row-title${event.status === 'cancelled' ? ' is-cancelled' : ''}`;
   return (
-    <li className="preview-event" aria-label={event.title || 'Sem título'}>
+    <li
+      className={`preview-event${missing ? ' is-missing' : ''}${marker ? ' is-marker' : ''}${event.highlighted ? ' is-highlighted' : ''}${selected ? ' is-selected' : ''}`}
+      aria-label={event.title || 'Sem título'}
+      data-selected={selected || undefined}
+      onContextMenu={
+        onSelect && !readOnly && event.status !== 'cancelled'
+          ? (ev) => {
+              ev.preventDefault();
+              onSelect(event);
+            }
+          : undefined
+      }
+    >
+      <HighlightToggle event={event} readOnly={readOnly} />
       <span className="list-row-main">
-        <a className={`list-row-title${event.status === 'cancelled' ? ' is-cancelled' : ''}`} href={`#/evento/${event.id}`}>
-          {event.title || 'Sem título'}
-        </a>
+        {onOpen ? (
+          <button type="button" className={`${titleClass} title-button`} onClick={() => onOpen(event)}>
+            {event.title || 'Sem título'}
+          </button>
+        ) : (
+          <a className={titleClass} href={`#/evento/${event.id}`}>
+            {event.title || 'Sem título'}
+          </a>
+        )}
         <span className="list-row-sub">
           {eventSpan(event)}
           {event.location ? `, ${event.location}` : ''}. {event.origin === 'internal' ? 'Atividade interna' : `Agenda ${sourceLabel}`}
@@ -91,10 +127,32 @@ const PreviewEvent = memo(function PreviewEvent({ event, types, crew, roles, sou
         />
       ) : (
         <span className="preview-type">
-          <span className="list-row-sub">{typeName ?? 'Tipo a definir'}</span>
-          {!readOnly && event.status !== 'cancelled' && (
-            <button type="button" className="text-button" onClick={() => setEditing(true)} aria-label={`Trocar o tipo de ${event.title || 'Sem título'}`}>
-              Trocar tipo
+          {type ? (
+            <span className="type-chip">
+              <span className="type-icon type-icon--sm">
+                <AppIcon icon={typeIcon(type).icon} size={18} />
+              </span>
+              <strong className="type-name">{type.name}</strong>
+              {!readOnly && event.status !== 'cancelled' && (
+                // Botão simples, sem estado: a prévia tem 100 eventos ou mais (US-010 EC-8).
+                <button type="button" className="pen-button" onClick={() => setEditing(true)} aria-label={`Trocar o tipo de ${event.title || 'Sem título'}`} title="Trocar o tipo">
+                  <span className="mask-icon mask-icon--sm mask-pen" aria-hidden="true" />
+                </button>
+              )}
+            </span>
+          ) : (
+            <>
+              <span className="list-row-sub">Tipo a definir</span>
+              {!readOnly && event.status !== 'cancelled' && (
+                <button type="button" className="text-button" onClick={() => setEditing(true)} aria-label={`Trocar o tipo de ${event.title || 'Sem título'}`}>
+                  Escolher tipo
+                </button>
+              )}
+            </>
+          )}
+          {!readOnly && suggestion && !event.service_type_id && (
+            <button type="button" className="text-button" onClick={() => onType(event, suggestion.id)} aria-label={`Usar ${suggestion.name} em ${event.title || 'Sem título'}`}>
+              Usar {suggestion.name}, sugerido pelo histórico
             </button>
           )}
         </span>
@@ -103,79 +161,39 @@ const PreviewEvent = memo(function PreviewEvent({ event, types, crew, roles, sou
   );
 });
 
-interface PreviewProps {
+interface PreviewListProps {
   rows: WeekRows;
   sources: readonly CalendarSourceRow[];
-  now: Date;
   today: string;
+  readOnly: boolean;
+  /** Destaca os eventos sem tipo. */
+  highlight?: boolean;
+  /** Tipo sugerido pelo histórico, por evento. */
+  suggestions?: ReadonlyMap<string, ServiceTypeRow>;
+  onOpenEvent?: (e: EventRow) => void;
+  /** Mostra só os eventos que passam no filtro (por exemplo, os sem tipo). */
+  filter?: (e: EventRow) => boolean;
+  selected?: ReadonlySet<string>;
+  onSelect?: (e: EventRow) => void;
 }
 
 /**
- * Prévia da semana sem montagem (US-010): eventos por dia com origem, tipo previsto, certeza e equipe
- * estimada; horas pedidas e disponíveis por função no topo; "Montar semana" pela fila (`week.build`).
+ * Eventos da semana sem montagem por dia (US-010): origem, tipo previsto, certeza e equipe estimada, com
+ * a troca de tipo. Só eventos com tipo ganham vagas ao montar.
  */
-export function PreviewPage({ rows, sources, now, today }: PreviewProps) {
+export function PreviewList({ rows, sources, today, readOnly, highlight = false, suggestions, onOpenEvent, filter, selected, onSelect }: PreviewListProps) {
   const engine = useSyncEngine();
   const { pendingRows } = useSyncState();
-  const past = isWeekPast(rows.weekStart, now);
-  const building = useLocalQuery(
-    async (store) => (await store.outbox.toArray()).some((op) => op.kind === 'week.build' && (op.payload as { week_start?: string }).week_start === rows.weekStart),
-    [rows.weekStart],
-  );
   const roles = useMemo(() => new Map(rows.roles.map((r) => [r.id, r])), [rows.roles]);
   const sourceLabels = useMemo(() => new Map(sources.map((s) => [s.id, s.label])), [sources]);
-  const balance = useMemo(() => roleBalance(rows, 'preview'), [rows]);
-  const visible = useMemo(() => rows.events.filter((e) => !e.ignored), [rows.events]);
+  const visible = useMemo(() => rows.events.filter((e) => !e.ignored && (!filter || filter(e))), [rows.events, filter]);
   const byDay = useMemo(() => eventsByDay(rows.weekStart, visible), [rows.weekStart, visible]);
-  const live = visible.filter((e) => e.status !== 'cancelled');
-  const [creating, setCreating] = useState(false);
-
-  function changeType(e: EventRow, typeId: string | null) {
-    const changes = { service_type_id: typeId, type_certainty: typeId ? 'alta' : 'baixa', type_source: 'admin' };
-    void engine.enqueue('event.update_extras', { id: e.id, service_type_id: typeId }, { baseVersion: e.version, target: { table: 'events', id: e.id, changes } });
-  }
-
-  async function build() {
-    await engine.enqueue('week.build', { week_start: rows.weekStart });
-    await sendAndRefresh(engine, WEEK_TABLES);
-  }
+  const onType = useMemo(() => (e: EventRow, typeId: string | null) => void changeType(engine, e, typeId), [engine]);
 
   return (
     <div className="week-preview">
-      <SourceAlerts sources={sources} />
-      {!past && (
-        <div className="week-actions-buttons">
-          <Button variant="secondary" size="sm" onClick={() => setCreating(true)}>
-            Nova atividade interna
-          </Button>
-        </div>
-      )}
-      {creating && <InternalEventForm defaultDate={rows.weekStart} types={rows.types} onClose={() => setCreating(false)} />}
-      {live.length === 0 ? (
-        <Card variant="raised" padding={24}>
-          <p className="form-text" style={{ margin: 0 }}>
-            {NO_EVENTS}.
-          </p>
-        </Card>
-      ) : (
-        <>
-          <RoleBalancePanel balance={balance} roleName={(id) => roles.get(id)?.name ?? 'Função'} />
-          <div className="week-actions">
-            <p className="form-text" style={{ margin: 0 }}>
-              {live.length === 1 ? '1 evento' : `${live.length} eventos`} nesta semana. Revise os tipos antes de montar: só eventos com tipo ganham vagas.
-            </p>
-            {past ? (
-              <p className="form-text">Semana passada fica só para consulta.</p>
-            ) : building ? (
-              <Seal>montagem a enviar</Seal>
-            ) : (
-              <Button onClick={() => void build()}>Montar semana</Button>
-            )}
-          </div>
-        </>
-      )}
       {weekDays(rows.weekStart).map((day) => {
-        const events = byDay.get(day.date) ?? [];
+        const events = markersLast(byDay.get(day.date) ?? [], rows.types);
         if (events.length === 0) return null;
         return (
           <section key={day.date} className="day-group" aria-label={day.label}>
@@ -192,9 +210,14 @@ export function PreviewPage({ rows, sources, now, today }: PreviewProps) {
                   roles={roles}
                   sourceLabel={sourceLabels.get(e.calendar_source_id ?? '') ?? ''}
                   today={today}
-                  readOnly={past}
+                  readOnly={readOnly}
                   pending={pendingRows.has(`events:${e.id}`)}
-                  onType={changeType}
+                  highlight={highlight}
+                  suggestion={suggestions?.get(e.id)}
+                  onType={onType}
+                  onOpen={onOpenEvent}
+                  selected={selected?.has(e.id) ?? false}
+                  onSelect={onSelect}
                 />
               ))}
             </ul>
