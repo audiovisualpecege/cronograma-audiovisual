@@ -12,6 +12,7 @@ import { Button, Card } from '../ui/chiaro';
 import { Dialog } from '../ui/Dialog';
 import { Select } from '../ui/Select';
 import { DraftContext, proposeByHistory, type Draft, type DraftApi } from './historyProposal';
+import { LOCAL_AI_MODEL, proposeWithLocalAi, type LocalAiProgress } from './localAi';
 import { dayMonth, isMeetingEvent, needsTeam, publishSummary, slotState, type WeekRows } from './model';
 import { changeType, NO_EVENTS, PreviewList, SourceAlerts } from './PreviewPage';
 import { AI_OFF, isRunning, ProposalActions, ProposalMessage, useProposalRequest } from './ProposalBar';
@@ -344,6 +345,27 @@ function ProposeAndReview({ rows, now, today, historyRows, aiOn, onBack, onOpenE
   const suggest = () => proposeByHistory(schedule.ctx, schedule.index, isMeeting);
   // A escala sai do histórico na hora, no próprio app: a IA é só um pedido a mais, se quiserem.
   const [drafts, setDrafts] = useState<ReadonlyMap<string, Draft>>(() => (schedule.readOnly ? new Map() : suggest()));
+  // IA deste computador (só no app rodando localmente): conversa direto com o Ollama, sem Supabase nem NAS.
+  const [localAi, setLocalAi] = useState<{ running: boolean; batch: number; total: number; errors: string[]; done?: number } | null>(null);
+  const stopLocalAi = useRef<AbortController | null>(null);
+  function startLocalAi() {
+    const controller = new AbortController();
+    stopLocalAi.current = controller;
+    setDrafts(new Map());
+    setLocalAi({ running: true, batch: 0, total: 0, errors: [] });
+    const show = (p: LocalAiProgress) => {
+      setDrafts(p.drafts);
+      setLocalAi({ running: true, batch: p.batch, total: p.total, errors: p.errors });
+    };
+    void proposeWithLocalAi(schedule.ctx, schedule.index, show, controller.signal).then((p) => {
+      // O que a IA não preencheu, a regra pelo histórico completa, já contando as escolhas da IA.
+      const confirmed = schedule.ctx.assignments.filter((a) => a.status === 'confirmed' || a.locked);
+      const fromAi = [...p.drafts].map(([slotId, d]) => ({ slotId, eventId: schedule.ctx.slots.find((s) => s.id === slotId)?.eventId ?? '', personId: d.personId, status: 'confirmed' as const, locked: false }));
+      const rest = proposeByHistory({ ...schedule.ctx, assignments: [...confirmed, ...fromAi] }, schedule.index, isMeeting);
+      setDrafts(new Map([...rest, ...p.drafts]));
+      setLocalAi({ running: false, batch: p.batch, total: p.total, errors: p.errors, done: p.drafts.size });
+    });
+  }
   // Sugestão vale só enquanto a vaga segue aberta (aceita, trocada à mão ou preenchida pela IA, ela some).
   const open = new Map([...drafts].filter(([slotId]) => slotState(schedule.model.bySlot.get(slotId)) === 'open'));
   const without = (slotId: string) => setDrafts((d) => new Map([...d].filter(([id]) => id !== slotId)));
@@ -418,10 +440,40 @@ function ProposeAndReview({ rows, now, today, historyRows, aiOn, onBack, onOpenE
                 {running ? 'A IA está propondo' : 'Pedir à IA'}
               </OnlineButton>
             )}
+            {import.meta.env.DEV && !schedule.readOnly && (
+              <Button size="sm" variant="ghost" disabled={localAi?.running} onClick={startLocalAi}>
+                Pedir à IA deste computador
+              </Button>
+            )}
             <Button size="sm" variant="secondary" onClick={() => navigate(`/semana/${rows.weekStart}`)}>
               Concluir
             </Button>
           </div>
+          {localAi && (
+            <div className="local-ai-status" role="status">
+              {localAi.running ? (
+                <>
+                  <span>
+                    IA deste computador ({LOCAL_AI_MODEL}):{' '}
+                    {localAi.batch === 0 ? 'enviando o primeiro lote' : `lote ${localAi.batch} de ${localAi.total}`}, perto de 2 minutos por lote. As
+                    sugestões vão aparecendo.
+                  </span>
+                  <Button size="sm" variant="ghost" onClick={() => stopLocalAi.current?.abort()}>
+                    Parar
+                  </Button>
+                </>
+              ) : (
+                <span>
+                  A IA deste computador sugeriu {localAi.done ?? 0} vagas; o histórico completou as outras.
+                </span>
+              )}
+              {localAi.errors.length > 0 && (
+                <span className="form-message form-message--alert">
+                  {localAi.errors.length === 1 ? '1 lote falhou' : `${localAi.errors.length} lotes falharam`}: {localAi.errors.at(-1)}
+                </span>
+              )}
+            </div>
+          )}
           {!aiOn && (
             <p className="page-note" role="note">
               {AI_OFF}

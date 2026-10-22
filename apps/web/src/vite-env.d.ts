@@ -8,4 +8,7 @@ interface ImportMetaEnv {
   readonly VITE_SUPABASE_ANON_KEY?: string;
   /** Chave pública VAPID das notificações no celular (a privada fica só no NAS). */
   readonly VITE_VAPID_PUBLIC_KEY?: string;
+  /** IA deste computador no teste local (padrão http://localhost:11434 e minicpm5). */
+  readonly VITE_LOCAL_AI_URL?: string;
+  readonly VITE_LOCAL_AI_MODEL?: string;
 }
