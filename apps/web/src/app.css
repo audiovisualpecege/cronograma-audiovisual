@@ -1560,6 +1560,53 @@ body {
   background: var(--accent-soft);
 }
 
+/* Funções da pessoa em ordem de prioridade, com o nível de cada uma. */
+.role-order {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.role-order-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-card);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+}
+
+.role-order-pos {
+  display: inline-flex;
+  align-self: center;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-pill);
+  background: var(--gradient-chiaro);
+  color: #fff;
+  font: var(--weight-black) var(--text-body-s) var(--font-display);
+}
+
+.role-order-name {
+  flex: 1;
+  align-self: center;
+  min-width: 120px;
+  font-weight: var(--weight-bold);
+}
+
+.role-order-actions {
+  display: inline-flex;
+  align-self: center;
+  gap: var(--space-1);
+}
+
 /* Seleção pelo botão direito e a barra para definir o tipo de vários de uma vez. */
 .preview-event.is-selected {
   border-color: var(--chiaro-lavanda);

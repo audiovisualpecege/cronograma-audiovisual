@@ -10,6 +10,7 @@ import {
   eventHours,
   personLoad,
   rankCandidates,
+  eventSeries,
   weekStartOf,
 } from './scheduling.ts';
 import { addDays, zonedTime } from './time.ts';
@@ -176,6 +177,58 @@ describe('ranking e lotes da pré-escala', () => {
     const ranked = rankCandidates('v1', ctx, history);
     expect(ranked.map((c) => c.personId)).toEqual(order);
     expect(ranked.map((c) => c.inTieGroup)).toEqual(tie);
+  });
+
+  describe('turma fixa, prioridade e nível', () => {
+    const fact = (personId: string, weekStart: string, title = 'Gravação aula') =>
+      ({ eventId: `h-${personId}-${weekStart}-${title}`, weekStart, eventDate: weekStart, title, serviceTypeId: 't1', jobRoleId: 'r1', personId, hours: 3 });
+    const titled = (ctx: ReturnType<typeof rankingScenario>['ctx'], title: string, complex = false) => ({
+      ...ctx,
+      events: ctx.events.map((e) => (e.id === 'ev' ? { ...e, title, complex } : e)),
+    });
+
+    it('quem fez o mesmo evento nas 8 semanas antes vai na frente, mesmo com menos histórico e mais carga', () => {
+      const { ctx } = rankingScenario([{ id: 'p3', hist: 0, loadHours: 20 }, { id: 'p4', hist: 0, loadHours: 0 }]);
+      const history = buildHistoryIndex([
+        ...Array.from({ length: 30 }, (_, i) => fact('p4', addDays('2025-01-06', 7 * i))),
+        fact('p3', '2026-10-12', 'MBA em Gestão de Projetos - Aula 7'),
+        // Fora da janela de 8 semanas: não conta como turma fixa.
+        fact('p4', '2026-06-01', 'MBA em Gestão de Projetos'),
+      ]);
+      const ranked = rankCandidates('v1', titled(ctx, 'MBA em Gestão de Projetos - Aula 8'), history);
+      expect(ranked.map((c) => c.personId)).toEqual(['p3', 'p4']);
+      expect(ranked[0]).toMatchObject({ series: 1 });
+      expect(eventSeries('MBA em Gestão de Projetos - Aula 8')).toBe(eventSeries('MBA em Gestão de Projetos: Aula 3'));
+    });
+
+    it('o recente pesa mais que o antigo', () => {
+      const { ctx } = rankingScenario([{ id: 'p3', hist: 0, loadHours: 0 }, { id: 'p4', hist: 0, loadHours: 10 }]);
+      const history = buildHistoryIndex([
+        ...Array.from({ length: 10 }, (_, i) => fact('p3', addDays('2023-01-02', 7 * i))),
+        ...Array.from({ length: 6 }, (_, i) => fact('p4', addDays('2026-08-03', 7 * i))),
+      ]);
+      // p3 tem mais vezes (10 x 6), mas de três anos atrás; p4 fez agora e vai na frente apesar da carga.
+      expect(rankCandidates('v1', titled(ctx, 'Outro'), history).map((c) => c.personId)).toEqual(['p4', 'p3']);
+    });
+
+    it('no empate, a função principal da pessoa vem antes da carga', () => {
+      const { ctx, history } = rankingScenario([
+        { id: 'p3', hist: 0, loadHours: 10, extra: { rolePriority: ['r1', 'r2'] } },
+        { id: 'p4', hist: 0, loadHours: 0, extra: { rolePriority: ['r2', 'r1'] } },
+      ]);
+      expect(rankCandidates('v1', ctx, history).map((c) => [c.personId, c.priority])).toEqual([['p3', 0], ['p4', 1]]);
+    });
+
+    it('trabalho complexo pede a Referência primeiro; no simples, a Referência vai por último', () => {
+      const { ctx, history } = rankingScenario([
+        { id: 'p3', hist: 0, loadHours: 0, extra: { roleLevels: { r1: 3 } } },
+        { id: 'p4', hist: 0, loadHours: 5, extra: { roleLevels: { r1: 2 } } },
+        { id: 'p5', hist: 0, loadHours: 9, extra: { roleLevels: { r1: 1 } } },
+      ]);
+      expect(rankCandidates('v1', titled(ctx, 'Evento', true), history).map((c) => c.personId)).toEqual(['p3', 'p4', 'p5']);
+      // Simples: Apoio e Titular empatam e vão pela carga; a Referência fica por último, livre para o complexo.
+      expect(rankCandidates('v1', titled(ctx, 'Aula', false), history).map((c) => c.personId)).toEqual(['p4', 'p5', 'p3']);
+    });
   });
 
   it('UT-022 a carga e o histórico de cada candidato vêm junto', () => {

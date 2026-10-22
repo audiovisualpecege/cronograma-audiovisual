@@ -26,7 +26,16 @@ export interface Candidate {
   loadHours: number;
   loadCount: number;
   inTieGroup: boolean;
+  /** Vezes que fez a função neste mesmo evento (turma fixa) nas 8 semanas anteriores; 0 sem datas no histórico. */
+  series?: number;
+  /** Posição da função na lista da pessoa (0 = principal); ausente quando a pessoa não tem ordem definida. */
+  priority?: number;
+  /** Nível da pessoa na função: 1 Apoio, 2 Titular, 3 Referência; ausente vale Titular. */
+  level?: number;
 }
+
+/** Nível da pessoa numa função (person_roles.level). */
+export const ROLE_LEVELS = { apoio: 1, titular: 2, referencia: 3 } as const;
 
 export interface PersonLike {
   id: string;
@@ -36,6 +45,10 @@ export interface PersonLike {
   active: boolean;
   weeklyLimitHours: number;
   roleIds: string[];
+  /** Funções da mais para a menos prioritária, quando a pessoa tem ordem definida no cadastro. */
+  rolePriority?: string[];
+  /** Nível em cada função (1 Apoio, 2 Titular, 3 Referência); função fora do mapa vale Titular. */
+  roleLevels?: Record<string, number>;
 }
 
 export interface EventLike {
@@ -50,6 +63,8 @@ export interface EventLike {
   serviceTypeId?: string | null;
   noTeam?: boolean;
   title?: string;
+  /** Trabalho complexo (tipo marcado como complexo ou evento com estrela): pede a Referência primeiro. */
+  complex?: boolean;
 }
 
 export interface SlotLike {

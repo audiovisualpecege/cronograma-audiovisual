@@ -18,6 +18,8 @@ import {
 } from '@cronograma/core';
 import {
   crewOf,
+  hasRoleOrder,
+  levelsOf,
   rolesOf,
   type AbsenceRow,
   type AssignmentRow,
@@ -105,6 +107,8 @@ export function needsTeam(e: EventRow, types: readonly ServiceTypeRow[]): boolea
 
 export function toEventLike(e: EventRow, types: readonly ServiceTypeRow[]): EventLike {
   return {
+    // Trabalho complexo: tipo marcado como complexo ou evento com estrela de atividade principal.
+    complex: Boolean(e.highlighted) || Boolean(types.find((t) => t.id === e.service_type_id)?.complex),
     id: e.id,
     weekStart: e.week_start,
     startsAt: new Date(e.starts_at),
@@ -127,6 +131,9 @@ export function toPersonLike(p: PersonRow, personRoles: readonly PersonRoleRow[]
     active: p.active,
     weeklyLimitHours: Number(p.weekly_limit_hours),
     roleIds: rolesOf(p, personRoles),
+    // A ordem só vale como prioridade quando alguém ordenou; senão é a ordem de cadastro, sem significado.
+    ...(hasRoleOrder(p, personRoles) ? { rolePriority: rolesOf(p, personRoles) } : {}),
+    roleLevels: levelsOf(p, personRoles),
   };
 }
 

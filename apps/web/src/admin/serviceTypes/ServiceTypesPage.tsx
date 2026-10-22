@@ -83,6 +83,7 @@ function ServiceTypeForm({
   const [keywords, setKeywords] = useState((type?.keywords ?? []).join(', '));
   const [noTeam, setNoTeam] = useState(type?.no_team ?? false);
   const [icon, setIcon] = useState(type?.icon ?? '');
+  const [complex, setComplex] = useState(type?.complex ?? false);
   const [rows, setRows] = useState<CrewDraft[]>(() =>
     (type ? crewOf(type, crew) : []).map((c) => ({ key: crypto.randomUUID(), jobRoleId: c.job_role_id, quantity: String(c.quantity) })),
   );
@@ -109,8 +110,8 @@ function ServiceTypeForm({
     const crewPayload = v.crew.map((c) => ({ job_role_id: c.jobRoleId, quantity: c.quantity }));
     await engine.enqueue(
       'service_type.upsert',
-      { id, name: v.name, keywords: v.keywords, no_team: v.noTeam, icon: icon || null, crew: crewPayload },
-      { target: { table: 'service_types', id, changes: { name: v.name, keywords: v.keywords, no_team: v.noTeam, icon: icon || null, crew: crewPayload, code: type?.code ?? '' } } },
+      { id, name: v.name, keywords: v.keywords, no_team: v.noTeam, icon: icon || null, complex, crew: crewPayload },
+      { target: { table: 'service_types', id, changes: { name: v.name, keywords: v.keywords, no_team: v.noTeam, icon: icon || null, complex, crew: crewPayload, code: type?.code ?? '' } } },
     );
     onClose();
   }
@@ -133,6 +134,13 @@ function ServiceTypeForm({
         />
         <IconPicker name={name} value={icon} onChange={setIcon} />
         <Checkbox label="Não exige equipe (não gera vagas e não aparece para a equipe)" checked={noTeam} onChange={setNoTeam} />
+        {!noTeam && (
+          <Checkbox
+            label="Trabalho complexo (a escala sugerida chama primeiro quem é Referência na função)"
+            checked={complex}
+            onChange={setComplex}
+          />
+        )}
 
         {!noTeam && (
           <fieldset className="check-group">
@@ -259,6 +267,7 @@ export function ServiceTypesPage() {
                     {t.code && <span className="list-row-code">{t.code}</span>}
                   </span>
                   <span className="list-row-sub">
+                    {t.complex ? 'trabalho complexo · ' : ''}
                     {t.no_team ? 'não exige equipe' : items.length ? crewText(items, roleName) : 'sem equipe típica'}
                     {t.keywords.length > 0 && ` · palavras-chave: ${t.keywords.join(', ')}`}
                   </span>

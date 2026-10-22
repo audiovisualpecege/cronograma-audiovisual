@@ -24,6 +24,21 @@ PATCH para um conserto, MINOR para algo novo, MAJOR quando o jeito de usar muda.
   do histórico e o Gemini). Os que faltarem ficam em destaque, com sugestões do histórico para usar com um clique.
   Passo 2: a semana é montada, a IA propõe as pessoas e a revisão acontece ali mesmo (aceitar, trocar,
   descartar), com as vagas vazias em destaque.
+- **Escala sugerida pelo histórico, no próprio app**: o passo 2 do Propor escala sugere uma pessoa para cada
+  vaga na hora, sem depender da IA. A regra saiu da análise do histórico: testada contra quem foi escalado de
+  fato nas últimas 12 semanas, ela acerta a pessoa em 64% das vagas, contra 38% da regra anterior. A ordem é:
+  1. quem tem a função, está livre no horário, sem ausência e dentro do limite de horas;
+  2. **a turma fixa**, ou seja, quem fez o mesmo evento nas últimas 8 semanas;
+  3. **o nível**: no trabalho complexo, a Referência primeiro; no simples, a Referência por último, livre para
+     os complexos;
+  4. **a prioridade da função** na lista da pessoa;
+  5. o histórico na função e no tipo, com o recente pesando mais;
+  6. a menor carga na semana.
+
+  Cada sugestão diz o porquê e só vale depois de aceita. A IA vira um botão opcional.
+- **Pessoas**: as funções de cada pessoa ficam em ordem de prioridade (setas para subir e descer) e cada uma tem
+  um nível: Apoio, Titular ou Referência.
+- **Tipos de serviço**: marca de **trabalho complexo**. Evento com estrela também conta como complexo.
 - Conserto da proposta da IA, que falhava toda vez:
   - **Reuniões por setor**: a REUNIAO INTERNA pedia a equipe inteira (47 vagas por reunião, metade das vagas da
     semana), inclusive em reuniões de um setor só. Agora as reuniões de Edição, Produção, Planejamento, Técnica e

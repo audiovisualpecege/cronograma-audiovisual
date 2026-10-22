@@ -32,11 +32,18 @@ export function proposeByHistory(ctx: WeekContext, history: HistoryIndex): Map<s
     const best = rankCandidates(slot.id, work, history)[0];
     if (!best) continue;
     work.assignments.push({ slotId: slot.id, eventId: slot.eventId, personId: best.personId, status: 'proposed', locked: false });
-    const load = hoursText(best.loadHours);
-    out.set(slot.id, {
-      personId: best.personId,
-      reason: best.hist > 0 ? `fez ${best.hist} ${best.hist === 1 ? 'vez' : 'vezes'} esta função neste tipo; ${load} na semana` : `sem histórico neste tipo; menor carga (${load} na semana)`,
-    });
+    const load = `${hoursText(best.loadHours)} na semana`;
+    const vezes = (n: number) => `${n} ${n === 1 ? 'vez' : 'vezes'}`;
+    const parts = [
+      best.series
+        ? `fez este mesmo evento ${vezes(best.series)} nas últimas 8 semanas`
+        : best.hist > 0
+          ? `fez ${vezes(best.hist)} esta função neste tipo`
+          : 'sem histórico neste tipo',
+    ];
+    if (best.level === 3) parts.push('Referência na função');
+    parts.push(best.series || best.hist > 0 ? load : `menor carga (${load})`);
+    out.set(slot.id, { personId: best.personId, reason: parts.join('; ') });
   }
   return out;
 }

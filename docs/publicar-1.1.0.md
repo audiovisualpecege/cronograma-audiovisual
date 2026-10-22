@@ -7,7 +7,7 @@ primeiro passo que não der o resultado esperado.
 
 - **Código**: branch `ajuste/painel-e-semana`, pull request #2 (`audiovisualpecege/cronograma-audiovisual`).
   Ainda **sem merge**: o app publicado no GitHub Pages continua na 1.0.1.
-- **Banco**: quatro migrações novas, **ainda não aplicadas** na produção:
+- **Banco**: cinco migrações novas, **ainda não aplicadas** na produção:
   - `supabase/migrations/0012_request_classify.sql`: o app passa a poder pedir o job `classify` (identificar os
     tipos pelo histórico e pelo Gemini), e "Montar semana" numa semana já montada cria as vagas dos eventos
     que o serviço de fundo tipou depois da montagem. Não mexe em dados.
@@ -27,8 +27,16 @@ primeiro passo que não der o resultado esperado.
     - as reuniões futuras são reclassificadas pelo título e as vagas das semanas montadas são refeitas.
     Antes de mudar, guarda o que era em `public._backup_0015`. Motivo: a REUNIAO INTERNA pedia 47 vagas por
     reunião (329 das 685 vagas da semana de 19/10) e a proposta da IA falhava no primeiro lote.
-- **Desfazer**: `supabase/rollback/0015_down.sql`, `0014_down.sql`, `0013_down.sql` e `0012_down.sql` (fora da
-  pasta de migrações, para o `db push` não rodá-los).
+  - `supabase/migrations/0016_role_priority_level.sql`: ordem e nível das funções de cada pessoa
+    (`person_roles.priority` e `level`: Apoio, Titular, Referência) e trabalho complexo nos tipos
+    (`service_types.complex`), mais as funções de gravação aceitando os dois. Não mexe em dados.
+- **Dados iniciais da 0016** (fora do repositório, porque trata da equipe pelo e-mail):
+  `..\dados-iniciais\aplicar-prioridades.mjs`. Ele grava a ordem das funções de cada pessoa a partir da
+  planilha `..\Analise da escala.xlsx`, aba "Prioridade por pessoa": vale a coluna "Sua ordem" quando
+  preenchida, senão a sugerida pelo histórico do último ano. Também acrescenta Cinegrafista e Operador Evento
+  a Pedro, Fernanda, Tiphany e Juliana.
+- **Desfazer**: `supabase/rollback/0016_down.sql`, `0015_down.sql`, `0014_down.sql`, `0013_down.sql` e
+  `0012_down.sql` (fora da pasta de migrações, para o `db push` não rodá-los).
 - **Serviço de fundo (NAS)**: **muda**. Ganhou o fornecedor de IA local (`apps/worker/src/ai/local.ts`), lotes
   de 25 vagas (eram 60), resposta da IA aproveitada item por item e o motivo exato da falha guardado no pedido. Depois
   do merge, o NAS precisa de `docker compose pull && docker compose up -d` na pasta
@@ -59,8 +67,8 @@ primeiro passo que não der o resultado esperado.
    ```
    npx supabase db push --dry-run
    ```
-   Deve listar **só** `0012_request_classify.sql`, `0013_type_icon_and_highlight.sql`, `0014_local_ai.sql` e
-   `0015_meetings_by_sector.sql`.
+   Deve listar **só** `0012_request_classify.sql`, `0013_type_icon_and_highlight.sql`, `0014_local_ai.sql`,
+   `0015_meetings_by_sector.sql` e `0016_role_priority_level.sql`.
    Se listar também as antigas (0001 a 0011), o histórico de migrações do banco não registrou que elas já
    foram aplicadas. **Não rode o push.** Confira com `npx supabase migration list`. Depois de confirmar que o
    esquema existe (as tabelas `people`, `events`, `weeks` estão lá), marque as antigas como aplicadas com
@@ -69,6 +77,12 @@ primeiro passo que não der o resultado esperado.
 2. **Aplicar**:
    ```
    npx supabase db push
+   ```
+   Depois, os dados iniciais de prioridade (pedem `..\login-admin.txt` com o e-mail e a senha de um
+   administrador; apague o arquivo no fim). Primeiro veja o que vai mudar, depois grave:
+   ```
+   node ..\dados-iniciais\aplicar-prioridades.mjs
+   node ..\dados-iniciais\aplicar-prioridades.mjs --gravar
    ```
 3. **Conferir no banco** (SQL Editor do painel do Supabase, ou `npx supabase db query` se a versão do CLI
    tiver):
@@ -116,16 +130,17 @@ que deu problema.
 2. **Serviço de fundo**: no NAS, volte a imagem anterior. Antes, troque o fornecedor para Gemini na tela, porque
    o worker antigo não conhece o local. Ou deixe como está: o worker novo funciona com o banco antigo.
 3. **Banco**, nesta ordem. Rode cada arquivo inteiro no SQL Editor do painel; cada um roda numa transação só:
-   1. `supabase/rollback/0015_down.sql`: volta as reuniões como eram (REUNIAO INTERNA com a equipe inteira) e
+   1. `supabase/rollback/0016_down.sql`: tira a ordem e o nível das funções e a marca de trabalho complexo.
+   2. `supabase/rollback/0015_down.sql`: volta as reuniões como eram (REUNIAO INTERNA com a equipe inteira) e
       refaz as vagas dos eventos de reunião sem ninguém escalado.
-   2. `supabase/rollback/0014_down.sql`: volta o fornecedor para Gemini e tira as colunas da IA local.
-   3. `supabase/rollback/0013_down.sql`: volta os eventos que mudaram de tipo, o NAO ESCALAR e o
+   3. `supabase/rollback/0014_down.sql`: volta o fornecedor para Gemini e tira as colunas da IA local.
+   4. `supabase/rollback/0013_down.sql`: volta os eventos que mudaram de tipo, o NAO ESCALAR e o
       DISPONIBILIZAR (equipe típica e vagas), apaga FERIAS e FOLGA se ninguém os usou e tira as colunas
       novas. Estrelas e ícones escolhidos depois da 1.1.0 se perdem.
-   4. `supabase/rollback/0012_down.sql`: volta `request_job` e `build_week_internal`.
-   5. Registre no histórico de migrações:
-      `npx supabase migration repair --status reverted 0015 0014 0013 0012`.
-   6. Confira com `select name, no_team, keywords from public.service_types order by name;`. Depois de
+   5. `supabase/rollback/0012_down.sql`: volta `request_job` e `build_week_internal`.
+   6. Registre no histórico de migrações:
+      `npx supabase migration repair --status reverted 0016 0015 0014 0013 0012`.
+   7. Confira com `select name, no_team, keywords from public.service_types order by name;`. Depois de
       conferir, apague as cópias: `drop table public._backup_0013; drop table public._backup_0015;`.
 4. Os tipos que a identificação gravou nos eventos (por palavra-chave, histórico ou IA) **não** são desfeitos:
    são tipos certos, e o administrador pode trocar qualquer um na tela.

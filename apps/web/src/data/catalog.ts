@@ -14,14 +14,23 @@ export interface PersonRow extends Row {
   weekly_limit_hours: number | string;
   active: boolean;
   invite_status: 'pending' | 'sent' | 'accepted';
+  /** Funções na ordem de prioridade, enquanto o cadastro está na fila. */
   role_ids?: string[];
+  /** Nível em cada função (1 Apoio, 2 Titular, 3 Referência), enquanto o cadastro está na fila. */
+  role_levels?: Record<string, number>;
 }
 
 export interface PersonRoleRow extends Row {
   person_id: string;
   job_role_id: string;
   archived_at: string | null;
+  /** Ordem da função na lista da pessoa (1 = principal); nulo antes de alguém ordenar. */
+  priority?: number | null;
+  /** 1 Apoio, 2 Titular, 3 Referência. */
+  level?: number;
 }
+
+export const LEVEL_LABEL: Record<number, string> = { 1: 'Apoio', 2: 'Titular', 3: 'Referência' };
 
 export interface SectorRow extends Row {
   name: string;
@@ -47,6 +56,8 @@ export interface ServiceTypeRow extends Row {
   no_team: boolean;
   /** Chave do banco de ícones (ui/typeIcons); nulo usa um ícone pelo nome. */
   icon?: string | null;
+  /** Trabalho complexo: a escala sugerida chama a Referência da função primeiro. */
+  complex?: boolean;
   archived_at: string | null;
   crew?: CrewItem[];
 }
@@ -187,10 +198,29 @@ export function useTable<T extends Row>(table: TableName): T[] | undefined {
 
 export const byName = <T extends { name: string }>(a: T, b: T) => a.name.localeCompare(b.name, 'pt-BR');
 
-/** Funções habilitadas da pessoa: as da fila, quando há, senão as do servidor. */
+const activeRoles = (person: PersonRow, personRoles: readonly PersonRoleRow[]) =>
+  personRoles.filter((r) => r.person_id === person.id && !r.archived_at);
+
+/** Funções habilitadas da pessoa, da mais para a menos prioritária: as da fila, quando há, senão as do servidor. */
 export function rolesOf(person: PersonRow, personRoles: readonly PersonRoleRow[]): string[] {
   if (person.role_ids) return person.role_ids;
-  return personRoles.filter((r) => r.person_id === person.id && !r.archived_at).map((r) => r.job_role_id);
+  // Sem prioridade gravada fica no fim, na ordem em que veio.
+  return activeRoles(person, personRoles)
+    .map((r, i) => ({ id: r.job_role_id, order: r.priority ?? 1000 + i }))
+    .sort((a, b) => a.order - b.order)
+    .map((r) => r.id);
+}
+
+/** A pessoa já tem as funções ordenadas (pela tela ou pela carga), e não só na ordem em que foram marcadas. */
+export function hasRoleOrder(person: PersonRow, personRoles: readonly PersonRoleRow[]): boolean {
+  return Boolean(person.role_ids) || activeRoles(person, personRoles).some((r) => r.priority != null);
+}
+
+/** Nível da pessoa em cada função; função sem nível gravado vale Titular (2). */
+export function levelsOf(person: PersonRow, personRoles: readonly PersonRoleRow[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const r of activeRoles(person, personRoles)) out[r.job_role_id] = r.level ?? 2;
+  return { ...out, ...person.role_levels };
 }
 
 /** Equipe típica do tipo: a da fila, quando há, senão a do servidor. */
