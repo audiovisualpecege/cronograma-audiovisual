@@ -29,6 +29,7 @@ const worker = new Worker({
   appUrl: config.appUrl,
   google: config.googleServiceAccount ? new GoogleCalendar(config.googleServiceAccount, systemClock) : null,
   providerFactory: providerFactory(systemClock),
+  aiLocal: config.aiLocal,
   pushSender: config.vapid ? webPushSender(config.vapid) : null,
   authApi: supabaseAuthApi(db),
   queuePollMs: config.queuePollMs,

@@ -123,6 +123,20 @@ describe('configuração do fornecedor local', () => {
     expect(await providerResolver(store({ ai_provider: 'gemini' }), providerFactory({} as never), wrap)()).toBeNull();
   });
 
+  it('sem o campo no banco (antes da 0014), vale o AI_LOCAL_URL do .env do worker', async () => {
+    const seen: string[] = [];
+    const factory = ((opts: { url?: string; model: string }) => {
+      seen.push(`${opts.url}|${opts.model}`);
+      return { id: 'local' };
+    }) as never;
+    const semCampo = store({ ai_local_url: undefined, ai_local_model: undefined });
+    expect(await providerResolver(semCampo, factory, undefined, { url: 'http://localhost:11434', model: null })()).toMatchObject({ id: 'local' });
+    expect(seen).toEqual(['http://localhost:11434|minicpm5']);
+    // O que está no banco tem precedência sobre o .env.
+    await providerResolver(store({}), factory, undefined, { url: 'http://outro:1', model: 'x' })();
+    expect(seen.at(-1)).toBe('http://nas:11434|minicpm5');
+  });
+
   it('testar conexão do local: sem endereço pede o endereço; servidor fora do ar dá a mensagem do local', async () => {
     await expect(testAiKey(store({ ai_local_url: null }), providerFactory({} as never), {})).rejects.toThrow(LOCAL_NO_URL);
     const down = (() => ({ id: 'local', testKey: async () => ({ ok: false, reason: 'unavailable' }) })) as never;

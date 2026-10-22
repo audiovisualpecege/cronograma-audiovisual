@@ -14,9 +14,16 @@ export const DEFAULT_LOCAL_MODEL = 'minicpm5';
 
 const isLocal = (s: SettingsRow) => s.ai_provider === 'local';
 
-function localProvider(factory: ProviderFactory, s: SettingsRow): AiProvider | null {
-  if (!s.ai_local_url) return null;
-  return factory({ provider: 'local', model: s.ai_local_model || DEFAULT_LOCAL_MODEL, key: '', url: s.ai_local_url });
+/** Endereço e modelo do .env do worker, para quando o banco ainda não tem os campos (antes da 0014). */
+export interface LocalDefaults {
+  url: string;
+  model: string | null;
+}
+
+function localProvider(factory: ProviderFactory, s: SettingsRow, defaults: LocalDefaults | null = null): AiProvider | null {
+  const url = s.ai_local_url || defaults?.url;
+  if (!url) return null;
+  return factory({ provider: 'local', model: s.ai_local_model || defaults?.model || DEFAULT_LOCAL_MODEL, key: '', url });
 }
 
 /**
@@ -27,10 +34,11 @@ export function providerResolver(
   store: SettingsStore & { secret(name: string): Promise<string | null> },
   factory: ProviderFactory,
   wrap: (p: AiProvider) => AiProvider = (p) => p,
+  localDefaults: LocalDefaults | null = null,
 ): () => Promise<AiProvider | null> {
   return async () => {
     const s = await store.settings();
-    if (isLocal(s)) return localProvider(factory, s);
+    if (isLocal(s)) return localProvider(factory, s, localDefaults);
     const key = await store.secret('ai_key');
     if (!key) return null;
     return wrap(factory({ provider: s.ai_provider, model: s.ai_model, key }));
@@ -41,10 +49,11 @@ export async function testAiKey(
   store: AiKeyStore,
   factory: ProviderFactory,
   payload: Record<string, unknown>,
+  localDefaults: LocalDefaults | null = null,
 ): Promise<JobResult> {
   const s = await store.settings();
   if (isLocal(s)) {
-    const provider = localProvider(factory, s);
+    const provider = localProvider(factory, s, localDefaults);
     if (!provider) throw new JobFailure(LOCAL_NO_URL);
     const res = await provider.testKey('');
     if (res.ok) return { ok: true, message: 'Conexão testada: a IA local respondeu.' };
