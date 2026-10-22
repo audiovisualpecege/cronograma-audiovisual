@@ -1,6 +1,6 @@
 import { buildHistoryIndex, type WeekContext } from '@cronograma/core';
 import { describe, expect, it } from 'vitest';
-import { proposeByHistory } from './historyProposal';
+import { fillOrder, proposeByHistory } from './historyProposal';
 
 const WEEK = '2026-10-26';
 const at = (h: number) => new Date(`2026-10-26T${String(h).padStart(2, '0')}:00:00-03:00`);
@@ -28,6 +28,14 @@ function ctx(extra: Partial<WeekContext> = {}): WeekContext {
     ...extra,
   };
 }
+
+describe('fillOrder', () => {
+  it('uma vaga de cada evento primeiro, depois o resto, e as reuniões por último', () => {
+    const s = (id: string, eventId: string) => ({ id, eventId });
+    const slots = [s('a1', 'A'), s('a2', 'A'), s('r1', 'R'), s('r2', 'R'), s('b1', 'B'), s('b2', 'B')];
+    expect(fillOrder(slots, (e) => e === 'R').map((x) => x.id)).toEqual(['a1', 'b1', 'a2', 'b2', 'r1', 'r2']);
+  });
+});
 
 describe('proposeByHistory', () => {
   it('quem mais fez vai primeiro; a mesma pessoa não fica em duas vagas do mesmo evento', () => {

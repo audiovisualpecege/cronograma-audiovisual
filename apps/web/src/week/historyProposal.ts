@@ -25,10 +25,29 @@ export interface DraftApi {
 
 export const DraftContext = createContext<DraftApi | null>(null);
 
-export function proposeByHistory(ctx: WeekContext, history: HistoryIndex): Map<string, Draft> {
+/**
+ * Ordem de preenchimento: 1) uma pessoa em cada evento (a primeira vaga aberta de cada um), para nenhuma demanda
+ * ficar sem ninguém; 2) as outras vagas dos eventos que não são reunião; 3) por último, as reuniões. Dentro de
+ * cada passo, em ordem de horário.
+ */
+export function fillOrder<S extends { id: string; eventId: string }>(slots: readonly S[], isMeeting: (eventId: string) => boolean): S[] {
+  const first: S[] = [];
+  const seen = new Set<string>();
+  for (const s of slots) {
+    if (isMeeting(s.eventId) || seen.has(s.eventId)) continue;
+    seen.add(s.eventId);
+    first.push(s);
+  }
+  const picked = new Set(first.map((s) => s.id));
+  const rest = slots.filter((s) => !picked.has(s.id) && !isMeeting(s.eventId));
+  const meetings = slots.filter((s) => isMeeting(s.eventId));
+  return [...first, ...rest, ...meetings];
+}
+
+export function proposeByHistory(ctx: WeekContext, history: HistoryIndex, isMeeting: (eventId: string) => boolean = () => false): Map<string, Draft> {
   const work: WeekContext = { ...ctx, assignments: ctx.assignments.filter((a) => a.status === 'confirmed' || a.locked) };
   const out = new Map<string, Draft>();
-  for (const slot of openSlots(work)) {
+  for (const slot of fillOrder(openSlots(work), isMeeting)) {
     const best = rankCandidates(slot.id, work, history)[0];
     if (!best) continue;
     work.assignments.push({ slotId: slot.id, eventId: slot.eventId, personId: best.personId, status: 'proposed', locked: false });

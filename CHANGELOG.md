@@ -36,6 +36,14 @@ PATCH para um conserto, MINOR para algo novo, MAJOR quando o jeito de usar muda.
   6. a menor carga na semana.
 
   Cada sugestão diz o porquê e só vale depois de aceita. A IA vira um botão opcional.
+- **Ordem de preenchimento** das sugestões:
+  1. uma pessoa em cada evento, para nenhuma demanda ficar sem ninguém;
+  2. as outras vagas dos eventos que não são reunião;
+  3. por último, as reuniões.
+- **Revisão da escala no Propor escala**:
+  - os eventos começam recolhidos, com o resumo das vagas (preenchidas, sugestões e vazias);
+  - a setinha mostra as pessoas de cada evento;
+  - há os botões **"Abrir todos os eventos"** e **"Só vagas vazias"**.
 - **Pessoas**: as funções de cada pessoa ficam em ordem de prioridade (setas para subir e descer) e cada uma tem
   um nível: Apoio, Titular ou Referência.
 - **Tipos de serviço**: marca de **trabalho complexo**. Evento com estrela também conta como complexo.

@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithSync } from '../../test/helpers';
-import { eventRow, NOW, slotWith, WEEK_B, weekRemote } from '../../test/weekFixtures';
+import { eventRow, NOW, peopleRows, personRoleRows, slotWith, WEEK_B, weekRemote } from '../../test/weekFixtures';
 import { RemoteError } from '../supabase';
 import { ProposalPage } from './ProposalPage';
 
@@ -151,6 +151,11 @@ describe('ProposalPage: passo 2, pessoas', () => {
 
     const region = await screen.findByRole('region', { name: 'Proposta de pessoas' });
     await waitFor(() => expect(region).toHaveTextContent('1 vaga confirmada, 1 sugestão para revisar e 0 vagas vazias.'));
+    // Eventos começam recolhidos, com o resumo; a setinha mostra as pessoas.
+    const event = screen.getByRole('article', { name: 'Gravação aula Biologia' });
+    expect(within(event).getByLabelText('Situação das vagas')).toHaveTextContent('1/2 preenchidas1 sugestão');
+    expect(within(event).queryByRole('listitem')).toBeNull();
+    await user.click(within(event).getByRole('button', { name: 'Mostrar a equipe de Gravação aula Biologia' }));
     const item = screen.getByRole('listitem', { name: /^Câmera: Pessoa Exemplo/ });
     expect(item).toHaveClass('is-draft');
     expect(item).toHaveTextContent('sugestão');
@@ -171,7 +176,22 @@ describe('ProposalPage: passo 2, pessoas', () => {
     remote.views.history_facts = [...fact('p8', 12), ...fact('p4', 2)];
     await page(remote);
     await user.click(await screen.findByRole('button', { name: 'Próximo passo' }));
+    await user.click(await screen.findByRole('button', { name: 'Abrir todos os eventos' }));
     const item = await screen.findByRole('listitem', { name: 'Câmera: Pessoa Exemplo 08' });
     expect(item).toHaveTextContent('fez 12 vezes esta função neste tipo; 0 h na semana');
+  });
+
+  it('"Só vagas vazias" mostra só as vagas sem ninguém nem sugestão, já abertas', async () => {
+    const user = userEvent.setup();
+    // Ninguém de P1 a P13 tem R4 (Mediação): a vaga fica vazia; a de Câmera ganha sugestão.
+    const remote = weekRemote({ events: [AULA, TARDE], slots: [slotWith('ea', 'r4'), slotWith('ea', 'r1'), slotWith('eb', 'r1', 'p3')], people: peopleRows(13), personRoles: personRoleRows(13) });
+    await page(remote);
+    await user.click(await screen.findByRole('button', { name: 'Próximo passo' }));
+    await user.click(await screen.findByRole('button', { name: 'Só vagas vazias (1)' }));
+    expect(screen.getAllByRole('article').map((a) => a.getAttribute('aria-label'))).toEqual(['Gravação aula Biologia']);
+    const event = screen.getByRole('article', { name: 'Gravação aula Biologia' });
+    expect(within(event).getAllByRole('listitem').map((li) => li.getAttribute('aria-label'))).toEqual(['Mediação: Vaga aberta']);
+    await user.click(screen.getByRole('button', { name: 'Mostrar todas as vagas' }));
+    expect(screen.getAllByRole('article')).toHaveLength(2);
   });
 });

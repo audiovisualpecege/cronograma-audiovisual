@@ -12,7 +12,7 @@ import { Button, Card } from '../ui/chiaro';
 import { Dialog } from '../ui/Dialog';
 import { Select } from '../ui/Select';
 import { DraftContext, proposeByHistory, type Draft, type DraftApi } from './historyProposal';
-import { dayMonth, publishSummary, slotState, type WeekRows } from './model';
+import { dayMonth, isMeetingEvent, needsTeam, publishSummary, slotState, type WeekRows } from './model';
 import { changeType, NO_EVENTS, PreviewList, SourceAlerts } from './PreviewPage';
 import { AI_OFF, isRunning, ProposalActions, ProposalMessage, useProposalRequest } from './ProposalBar';
 import { ScheduleEditor, useSchedule } from './ScheduleEditor';
@@ -336,10 +336,14 @@ function ProposeAndReview({ rows, now, today, historyRows, aiOn, onBack, onOpenE
   const { job, request, sending, requestedHere, error } = useProposalRequest(week);
   const pending = schedule.proposed.length;
   const [asking, setAsking] = useState(false);
+  const [onlyEmpty, setOnlyEmpty] = useState(false);
+  const [expandAll, setExpandAll] = useState(false);
+  // Reunião pelo tipo (REUNIAO ...): preenchida por último, depois de todas as outras demandas.
+  const meetingEvents = new Set(rows.events.filter((e) => isMeetingEvent(e, rows.types)).map((e) => e.id));
+  const isMeeting = (eventId: string) => meetingEvents.has(eventId);
+  const suggest = () => proposeByHistory(schedule.ctx, schedule.index, isMeeting);
   // A escala sai do histórico na hora, no próprio app: a IA é só um pedido a mais, se quiserem.
-  const [drafts, setDrafts] = useState<ReadonlyMap<string, Draft>>(() =>
-    schedule.readOnly ? new Map() : proposeByHistory(schedule.ctx, schedule.index),
-  );
+  const [drafts, setDrafts] = useState<ReadonlyMap<string, Draft>>(() => (schedule.readOnly ? new Map() : suggest()));
   // Sugestão vale só enquanto a vaga segue aberta (aceita, trocada à mão ou preenchida pela IA, ela some).
   const open = new Map([...drafts].filter(([slotId]) => slotState(schedule.model.bySlot.get(slotId)) === 'open'));
   const without = (slotId: string) => setDrafts((d) => new Map([...d].filter(([id]) => id !== slotId)));
@@ -362,6 +366,12 @@ function ProposeAndReview({ rows, now, today, historyRows, aiOn, onBack, onOpenE
 
   const summary = publishSummary(rows);
   const empty = Math.max(0, summary.open - open.size);
+  // Vaga vazia: sem ninguém escalado, proposto ou sugerido, de evento que pede equipe.
+  const teamEvents = new Set(rows.events.filter((e) => needsTeam(e, rows.types)).map((e) => e.id));
+  const isEmptySlot = (slotId: string) => {
+    const s = schedule.model.rows.slots.find((x) => x.id === slotId);
+    return Boolean(s && teamEvents.has(s.event_id)) && slotState(schedule.model.bySlot.get(slotId)) === 'open' && !open.has(slotId);
+  };
   const running = sending || isRunning(job);
   return (
     <>
@@ -398,7 +408,7 @@ function ProposeAndReview({ rows, now, today, historyRows, aiOn, onBack, onOpenE
               </>
             )}
             {!schedule.readOnly && (
-              <Button size="sm" variant="secondary" onClick={() => setDrafts(proposeByHistory(schedule.ctx, schedule.index))}>
+              <Button size="sm" variant="secondary" onClick={() => setDrafts(suggest())}>
                 Sugerir de novo
               </Button>
             )}
@@ -419,8 +429,30 @@ function ProposeAndReview({ rows, now, today, historyRows, aiOn, onBack, onOpenE
           )}
         </section>
       </Card>
+      <div className="week-actions-buttons list-tools">
+        <Button size="sm" variant={onlyEmpty ? 'primary' : 'secondary'} aria-pressed={onlyEmpty} onClick={() => setOnlyEmpty(!onlyEmpty)}>
+          {onlyEmpty ? 'Mostrar todas as vagas' : `Só vagas vazias (${empty})`}
+        </Button>
+        {!onlyEmpty && (
+          <Button size="sm" variant="ghost" aria-pressed={expandAll} onClick={() => setExpandAll(!expandAll)}>
+            {expandAll ? 'Recolher todos os eventos' : 'Abrir todos os eventos'}
+          </Button>
+        )}
+      </div>
+      {onlyEmpty && empty === 0 && (
+        <p className="form-text" role="note">
+          Nenhuma vaga vazia: todas têm alguém escalado, proposto ou sugerido.
+        </p>
+      )}
       <DraftContext.Provider value={draftApi}>
-        <ScheduleEditor schedule={schedule} today={today} onOpenEvent={onOpenEvent} />
+        <ScheduleEditor
+          schedule={schedule}
+          today={today}
+          onOpenEvent={onOpenEvent}
+          collapsible
+          expandAll={expandAll}
+          slotFilter={onlyEmpty ? isEmptySlot : undefined}
+        />
       </DraftContext.Provider>
       <Dialog
         open={asking}

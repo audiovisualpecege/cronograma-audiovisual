@@ -100,6 +100,12 @@ export function markersLast(events: readonly EventRow[], types: readonly Service
   return [...events.filter((e) => !isMarker(e, types)), ...events.filter((e) => isMarker(e, types))];
 }
 
+/** Reunião, pelo tipo de serviço (REUNIAO EDICAO, REUNIAO MEDIADORES...): na proposta, preenchida por último. */
+export function isMeetingEvent(e: EventRow, types: readonly ServiceTypeRow[]): boolean {
+  const name = types.find((t) => t.id === e.service_type_id)?.name ?? '';
+  return nameTokens(name)[0] === 'reuniao';
+}
+
 /** Evento que entra na escala: ativo, não ignorado e que exige equipe. */
 export function needsTeam(e: EventRow, types: readonly ServiceTypeRow[]): boolean {
   return e.status !== 'cancelled' && !e.ignored && !e.no_team && !typeNoTeam(types, e.service_type_id);

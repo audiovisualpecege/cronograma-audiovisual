@@ -1560,6 +1560,43 @@ body {
   background: var(--accent-soft);
 }
 
+/* Resumo das vagas do evento recolhido: preenchidas, sugestões e vazias. */
+.slot-summary {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-left: auto;
+  font: var(--weight-bold) var(--text-caption) var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+}
+
+.slot-summary > span {
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+}
+
+.slot-summary > .is-done {
+  background: rgba(46, 155, 107, 0.2);
+  color: var(--success);
+}
+
+.slot-summary > .is-suggested {
+  background: var(--accent-soft);
+  color: var(--chiaro-lavanda);
+}
+
+.slot-summary > .is-empty {
+  background: rgba(250, 206, 149, 0.16);
+  color: var(--chiaro-pessego);
+}
+
+.list-tools {
+  justify-content: flex-end;
+}
+
 /* Funções da pessoa em ordem de prioridade, com o nível de cada uma. */
 .role-order {
   display: flex;

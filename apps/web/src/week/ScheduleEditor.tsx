@@ -20,10 +20,13 @@ interface EditorProps {
   schedule: ReturnType<typeof useSchedule>;
   today: string;
   onOpenEvent?: (e: EventRow) => void;
+  collapsible?: boolean;
+  expandAll?: boolean;
+  slotFilter?: (slotId: string) => boolean;
 }
 
 /** Lista por evento com a escolha de pessoa (US-014, US-015). */
-export function ScheduleEditor({ schedule, today, onOpenEvent }: EditorProps) {
+export function ScheduleEditor({ schedule, today, onOpenEvent, collapsible, expandAll, slotFilter }: EditorProps) {
   const { model, ctx, index, readOnly } = schedule;
   const [picking, setPicking] = useState<string | null>(null);
   const pickSlot = picking ? model.rows.slots.find((s) => s.id === picking) : undefined;
@@ -31,7 +34,16 @@ export function ScheduleEditor({ schedule, today, onOpenEvent }: EditorProps) {
   const pickEvent = pickSlot ? model.rows.events.find((e) => e.id === pickSlot.event_id) : undefined;
   return (
     <>
-      <ScheduleList model={model} readOnly={readOnly} today={today} onPick={setPicking} onOpenEvent={onOpenEvent} />
+      <ScheduleList
+        model={model}
+        readOnly={readOnly}
+        today={today}
+        onPick={setPicking}
+        onOpenEvent={onOpenEvent}
+        collapsible={collapsible}
+        expandAll={expandAll}
+        slotFilter={slotFilter}
+      />
       {pickSlot && pickAssignment && pickEvent && (
         <PersonPicker
           ctx={ctx}
