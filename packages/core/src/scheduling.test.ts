@@ -11,6 +11,7 @@ import {
   personLoad,
   rankCandidates,
   eventSeries,
+  proposeWeek,
   weekStartOf,
 } from './scheduling.ts';
 import { addDays, zonedTime } from './time.ts';
@@ -199,6 +200,29 @@ describe('ranking e lotes da pré-escala', () => {
       expect(ranked.map((c) => c.personId)).toEqual(['p3', 'p4']);
       expect(ranked[0]).toMatchObject({ series: 1 });
       expect(eventSeries('MBA em Gestão de Projetos - Aula 8')).toBe(eventSeries('MBA em Gestão de Projetos: Aula 3'));
+    });
+
+    it('série: só a primeira linha do título, sem o rótulo curto antes de ":"', () => {
+      expect(eventSeries('MBA em Marketing\nDisciplina: Plataformas Digitais')).toBe(eventSeries('MBA em Marketing\nDisciplina: Branding'));
+      expect(eventSeries('GRAVAÇÃO: Virada Empresarial')).not.toBe(eventSeries('GRAVAÇÃO: Chiaro Reels'));
+      expect(eventSeries('*DISPONIBILIZAR: English@USP - Focus on Reading')).toBe('english usp focus on reading');
+    });
+
+    it('proposeWeek dá a vaga a quem é da turma fixa antes que outro evento no mesmo horário o ocupe', () => {
+      // p3 é da turma fixa de "MBA B" e também o maior histórico geral; "MBA A" vem antes na ordem.
+      const ctx = weekContext({
+        people: [person('p3', { roleIds: ['r1'] }), person('p4', { roleIds: ['r1'] })],
+        events: [{ ...event('a', '2026-10-21', '19:00', '23:00'), title: 'MBA A' }, { ...event('b', '2026-10-21', '19:00', '23:00'), title: 'MBA B' }],
+        slots: [slot('va', 'V1', 'a'), slot('vb', 'V2', 'b')],
+        assignments: [],
+      });
+      const history = buildHistoryIndex([
+        ...Array.from({ length: 20 }, (_, i) => fact('p3', addDays('2025-01-06', 7 * i), 'MBA X')),
+        fact('p3', '2026-10-12', 'MBA B'),
+      ]);
+      const picks = proposeWeek(ctx, history);
+      expect(picks.get('vb')?.personId).toBe('p3');
+      expect(picks.get('va')?.personId).toBe('p4');
     });
 
     it('o recente pesa mais que o antigo', () => {

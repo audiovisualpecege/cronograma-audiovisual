@@ -169,15 +169,24 @@ export const HISTORY_HALF_LIFE_WEEKS = 26;
 /** Janela da turma fixa: quem fez o mesmo evento nestas semanas antes vai na frente. */
 export const SERIES_WINDOW_WEEKS = 8;
 
+/** Palavras que mudam de uma semana para outra na mesma turma: ficam fora da série. */
+const SERIES_NOISE = new Set(['aula', 'aulas', 'modulo', 'parte', 'encontro', 'turma', 'dia', 'semana', 'disciplina', 'professor', 'professora', 'prof', 'id']);
+
 /**
- * Série do evento pelo título: a parte antes de " - ", ": " ou " | " (o que vem depois costuma ser a aula, o
- * módulo ou o professor), sem números. "MBA em Gestão de Projetos - Aula 3" e "MBA em Gestão de Projetos"
- * são a mesma série. No teste com as 12 semanas mais recentes do histórico, quem fez a mesma série nas 8
- * semanas anteriores acertou a pessoa escalada em 64% das vagas, contra 38% do histórico só por tipo.
+ * Série do evento pelo título, para achar a turma fixa: a primeira linha do título sem números e sem as
+ * palavras que mudam de semana para semana (aula, módulo, parte...). Um rótulo curto antes de ":" ("GRAVAÇÃO:",
+ * "*DISPONIBILIZAR:", "Curso:") sai, para "GRAVAÇÃO: Virada Empresarial" e "GRAVAÇÃO: Reels" não virarem a mesma
+ * série. "MBA em Gestão de Projetos - Aula 3" e "MBA em Gestão de Projetos - Aula 4" são a mesma série.
  */
 export function eventSeries(title: string): string {
-  const head = title.split(/ - |: | \| /)[0] ?? title;
-  return nameTokens(head).filter((t) => !/^[0-9]+$/.test(t)).join(' ');
+  // Só a primeira linha: nas planilhas e agendas, as linhas de baixo trazem a disciplina e o professor da semana.
+  const first = title.split(/\r?\n/)[0] ?? title;
+  const colon = first.indexOf(': ');
+  const label = colon > 0 ? nameTokens(first.slice(0, colon)) : [];
+  const body = label.length > 0 && label.length <= 2 ? first.slice(colon + 2) : first;
+  return nameTokens(body)
+    .filter((t) => !/^[0-9]+$/.test(t) && !SERIES_NOISE.has(t))
+    .join(' ');
 }
 
 const WEEK_MS = 7 * 86_400_000;
@@ -295,6 +304,56 @@ export function rankCandidates(slotId: string, ctx: WeekContext, history: Histor
     if (c.level !== undefined) out.level = c.level;
     return out;
   });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Escala sugerida pelo histórico (sem IA), a semana inteira de uma vez.
+
+/**
+ * Ordem de preenchimento: 1) uma pessoa em cada evento (a primeira vaga aberta de cada um), para nenhuma demanda
+ * ficar sem ninguém; 2) as outras vagas dos eventos que não são reunião; 3) por último, as reuniões. Dentro de
+ * cada passo, em ordem de horário.
+ */
+export function fillOrder<S extends { id: string; eventId: string }>(slots: readonly S[], isMeeting: (eventId: string) => boolean): S[] {
+  const first: S[] = [];
+  const seen = new Set<string>();
+  for (const s of slots) {
+    if (isMeeting(s.eventId) || seen.has(s.eventId)) continue;
+    seen.add(s.eventId);
+    first.push(s);
+  }
+  const picked = new Set(first.map((s) => s.id));
+  const rest = slots.filter((s) => !picked.has(s.id) && !isMeeting(s.eventId));
+  const meetings = slots.filter((s) => isMeeting(s.eventId));
+  return [...first, ...rest, ...meetings];
+}
+
+/**
+ * A escala da semana pelo ranking, vaga por vaga, cada escolha contando na carga da seguinte:
+ *   1. primeiro as turmas fixas da semana toda: quem fez o mesmo evento nas 8 semanas antes fica com a vaga,
+ *      antes que um evento no mesmo horário o ocupe;
+ *   2. depois o resto, pela fillOrder (uma pessoa por evento, as demais vagas, reuniões por último).
+ * Devolve o candidato escolhido de cada vaga (com o histórico, a turma fixa e o nível, para o motivo).
+ */
+export function proposeWeek(ctx: WeekContext, history: HistoryIndex, isMeeting: (eventId: string) => boolean = () => false): Map<string, Candidate> {
+  const work: WeekContext = { ...ctx, assignments: ctx.assignments.filter((a) => a.status === 'confirmed' || a.locked) };
+  const out = new Map<string, Candidate>();
+  const take = (slot: SlotLike, c: Candidate) => {
+    work.assignments.push({ slotId: slot.id, eventId: slot.eventId, personId: c.personId, status: 'proposed', locked: false });
+    out.set(slot.id, c);
+  };
+  const order = fillOrder(openSlots(work), isMeeting);
+  for (const slot of order) {
+    if (isMeeting(slot.eventId)) continue;
+    const best = rankCandidates(slot.id, work, history)[0];
+    if (best?.series) take(slot, best);
+  }
+  for (const slot of order) {
+    if (out.has(slot.id)) continue;
+    const best = rankCandidates(slot.id, work, history)[0];
+    if (best) take(slot, best);
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------------------------
