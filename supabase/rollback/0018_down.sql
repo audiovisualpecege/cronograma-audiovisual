@@ -3,7 +3,8 @@
 --   1. as funções voltam ao que eram (check_eligibility da 0005 e op_job_role_upsert da 0004);
 --   2. os eventos que passaram para DISPONIBILIZAR voltam ao tipo que tinham;
 --   3. o DISPONIBILIZAR volta a não exigir equipe, com as palavras-chave e a equipe de antes;
---   4. a função Disponibilizador criada pela 0018 é apagada, ou arquivada se alguém já a usa;
+--   4. quem ganhou Disponibilizador pela 0018 perde a função, e a função criada pela 0018 é apagada, ou arquivada
+--      se alguém já a usa;
 --   5. sai a coluna no_hours, e as vagas do DISPONIBILIZAR sem ninguém escalado são refeitas.
 -- Depois de rodar: npx supabase migration repair --status reverted 0018
 
@@ -134,7 +135,12 @@ set archived_at = null, quantity = (b.data ->> 'quantity')::int
 from public._backup_0018 b
 where b.kind = 'crew' and c.id = (b.data ->> 'id')::uuid;
 
--- 4. A função criada pela 0018: apagada se nada a usa, senão arquivada. A que já existia volta ao que era.
+-- 4. A função dada pela 0018 a quem tem Operador Aula sai (arquivada, para os aparelhos verem). A função criada
+-- pela 0018: apagada se nada a usa, senão arquivada. A que já existia volta ao que era.
+update public.person_roles pr set archived_at = coalesce(pr.archived_at, now())
+from public._backup_0018 b
+where b.kind = 'given_role' and pr.id = b.ref;
+
 delete from public.service_type_crew c using public._backup_0018 b
 where b.kind = 'created_role' and c.job_role_id = b.ref
   and not exists (select 1 from public.slots s where s.job_role_id = b.ref)

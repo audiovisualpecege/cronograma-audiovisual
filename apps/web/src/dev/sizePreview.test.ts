@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { AssignmentRow, CrewRow, EventRow, JobRoleRow, ServiceTypeRow, SlotRow } from '../data/catalog';
+import type { AssignmentRow, CrewRow, EventRow, JobRoleRow, PersonRoleRow, ServiceTypeRow, SlotRow } from '../data/catalog';
 import { estimatedCrew, type WeekRows } from '../week/model';
 import { previewActive, simulateCatalog, simulateWeek } from './sizePreview';
 
@@ -45,6 +45,11 @@ describe('simulação do porte no app local', () => {
     const simple = simulateWeek(rows, {});
     expect(simple.slots.filter((s) => !s.archived_at).map((s) => s.id)).toEqual(['s-op', 's-cin2']);
     expect(estimatedCrew(simple.events[0] as EventRow, simple.types, simple.crew)).toEqual([{ job_role_id: 'op', quantity: 1, size: 1 }]);
+
+    // Quem tem Operador Aula ganha Disponibilizador.
+    const withAula = simulateWeek({ ...rows, personRoles: [{ id: 'pr1', version: 1, person_id: 'p1', job_role_id: 'aula', archived_at: null }] as PersonRoleRow[] }, {});
+    const disp = withAula.roles.find((r) => r.name === 'Disponibilizador');
+    expect(withAula.personRoles.filter((r) => r.person_id === 'p1').map((r) => r.job_role_id)).toEqual(['aula', disp?.id]);
 
     const medium = simulateWeek(rows, { e1: 2 });
     expect(medium.events[0]?.size).toBe(2);

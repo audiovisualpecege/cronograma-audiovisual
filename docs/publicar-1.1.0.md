@@ -50,8 +50,9 @@ primeiro passo que não der o resultado esperado.
       palavra-chave "*disponibilizar" (título que começa com "*DISPONIBILIZAR" recebe o tipo);
     - os eventos de agora em diante com esse começo passam para o tipo, e as vagas das semanas montadas são
       refeitas onde ninguém foi escalado.
-    Antes de mudar, guarda o que era em `public._backup_0018`. Ninguém tem a função ainda: marque quem
-    disponibiliza em Dados > Pessoas.
+    - quem está ativo com Operador Aula ganha Disponibilizador, por último na lista de funções (o histórico não
+      diz quem disponibiliza hoje; escolha do Raoni em 26/10/2026). Quem não faz, tire em Dados > Pessoas.
+    Antes de mudar, guarda o que era em `public._backup_0018`.
 - **Dados iniciais da 0016** (fora do repositório, porque trata da equipe pelo e-mail):
   `..\dados-iniciais\aplicar-prioridades.mjs`. Ele grava a ordem das funções de cada pessoa a partir da
   planilha `..\Analise da escala.xlsx`, aba "Prioridade por pessoa": vale a coluna "Sua ordem" quando

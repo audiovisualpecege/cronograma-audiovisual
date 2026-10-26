@@ -6,7 +6,7 @@
 // sozinha quando o banco tiver a 0017 (os tipos chegam com "sized") e nunca roda no app publicado nem nos testes.
 import { EVENT_SIZES, isEventSize, normalizeName, type EventSize } from '@cronograma/core';
 import { useSyncExternalStore } from 'react';
-import { crewForSize, type CrewRow, type EventRow, type JobRoleRow, type ServiceTypeRow } from '../data/catalog';
+import { crewForSize, type CrewRow, type EventRow, type JobRoleRow, type PersonRoleRow, type ServiceTypeRow } from '../data/catalog';
 import type { WeekRows } from '../week/model';
 
 const ENABLED = import.meta.env.DEV && import.meta.env.MODE !== 'test';
@@ -175,7 +175,19 @@ export function simulateWeek(rows: WeekRows, sizes: Sizes): WeekRows {
     }
   }
   const slots = hidden.size ? rows.slots.map((s) => (hidden.has(s.id) ? { ...s, archived_at: 'simulacao' } : s)) : rows.slots;
-  return { ...rows, types, crew, roles, events, slots };
+  return { ...rows, types, crew, roles, events, slots, personRoles: simulatePersonRoles(rows.personRoles, roles) };
+}
+
+/** A 0018 dá Disponibilizador, por último na lista, a quem tem Operador Aula. */
+function simulatePersonRoles(personRoles: readonly PersonRoleRow[], roles: readonly JobRoleRow[]): PersonRoleRow[] {
+  const disp = roles.find((r) => normalizeName(r.name) === 'disponibilizador');
+  const aula = roles.find((r) => normalizeName(r.name) === 'operador aula');
+  if (!disp || !aula) return [...personRoles];
+  const has = new Set(personRoles.filter((r) => r.job_role_id === disp.id).map((r) => r.person_id));
+  const given = personRoles
+    .filter((r) => r.job_role_id === aula.id && !r.archived_at && !has.has(r.person_id))
+    .map((r) => ({ id: `sim:${r.person_id}:${disp.id}`, version: 1, person_id: r.person_id, job_role_id: disp.id, archived_at: null, priority: 1000, level: 2 }) as PersonRoleRow);
+  return [...personRoles, ...given];
 }
 
 /** Vagas que o porte pede e a semana montada não tem (a simulação não cria vagas), em linhas já simuladas. */

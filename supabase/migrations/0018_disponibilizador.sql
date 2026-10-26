@@ -5,8 +5,8 @@
 --   - job_role.upsert recebe "no_hours" (sem a chave, mantém o gravado);
 --   - título que começa com "*DISPONIBILIZAR" vira DISPONIBILIZAR com certeza alta: a palavra-chave com asterisco
 --     "*disponibilizar" (classifyTitle do core). Os eventos de agora em diante com esse começo mudam de tipo aqui.
--- A 0013 tinha deixado o DISPONIBILIZAR sem equipe; esta volta atrás com a função nova. Ninguém tem a função
--- ainda: as vagas ficam vazias até alguém marcar Disponibilizador nas pessoas.
+-- A 0013 tinha deixado o DISPONIBILIZAR sem equipe; esta volta atrás com a função nova, dada a quem tem
+-- Operador Aula (quem tinha a vaga do DISPONIBILIZAR antes).
 -- Tudo o que muda fica antes em public._backup_0018, para supabase/rollback/0018_down.sql.
 
 alter table public.job_roles add column no_hours boolean not null default false;
@@ -129,7 +129,7 @@ $$;
 -- Dados. A cópia (public._backup_0018) fica fechada pela RLS, sem política: ninguém lê pela API.
 
 create table public._backup_0018 (
-  kind text not null,  -- service_type | crew | created_role | role | event_type | event_outdated
+  kind text not null,  -- service_type | crew | created_role | role | given_role | event_type | event_outdated
   ref uuid not null,
   data jsonb,
   saved_at timestamptz not null default now()
@@ -158,6 +158,23 @@ with created as (
 insert into public._backup_0018 (kind, ref) select 'created_role', id from created;
 
 update public.job_roles set no_hours = true, archived_at = null where public.norm_name(name) = 'disponibilizador';
+
+-- Quem tem Operador Aula ganha Disponibilizador, por último na ordem das funções (o histórico não diz quem
+-- disponibiliza hoje: em 705 dos 901 eventos ninguém foi escalado; o Raoni escolheu assim em 26/10/2026).
+with given as (
+  insert into public.person_roles (person_id, job_role_id, priority, level)
+  select pr.person_id, d.id,
+    (select coalesce(max(x.priority), count(*)) + 1 from public.person_roles x where x.person_id = pr.person_id and x.archived_at is null),
+    2
+  from public.person_roles pr
+  join public.people p on p.id = pr.person_id and p.active
+  join public.job_roles a on a.id = pr.job_role_id and public.norm_name(a.name) = 'operador aula'
+  cross join (select id from public.job_roles where public.norm_name(name) = 'disponibilizador' limit 1) d
+  where pr.archived_at is null
+    and not exists (select 1 from public.person_roles y where y.person_id = pr.person_id and y.job_role_id = d.id)
+  returning id
+)
+insert into public._backup_0018 (kind, ref) select 'given_role', id from given;
 
 -- DISPONIBILIZAR: 1 Disponibilizador e a palavra-chave com asterisco. Os eventos de agora em diante com
 -- "*DISPONIBILIZAR" no começo do título passam para o tipo; depois as vagas das semanas montadas são refeitas
