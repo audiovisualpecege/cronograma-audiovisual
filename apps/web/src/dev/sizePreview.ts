@@ -6,7 +6,7 @@
 // sozinha quando o banco tiver a 0017 (os tipos chegam com "sized") e nunca roda no app publicado nem nos testes.
 import { EVENT_SIZES, isEventSize, normalizeName, type EventSize } from '@cronograma/core';
 import { useSyncExternalStore } from 'react';
-import { crewForSize, type CrewRow, type EventRow, type JobRoleRow, type PersonRoleRow, type ServiceTypeRow } from '../data/catalog';
+import { crewForSize, type CrewRow, type EventRow, type JobRoleRow, type PersonRoleRow, type SectorRow, type ServiceTypeRow } from '../data/catalog';
 import type { WeekRows } from '../week/model';
 
 const ENABLED = import.meta.env.DEV && import.meta.env.MODE !== 'test';
@@ -50,11 +50,20 @@ interface Catalog {
   roles: JobRoleRow[];
 }
 
-/** Tipos, equipe e funções como ficariam com a 0017 e a 0018, quando a simulação vale; senão, como vieram. */
-export function previewCatalog(types: ServiceTypeRow[], crew: CrewRow[], roles: JobRoleRow[]): Catalog {
+/** Tipos, equipe e funções como ficariam com a 0017 a 0019, quando a simulação vale; senão, como vieram. */
+export function previewCatalog(types: ServiceTypeRow[], crew: CrewRow[], roles: JobRoleRow[], sectors: readonly SectorRow[] = []): Catalog {
   if (types.length > 0) simulating = previewActive(types);
-  return previewActive(types) ? simulateCatalog(types, crew, roles) : { types, crew, roles };
+  return previewActive(types) ? simulateCatalog(types, crew, roles, sectors) : { types, crew, roles };
 }
+
+/** A 0019: reuniões de setor sem equipe, ligadas ao setor (tipo e setor pelo nome normalizado). */
+const MEETINGS: Record<string, string> = {
+  'reuniao edicao': 'edicao',
+  'reuniao producao': 'producao',
+  'reuniao planejamento': 'planejamento',
+  'reuniao tecnica aulas': 'tecnica',
+  'reuniao mediadores': 'mediacao',
+};
 
 const DISPONIBILIZADOR_ID = 'sim:disponibilizador';
 
@@ -70,14 +79,27 @@ function simulateRoles(roles: readonly JobRoleRow[]): JobRoleRow[] {
 }
 
 /** Tipos, equipe e funções como ficariam com a 0017 e a 0018. */
-export function simulateCatalog(types: readonly ServiceTypeRow[], crew: readonly CrewRow[], baseRoles: readonly JobRoleRow[]): Catalog {
+export function simulateCatalog(
+  types: readonly ServiceTypeRow[],
+  crew: readonly CrewRow[],
+  baseRoles: readonly JobRoleRow[],
+  sectors: readonly SectorRow[] = [],
+): Catalog {
   const roles = simulateRoles(baseRoles);
   const roleId = new Map(roles.filter((r) => !r.archived_at).map((r) => [normalizeName(r.name), r.id]));
+  const sectorId = new Map(sectors.filter((s) => !s.archived_at).map((s) => [normalizeName(s.name), s.id]));
   const suporte = roleId.get('suporte');
   const outTypes: ServiceTypeRow[] = [];
   const outCrew: CrewRow[] = crew.map((c) => ({ ...c, size: 2 }));
   for (const t of types) {
     const name = normalizeName(t.name);
+    const meeting = MEETINGS[name];
+    if (meeting && !t.archived_at) {
+      const sector = sectorId.get(meeting);
+      outTypes.push({ ...t, no_team: true, sized: false, default_size: 1, sector_ids: sector ? [sector] : [] });
+      for (let i = outCrew.length - 1; i >= 0; i--) if (outCrew[i]?.service_type_id === t.id) outCrew.splice(i, 1);
+      continue;
+    }
     if (name === 'disponibilizar' && !t.archived_at) {
       const disp = roleId.get('disponibilizador') as string;
       outTypes.push({ ...t, no_team: false, sized: false, default_size: 1, keywords: [...new Set([...t.keywords, '*disponibilizar'])] });
@@ -164,7 +186,12 @@ export function simulateWeek(rows: WeekRows, sizes: Sizes): WeekRows {
   const hidden = new Set<string>();
   for (const e of events) {
     const type = types.find((t) => t.id === e.service_type_id);
-    if (!type || type.no_team || e.no_team) continue;
+    if (!type) continue;
+    // Tipo que deixou de pedir equipe (reunião de setor): as vagas vazias somem.
+    if (type.no_team || e.no_team) {
+      for (const s of rows.slots) if (s.event_id === e.id && !s.archived_at && !filled.has(s.id)) hidden.add(s.id);
+      continue;
+    }
     const want = new Map(crewForSize(type, crew, e.size).map((c) => [c.job_role_id, c.quantity]));
     const slots = rows.slots.filter((s) => s.event_id === e.id && !s.archived_at).sort((a, b) => Number(filled.has(b.id)) - Number(filled.has(a.id)));
     const used = new Map<string, number>();

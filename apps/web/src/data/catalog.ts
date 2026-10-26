@@ -66,6 +66,8 @@ export interface ServiceTypeRow extends Row {
   sized?: boolean;
   /** Porte de quem não escolheu (1 Simples, 2 Médio, 3 Grande). */
   default_size?: number;
+  /** Setores que veem os eventos do tipo na agenda (reuniões, sem escala). */
+  sector_ids?: string[];
   archived_at: string | null;
   crew?: CrewItem[];
 }

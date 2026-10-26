@@ -24,15 +24,18 @@ export interface Row {
   [column: string]: unknown;
 }
 
-/** Tabelas que a cópia local espelha. A RLS decide o que cada perfil recebe. */
+/**
+ * Tabelas que a cópia local espelha. A RLS decide o que cada perfil recebe. A equipe lê os tipos de serviço
+ * (migração 0019) para saber de que setor é cada reunião; antes dela, a leitura volta vazia.
+ */
 export const TEAM_TABLES = [
   'sectors', 'job_roles', 'people', 'people_public', 'person_roles', 'weeks', 'events',
-  'published_assignments', 'absences', 'notifications',
+  'published_assignments', 'absences', 'notifications', 'service_types',
 ] as const;
 
 export const ADMIN_TABLES = [
   ...TEAM_TABLES,
-  'service_types', 'service_type_crew', 'calendar_sources', 'slots', 'assignments', 'publications', 'jobs',
+  'service_type_crew', 'calendar_sources', 'slots', 'assignments', 'publications', 'jobs',
   'settings',
 ] as const;
 

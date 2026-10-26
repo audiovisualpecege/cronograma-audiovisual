@@ -12,7 +12,7 @@ import {
 } from '@cronograma/core';
 import { AddCircleIcon, TrashBinMinimalisticIcon } from '@solar-icons/react/linear';
 import { useMemo, useState, type FormEvent } from 'react';
-import { byName, crewOf, toFact, useTable, type CrewItem, type CrewRow, type JobRoleRow, type ServiceTypeRow } from '../../data/catalog';
+import { byName, crewOf, toFact, useTable, type CrewItem, type CrewRow, type JobRoleRow, type SectorRow, type ServiceTypeRow } from '../../data/catalog';
 import { firstError } from '../../data/messages';
 import { previewActive, previewCatalog } from '../../dev/sizePreview';
 import { PageTitle } from '../../layout/PageTitle';
@@ -141,11 +141,13 @@ function ServiceTypeForm({
   crew,
   suggested,
   simulated,
+  sectors,
   onClose,
 }: {
   type?: ServiceTypeRow;
   initialName?: string;
   roles: JobRoleRow[];
+  sectors: SectorRow[];
   types: ServiceTypeRow[];
   crew: CrewRow[];
   suggested: CrewItem[];
@@ -161,6 +163,7 @@ function ServiceTypeForm({
   const [icon, setIcon] = useState(type?.icon ?? '');
   const [complex, setComplex] = useState(type?.complex ?? false);
   const [sized, setSized] = useState(type?.sized ?? false);
+  const [sectorIds, setSectorIds] = useState<string[]>(type?.sector_ids ?? []);
   const [defaultSize, setDefaultSize] = useState(String(isEventSize(type?.default_size) ? type.default_size : DEFAULT_SIZE));
   const [rows, setRows] = useState<CrewDraft[]>(() =>
     (type ? crewOf(type, crew) : []).filter((c) => type?.sized || c.size === SINGLE_CREW_SIZE).map((c) => draftRow(c, isEventSize(c.size) ? c.size : SINGLE_CREW_SIZE)),
@@ -202,7 +205,18 @@ function ServiceTypeForm({
     if (!check.ok || repeated) return;
     const v = check.value;
     const crewPayload = v.crew.map((c) => ({ job_role_id: c.jobRoleId, quantity: c.quantity, ...(sized ? { size: c.size } : {}) }));
-    const fields = { name: v.name, keywords: v.keywords, no_team: v.noTeam, icon: icon || null, complex, sized, default_size: Number(defaultSize), crew: crewPayload };
+    const fields = {
+      name: v.name,
+      keywords: v.keywords,
+      no_team: v.noTeam,
+      icon: icon || null,
+      complex,
+      sized,
+      default_size: Number(defaultSize),
+      // Setores só valem para tipo sem equipe (reunião); com equipe, quem vê é quem está escalado.
+      sector_ids: v.noTeam ? sectorIds : [],
+      crew: crewPayload,
+    };
     await engine.enqueue('service_type.upsert', { id, ...fields }, { target: { table: 'service_types', id, changes: { ...fields, code: type?.code ?? '' } } });
     onClose();
   }
@@ -224,7 +238,21 @@ function ServiceTypeForm({
           hint='Separadas por vírgula. Um título com a palavra recebe este tipo com certeza alta. Com asterisco ("*disponibilizar"), vale quando o título começa com ela e ganha das outras.'
         />
         <IconPicker name={name} value={icon} onChange={setIcon} />
-        <Checkbox label="Não exige equipe (não gera vagas e não aparece para a equipe)" checked={noTeam} onChange={setNoTeam} />
+        <Checkbox label="Não exige equipe (não gera vagas; só os setores marcados abaixo veem na agenda)" checked={noTeam} onChange={setNoTeam} />
+        {noTeam && (
+          <fieldset className="check-group">
+            <legend className="field-label">Setores que veem na agenda</legend>
+            {sectors.filter((s) => !s.archived_at || sectorIds.includes(s.id)).map((s) => (
+              <Checkbox
+                key={s.id}
+                label={s.name}
+                checked={sectorIds.includes(s.id)}
+                onChange={(on) => setSectorIds((list) => (on ? [...list, s.id] : list.filter((x) => x !== s.id)))}
+              />
+            ))}
+            <span className="form-text">Reunião do setor: quem é do setor vê em Minha semana e no filtro da Equipe. Sem setor, só quem monta a escala vê.</span>
+          </fieldset>
+        )}
         {!noTeam && (
           <Checkbox
             label="Trabalho complexo (a escala sugerida chama primeiro quem é Referência na função)"
@@ -330,8 +358,9 @@ export function ServiceTypesPage() {
   const serverTypes = useTable<ServiceTypeRow>('service_types');
   const serverCrew = useTable<CrewRow>('service_type_crew');
   const serverRoles = [...(useTable<JobRoleRow>('job_roles') ?? [])].sort(byName);
+  const sectors = [...(useTable<SectorRow>('sectors') ?? [])].sort(byName);
   // App local sem a 0017 e a 0018 no banco: mostra os tipos como ficariam (dev/sizePreview), só para ver.
-  const preview = serverTypes && serverCrew ? previewCatalog(serverTypes, serverCrew, serverRoles) : undefined;
+  const preview = serverTypes && serverCrew ? previewCatalog(serverTypes, serverCrew, serverRoles, sectors) : undefined;
   const simulated = Boolean(serverTypes && previewActive(serverTypes));
   const types = preview?.types;
   const crew = preview?.crew;
@@ -340,6 +369,7 @@ export function ServiceTypesPage() {
   const [open, setOpen] = useState<{ id?: string; name?: string } | null>(null);
   const list = [...(types ?? [])].sort((a, b) => Number(Boolean(a.archived_at)) - Number(Boolean(b.archived_at)) || byName(a, b));
   const roleName = new Map(roles.map((r) => [r.id, r.name]));
+  const sectorName = new Map(sectors.map((s) => [s.id, s.name]));
   const facts = useMemo(() => (suggestions.history.rows ?? []).map(toFact), [suggestions.history.rows]);
   const editing = open?.id ? list.find((t) => t.id === open.id) : undefined;
 
@@ -383,7 +413,11 @@ export function ServiceTypesPage() {
                   </span>
                   <span className="list-row-sub">
                     {t.complex ? 'trabalho complexo · ' : ''}
-                    {t.no_team ? 'não exige equipe' : items.length ? team : 'sem equipe típica'}
+                    {t.no_team
+                      ? `não exige equipe${t.sector_ids?.length ? ` · veem: ${t.sector_ids.map((id) => sectorName.get(id) ?? 'Setor').join(', ')}` : ''}`
+                      : items.length
+                        ? team
+                        : 'sem equipe típica'}
                     {t.keywords.length > 0 && ` · palavras-chave: ${t.keywords.join(', ')}`}
                   </span>
                 </span>
@@ -406,6 +440,7 @@ export function ServiceTypesPage() {
           roles={roles}
           types={types}
           crew={crew}
+          sectors={sectors}
           simulated={simulated}
           suggested={editing ? suggestCrew(facts, editing.id).map((c) => ({ job_role_id: c.jobRoleId, quantity: c.quantity })) : []}
           onClose={() => setOpen(null)}

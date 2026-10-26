@@ -29,6 +29,10 @@ PATCH para um conserto, MINOR para algo novo, MAJOR quando o jeito de usar muda.
   Depois um dia por vez: cada atividade com o ícone do tipo e a cor da família (lavanda aulas e cursos, pêssego
   produção, cinza reuniões), e as vagas como fichas (verde confirmada, tracejada sugestão, vermelha aberta);
   tocar numa ficha troca a pessoa. "Validar e seguir" confirma o dia. No fim, o resumo e o Publicar.
+- **Reuniões sem escala, por setor**: reunião não se escala mais. Cada reunião fica ligada ao setor dela (Reunião
+  de Edição à Edição, de Produção à Produção, Técnica Aulas à Técnica, Mediadores à Mediação, Planejamento ao
+  Planejamento), e quem é do setor vê a reunião em Minha semana, com o selo "reunião do setor", e no filtro por
+  setor ou pessoa da Equipe. Em Tipos de serviço, tipo que não exige equipe ganha "Setores que veem na agenda".
 - **Porte do evento**: EVENTO, GRAVAÇÃO e PODCAST têm porte Simples, Médio ou Grande, cada um com a sua equipe.
   No histórico de um ano, metade dos eventos teve 1 pessoa, mas todo EVENTO pedia 8 vagas. Sem escolha, vale o
   porte padrão do tipo, tirado do histórico: Simples no EVENTO, Médio na GRAVAÇÃO e no PODCAST. No passo 1 do Propor escala, cada evento desses tipos tem os três botões de porte, e o histórico sugere

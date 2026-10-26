@@ -111,6 +111,7 @@ function Line({ line }: { line: TeamLine }) {
           {a.event.title || 'Sem título'}
         </a>
         {a.event.origin === 'internal' && <Seal kind="soft">interna</Seal>}
+        {a.meetingSectors && <Seal kind="soft">reunião</Seal>}
         {a.cancelled && <Seal kind="cancelado">cancelado</Seal>}
       </div>
     );
