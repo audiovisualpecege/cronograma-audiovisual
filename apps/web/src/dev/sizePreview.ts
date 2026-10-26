@@ -93,10 +93,12 @@ export function simulateCatalog(
   const outCrew: CrewRow[] = crew.map((c) => ({ ...c, size: 2 }));
   for (const t of types) {
     const name = normalizeName(t.name);
-    const meeting = MEETINGS[name];
+    const meeting = name === 'reuniao interna' ? '*' : MEETINGS[name];
     if (meeting && !t.archived_at) {
+      // A interna vai para todos os setores; as outras, para o setor delas.
       const sector = sectorId.get(meeting);
-      outTypes.push({ ...t, no_team: true, sized: false, default_size: 1, sector_ids: sector ? [sector] : [] });
+      const ids = meeting === '*' ? [...sectorId.values()] : sector ? [sector] : [];
+      outTypes.push({ ...t, no_team: true, sized: false, default_size: 1, sector_ids: ids });
       for (let i = outCrew.length - 1; i >= 0; i--) if (outCrew[i]?.service_type_id === t.id) outCrew.splice(i, 1);
       continue;
     }

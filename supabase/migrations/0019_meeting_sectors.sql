@@ -8,7 +8,7 @@
 --     op_service_type_upsert_base e a nova grava os setores depois dela.
 -- Dados: REUNIAO EDICAO, PRODUCAO, PLANEJAMENTO, TECNICA AULAS e MEDIADORES deixam de pedir equipe (as vagas
 -- vazias somem das semanas montadas; com gente, ficam com "equipe típica mudou") e ficam ligadas ao setor de cada
--- uma. REUNIAO INTERNA fica sem setor: só quem monta a escala vê, até alguém escolher os setores na tela.
+-- uma. REUNIAO INTERNA fica ligada a todos os setores (escolha do Raoni): toda a equipe vê.
 -- Tudo o que muda fica antes em public._backup_0019, para supabase/rollback/0019_down.sql.
 
 alter table public.service_types add column sector_ids uuid[] not null default '{}';
@@ -119,3 +119,13 @@ begin
   end loop;
 end;
 $$;
+
+-- REUNIAO INTERNA (já sem equipe desde a 0015): toda a equipe vê, ligada a todos os setores ativos de hoje.
+-- Setor criado depois entra marcando na tela.
+insert into public._backup_0019 (kind, ref, data)
+select 'service_type', t.id, to_jsonb(t) from public.service_types t
+where public.norm_name(t.name) = 'reuniao interna' and t.archived_at is null;
+
+update public.service_types
+set no_team = true, sector_ids = array(select s.id from public.sectors s where s.archived_at is null order by s.name)
+where public.norm_name(name) = 'reuniao interna' and archived_at is null;

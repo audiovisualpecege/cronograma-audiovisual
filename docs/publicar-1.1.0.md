@@ -58,7 +58,7 @@ primeiro passo que não der o resultado esperado.
     dela (política `team_read` de `events` refeita); `op_service_type_upsert` vira `op_service_type_upsert_base`
     e a nova grava os setores. **Mexe em dados da produção**: REUNIAO EDICAO, PRODUCAO, PLANEJAMENTO, TECNICA
     AULAS e MEDIADORES deixam de pedir equipe (as vagas vazias somem) e ficam ligadas ao setor de cada uma.
-    REUNIAO INTERNA fica sem setor. Antes de mudar, guarda o que era em `public._backup_0019`.
+    REUNIAO INTERNA fica ligada a todos os setores ativos (toda a equipe vê). Antes de mudar, guarda o que era em `public._backup_0019`.
 - **Dados iniciais da 0016** (fora do repositório, porque trata da equipe pelo e-mail):
   `..\dados-iniciais\aplicar-prioridades.mjs`. Ele grava a ordem das funções de cada pessoa a partir da
   planilha `..\Analise da escala.xlsx`, aba "Prioridade por pessoa": vale a coluna "Sua ordem" quando
