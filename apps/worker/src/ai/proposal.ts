@@ -46,10 +46,12 @@ export function weekContext(data: ProposalData, now: Date, replacePending: boole
       noTeam: e.no_team || (e.service_type_id ? (typeNoTeam.get(e.service_type_id) ?? false) : false),
     }));
   const start = new Map(events.map((e) => [e.id, e.startsAt.getTime()]));
+  // Função que não ocupa horário (Disponibilizador): sem horas na carga e sem bater horário.
+  const noHours = new Set(data.jobRoles.filter((r) => r.no_hours).map((r) => r.id));
   const slots = data.slots
     .filter((s) => start.has(s.event_id))
     .sort((a, b) => (start.get(a.event_id) as number) - (start.get(b.event_id) as number) || a.id.localeCompare(b.id))
-    .map((s, i) => ({ id: s.id, code: `V${i + 1}`, eventId: s.event_id, jobRoleId: s.job_role_id }));
+    .map((s, i) => ({ id: s.id, code: `V${i + 1}`, eventId: s.event_id, jobRoleId: s.job_role_id, ...(noHours.has(s.job_role_id) ? { noHours: true } : {}) }));
   const assignments: AssignmentLike[] = data.assignments
     .filter((a) => a.person_id && a.status)
     .map((a) => ({
@@ -72,7 +74,7 @@ export function weekContext(data: ProposalData, now: Date, replacePending: boole
     slots,
     assignments,
     absences: data.absences.map((a) => ({ personId: a.person_id, startsAt: new Date(a.starts_at), endsAt: new Date(a.ends_at) })),
-    jobRoles: data.jobRoles,
+    jobRoles: data.jobRoles.map((r) => ({ id: r.id, code: r.code })),
     serviceTypes: data.serviceTypes,
   };
 }

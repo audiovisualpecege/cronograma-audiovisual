@@ -1,8 +1,9 @@
-// Simulação do porte do evento no app local (npm run dev), enquanto a migração 0017 não está no banco: o app
-// finge que ela já entrou. EVENTO, GRAVACAO e PODCAST ganham porte e as equipes por porte da 0017, a TRANSMISSAO
-// perde o Suporte, o porte escolhido em cada evento fica só neste navegador e, nas semanas montadas, as vagas
-// vazias que sobram no porte somem da tela. Nada disso vai para o banco. Some sozinha quando o banco tiver a 0017
-// (os tipos chegam com "sized") e nunca roda no app publicado nem nos testes.
+// Simulação do porte do evento e do Disponibilizador no app local (npm run dev), enquanto as migrações 0017 e
+// 0018 não estão no banco: o app finge que elas já entraram. EVENTO, GRAVACAO e PODCAST ganham porte e as equipes
+// por porte da 0017, a TRANSMISSAO perde o Suporte, o DISPONIBILIZAR pede 1 Disponibilizador (função que não ocupa
+// horário) e reconhece "*DISPONIBILIZAR" no começo do título. O porte escolhido em cada evento fica só neste
+// navegador e, nas semanas montadas, as vagas vazias que sobram somem da tela. Nada disso vai para o banco. Some
+// sozinha quando o banco tiver a 0017 (os tipos chegam com "sized") e nunca roda no app publicado nem nos testes.
 import { EVENT_SIZES, isEventSize, normalizeName, type EventSize } from '@cronograma/core';
 import { useSyncExternalStore } from 'react';
 import { crewForSize, type CrewRow, type EventRow, type JobRoleRow, type ServiceTypeRow } from '../data/catalog';
@@ -43,20 +44,47 @@ export function previewActive(types: readonly ServiceTypeRow[]): boolean {
   return ENABLED && types.length > 0 && types.every((t) => t.sized === undefined);
 }
 
-/** Tipos e equipe como ficariam com a 0017, quando a simulação vale; senão, como vieram. */
-export function previewCatalog(types: ServiceTypeRow[], crew: CrewRow[], roles: readonly JobRoleRow[]): { types: ServiceTypeRow[]; crew: CrewRow[] } {
-  if (types.length > 0) simulating = previewActive(types);
-  return previewActive(types) ? simulateCatalog(types, crew, roles) : { types, crew };
+interface Catalog {
+  types: ServiceTypeRow[];
+  crew: CrewRow[];
+  roles: JobRoleRow[];
 }
 
-/** Tipos e equipe como ficariam com a 0017. */
-export function simulateCatalog(types: readonly ServiceTypeRow[], crew: readonly CrewRow[], roles: readonly JobRoleRow[]): { types: ServiceTypeRow[]; crew: CrewRow[] } {
+/** Tipos, equipe e funções como ficariam com a 0017 e a 0018, quando a simulação vale; senão, como vieram. */
+export function previewCatalog(types: ServiceTypeRow[], crew: CrewRow[], roles: JobRoleRow[]): Catalog {
+  if (types.length > 0) simulating = previewActive(types);
+  return previewActive(types) ? simulateCatalog(types, crew, roles) : { types, crew, roles };
+}
+
+const DISPONIBILIZADOR_ID = 'sim:disponibilizador';
+
+/** A 0018: a função Disponibilizador, que não ocupa horário (criada aqui quando o banco ainda não tem). */
+function simulateRoles(roles: readonly JobRoleRow[]): JobRoleRow[] {
+  const found = roles.some((r) => normalizeName(r.name) === 'disponibilizador');
+  const out = roles.map((r) => (normalizeName(r.name) === 'disponibilizador' ? { ...r, no_hours: true, archived_at: null } : r));
+  if (!found) {
+    const sector = roles.find((r) => normalizeName(r.name) === 'operador aula')?.sector_id ?? null;
+    out.push({ id: DISPONIBILIZADOR_ID, version: 1, code: 'R?', name: 'Disponibilizador', sector_id: sector, archived_at: null, no_hours: true } as JobRoleRow);
+  }
+  return out;
+}
+
+/** Tipos, equipe e funções como ficariam com a 0017 e a 0018. */
+export function simulateCatalog(types: readonly ServiceTypeRow[], crew: readonly CrewRow[], baseRoles: readonly JobRoleRow[]): Catalog {
+  const roles = simulateRoles(baseRoles);
   const roleId = new Map(roles.filter((r) => !r.archived_at).map((r) => [normalizeName(r.name), r.id]));
   const suporte = roleId.get('suporte');
   const outTypes: ServiceTypeRow[] = [];
   const outCrew: CrewRow[] = crew.map((c) => ({ ...c, size: 2 }));
   for (const t of types) {
     const name = normalizeName(t.name);
+    if (name === 'disponibilizar' && !t.archived_at) {
+      const disp = roleId.get('disponibilizador') as string;
+      outTypes.push({ ...t, no_team: false, sized: false, default_size: 1, keywords: [...new Set([...t.keywords, '*disponibilizar'])] });
+      for (let i = outCrew.length - 1; i >= 0; i--) if (outCrew[i]?.service_type_id === t.id) outCrew.splice(i, 1);
+      outCrew.push({ id: `sim:${t.id}:${disp}`, version: 1, service_type_id: t.id, job_role_id: disp, quantity: 1, size: 2, archived_at: null } as CrewRow);
+      continue;
+    }
     const plan = PLAN[name];
     const rows = plan?.crew.filter(([, role]) => roleId.has(role)) ?? [];
     if (plan && !t.archived_at && !t.no_team && EVENT_SIZES.every((s) => rows.some(([size]) => size === s))) {
@@ -76,7 +104,7 @@ export function simulateCatalog(types: readonly ServiceTypeRow[], crew: readonly
     }
     outTypes.push({ ...t, sized: false, default_size: 1 });
   }
-  return { types: outTypes, crew: outCrew };
+  return { types: outTypes, crew: outCrew, roles };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -130,13 +158,13 @@ export function previewWeekRows(rows: WeekRows, sizes: Sizes): WeekRows {
 
 /** A semana como ficaria com a 0017 (ver previewWeekRows). */
 export function simulateWeek(rows: WeekRows, sizes: Sizes): WeekRows {
-  const { types, crew } = simulateCatalog(rows.types, rows.crew, rows.roles);
+  const { types, crew, roles } = simulateCatalog(rows.types, rows.crew, rows.roles);
   const events: EventRow[] = rows.events.map((e) => (sizes[e.id] ? { ...e, size: sizes[e.id] } : e));
   const filled = new Set(rows.assignments.filter((a) => a.person_id).map((a) => a.slot_id));
   const hidden = new Set<string>();
   for (const e of events) {
     const type = types.find((t) => t.id === e.service_type_id);
-    if (!type?.sized || e.no_team) continue;
+    if (!type || type.no_team || e.no_team) continue;
     const want = new Map(crewForSize(type, crew, e.size).map((c) => [c.job_role_id, c.quantity]));
     const slots = rows.slots.filter((s) => s.event_id === e.id && !s.archived_at).sort((a, b) => Number(filled.has(b.id)) - Number(filled.has(a.id)));
     const used = new Map<string, number>();
@@ -147,13 +175,13 @@ export function simulateWeek(rows: WeekRows, sizes: Sizes): WeekRows {
     }
   }
   const slots = hidden.size ? rows.slots.map((s) => (hidden.has(s.id) ? { ...s, archived_at: 'simulacao' } : s)) : rows.slots;
-  return { ...rows, types, crew, events, slots };
+  return { ...rows, types, crew, roles, events, slots };
 }
 
 /** Vagas que o porte pede e a semana montada não tem (a simulação não cria vagas), em linhas já simuladas. */
 export function previewMissingSlots(rows: WeekRows, e: EventRow): number {
   const type = rows.types.find((t) => t.id === e.service_type_id);
-  if (!simulating || !rows.week || !type?.sized || e.no_team || e.status === 'cancelled' || e.ignored) return 0;
+  if (!simulating || !rows.week || !type || type.no_team || e.no_team || e.status === 'cancelled' || e.ignored) return 0;
   let missing = 0;
   for (const c of crewForSize(type, rows.crew, e.size)) {
     const have = rows.slots.filter((s) => s.event_id === e.id && !s.archived_at && s.job_role_id === c.job_role_id).length;

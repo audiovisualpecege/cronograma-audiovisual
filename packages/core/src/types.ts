@@ -73,6 +73,11 @@ export interface SlotLike {
   eventId: string;
   jobRoleId: string;
   archived?: boolean;
+  /**
+   * Função que não ocupa horário (Disponibilizador): a vaga não soma horas na carga da pessoa e não bate
+   * horário com as outras atividades dela.
+   */
+  noHours?: boolean;
 }
 
 export interface AssignmentLike {

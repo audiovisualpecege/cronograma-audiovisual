@@ -129,7 +129,8 @@ export interface ProposalData {
   slots: { id: string; event_id: string; job_role_id: string }[];
   assignments: { slot_id: string; event_id: string; person_id: string | null; status: 'proposed' | 'confirmed' | null; locked: boolean }[];
   absences: { person_id: string; starts_at: string; ends_at: string }[];
-  jobRoles: { id: string; code: string }[];
+  /** no_hours só existe no banco com a migração 0018 (Disponibilizador). */
+  jobRoles: { id: string; code: string; no_hours?: boolean }[];
   serviceTypes: { id: string; code: string; no_team: boolean }[];
   history: { person_id: string | null; job_role_id: string | null; service_type_id: string | null }[];
 }
@@ -498,7 +499,8 @@ export class SupabaseStore implements Store {
           .lt('starts_at', weekEnd.toISOString()).gt('ends_at', weekStart.toISOString()).order('id').range(a, b),
         'proposalData.absences',
       ),
-      this.all<{ id: string; code: string }>((a, b) => this.db.from('job_roles').select('id, code').order('id').range(a, b), 'proposalData.jobRoles'),
+      // "*" e não a lista de colunas: com o banco ainda sem a 0018, no_hours só não vem.
+      this.all<{ id: string; code: string; no_hours?: boolean }>((a, b) => this.db.from('job_roles').select('*').order('id').range(a, b), 'proposalData.jobRoles'),
       this.all<{ id: string; code: string; no_team: boolean }>(
         (a, b) => this.db.from('service_types').select('id, code, no_team').order('id').range(a, b),
         'proposalData.serviceTypes',
@@ -518,7 +520,7 @@ export class SupabaseStore implements Store {
       slots: slots.map(({ id, event_id, job_role_id }) => ({ id, event_id, job_role_id })),
       assignments: assignments.map(({ slot_id, event_id, person_id, status, locked }) => ({ slot_id, event_id, person_id, status, locked })),
       absences,
-      jobRoles,
+      jobRoles: jobRoles.map(({ id, code, no_hours }) => ({ id, code, ...(no_hours ? { no_hours } : {}) })),
       serviceTypes,
       history,
     };

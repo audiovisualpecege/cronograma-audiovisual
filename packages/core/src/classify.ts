@@ -46,12 +46,28 @@ function containsPhrase(words: string[], phrase: string[]): boolean {
 }
 
 /**
- * Palavra-chave do tipo dá certeza alta; senão o título mais parecido do histórico (Jaccard >= 0,6)
+ * Palavra-chave com asterisco ("*disponibilizar") vale quando o título começa com ela, com o asterisco
+ * ("*DISPONIBILIZAR: aula 3"), e ganha de qualquer outra palavra-chave.
+ */
+export function startsWithMarker(title: string, keyword: string): boolean {
+  const k = keyword.trim();
+  if (!k.startsWith('*') || !title.trimStart().startsWith('*')) return false;
+  const phrase = nameTokens(k);
+  const words = nameTokens(title);
+  return phrase.length > 0 && phrase.every((p, i) => words[i] === p);
+}
+
+/**
+ * Título que começa com a palavra-chave de asterisco do tipo ("*DISPONIBILIZAR") dá esse tipo com certeza alta;
+ * senão, palavra-chave do tipo dá certeza alta; senão o título mais parecido do histórico (Jaccard >= 0,6)
  * dá certeza média; senão fica "a definir" com certeza baixa, para a IA ou o administrador.
  */
 export function classifyTitle(title: string, types: ServiceTypeLike[], history: TitleIndex): Classification {
   const active = types.filter((t) => !t.archived);
   const words = nameTokens(title);
+
+  const marked = active.find((t) => t.keywords.some((k) => startsWithMarker(title, k)));
+  if (marked) return { typeId: marked.id, type: marked.code, certainty: 'alta', source: 'keyword' };
 
   let best: { t: ServiceTypeLike; len: number } | null = null;
   let tie = false;

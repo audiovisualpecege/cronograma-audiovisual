@@ -29,6 +29,15 @@ describe('simulação do porte no app local', () => {
     expect(sim.crew.filter((c) => c.service_type_id === 'tr').map((c) => c.job_role_id)).toEqual(['aula']);
   });
 
+  it('DISPONIBILIZAR pede 1 Disponibilizador, que não ocupa horário, e reconhece "*DISPONIBILIZAR"', () => {
+    const disp = { ...type('dp', 'DISPONIBILIZAR'), no_team: true, keywords: ['disponibilizar'] } as ServiceTypeRow;
+    const sim = simulateCatalog([...TYPES, disp], CREW, ROLES);
+    const role = sim.roles.find((r) => r.name === 'Disponibilizador');
+    expect(role).toMatchObject({ no_hours: true });
+    expect(sim.types.find((t) => t.id === 'dp')).toMatchObject({ no_team: false, keywords: ['disponibilizar', '*disponibilizar'] });
+    expect(sim.crew.filter((c) => c.service_type_id === 'dp')).toMatchObject([{ job_role_id: role?.id, quantity: 1, size: 2 }]);
+  });
+
   it('na semana montada, o EVENTO Simples mostra só a vaga do Operador Evento e mantém vaga com gente', () => {
     const slots = [slot('s-aud', 'e1', 'aud'), slot('s-op', 'e1', 'op'), slot('s-cin1', 'e1', 'cin'), slot('s-cin2', 'e1', 'cin'), slot('s-fot', 'e1', 'fot')];
     const assignments = [{ id: 'a1', version: 1, slot_id: 's-cin2', event_id: 'e1', person_id: 'p1', status: 'confirmed' } as AssignmentRow];

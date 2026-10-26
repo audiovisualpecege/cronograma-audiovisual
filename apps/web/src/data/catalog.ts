@@ -42,6 +42,8 @@ export interface JobRoleRow extends Row {
   name: string;
   sector_id: string | null;
   archived_at: string | null;
+  /** Não ocupa horário (Disponibilizador): não soma horas nem bate horário com as outras atividades. */
+  no_hours?: boolean;
 }
 
 export interface CrewItem {

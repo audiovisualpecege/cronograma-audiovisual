@@ -30,6 +30,10 @@ PATCH para um conserto, MINOR para algo novo, MAJOR quando o jeito de usar muda.
   o porte quando o evento já aconteceu antes ("Usar Médio: 3 pessoas nas últimas vezes", ou todos de uma vez).
   O porte também se troca na página do evento, e o Grande chama primeiro quem é Referência. Em Dados > Tipos de
   serviço, "Tem porte" liga as três equipes em qualquer tipo. A TRANSMISSÃO deixou de pedir Suporte.
+- **Disponibilizador**: o DISPONIBILIZAR volta a pedir equipe, 1 Disponibilizador, uma função nova que não ocupa
+  horário: não soma horas na semana da pessoa e não bate horário com as outras atividades dela. Evento cujo título
+  começa com "*DISPONIBILIZAR" recebe o tipo sozinho. Em Dados > Funções, "Não ocupa horário" vale para qualquer
+  função; em Tipos de serviço, palavra-chave com asterisco ("*disponibilizar") vale no começo do título.
 - **Escala sugerida pelo histórico, no próprio app**: o passo 2 do Propor escala sugere uma pessoa para cada
   vaga na hora, sem depender da IA. A regra saiu da análise do histórico: testada contra quem foi escalado de
   fato nas últimas 12 semanas, ela acerta a pessoa em 64% das vagas, contra 38% da regra anterior. A ordem é:

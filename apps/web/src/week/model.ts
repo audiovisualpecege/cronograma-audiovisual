@@ -165,7 +165,14 @@ export function activeSlots(rows: Pick<WeekRows, 'events' | 'slots'>): SlotRow[]
 /** Contexto das regras do core (aptidão, carga, ranking) com o que está na cópia local. */
 export function weekContext(rows: WeekRows, now: Date): WeekContext {
   const events = rows.events.filter((e) => !e.ignored).map((e) => toEventLike(e, rows.types));
-  const slots: SlotLike[] = activeSlots(rows).map((s, i) => ({ id: s.id, code: `V${i + 1}`, eventId: s.event_id, jobRoleId: s.job_role_id }));
+  const noHours = new Set(rows.roles.filter((r) => r.no_hours).map((r) => r.id));
+  const slots: SlotLike[] = activeSlots(rows).map((s, i) => ({
+    id: s.id,
+    code: `V${i + 1}`,
+    eventId: s.event_id,
+    jobRoleId: s.job_role_id,
+    ...(noHours.has(s.job_role_id) ? { noHours: true } : {}),
+  }));
   const slotIds = new Set(slots.map((s) => s.id));
   const assignments: AssignmentLike[] = rows.assignments
     .filter((a) => a.person_id && a.status && slotIds.has(a.slot_id))

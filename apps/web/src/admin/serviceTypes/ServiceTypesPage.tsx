@@ -221,7 +221,7 @@ function ServiceTypeForm({
           label="Palavras-chave"
           value={keywords}
           onChange={(e) => setKeywords(e.target.value)}
-          hint="Separadas por vírgula. Um título com a palavra recebe este tipo com certeza alta."
+          hint='Separadas por vírgula. Um título com a palavra recebe este tipo com certeza alta. Com asterisco ("*disponibilizar"), vale quando o título começa com ela e ganha das outras.'
         />
         <IconPicker name={name} value={icon} onChange={setIcon} />
         <Checkbox label="Não exige equipe (não gera vagas e não aparece para a equipe)" checked={noTeam} onChange={setNoTeam} />
@@ -329,12 +329,13 @@ export function ServiceTypesPage() {
   const { pendingRows } = useSyncState();
   const serverTypes = useTable<ServiceTypeRow>('service_types');
   const serverCrew = useTable<CrewRow>('service_type_crew');
-  const roles = [...(useTable<JobRoleRow>('job_roles') ?? [])].sort(byName);
-  // App local sem a 0017 no banco: mostra os tipos como ficariam com o porte (dev/sizePreview), só para ver.
-  const preview = serverTypes && serverCrew ? previewCatalog(serverTypes, serverCrew, roles) : undefined;
+  const serverRoles = [...(useTable<JobRoleRow>('job_roles') ?? [])].sort(byName);
+  // App local sem a 0017 e a 0018 no banco: mostra os tipos como ficariam (dev/sizePreview), só para ver.
+  const preview = serverTypes && serverCrew ? previewCatalog(serverTypes, serverCrew, serverRoles) : undefined;
   const simulated = Boolean(serverTypes && previewActive(serverTypes));
   const types = preview?.types;
   const crew = preview?.crew;
+  const roles = [...(preview?.roles ?? serverRoles)].sort(byName);
   const suggestions = useCatalogSuggestions(roles, types);
   const [open, setOpen] = useState<{ id?: string; name?: string } | null>(null);
   const list = [...(types ?? [])].sort((a, b) => Number(Boolean(a.archived_at)) - Number(Boolean(b.archived_at)) || byName(a, b));

@@ -7,7 +7,7 @@ primeiro passo que não der o resultado esperado.
 
 - **Código**: branch `ajuste/painel-e-semana`, pull request #2 (`audiovisualpecege/cronograma-audiovisual`).
   Ainda **sem merge**: o app publicado no GitHub Pages continua na 1.0.1.
-- **Banco**: seis migrações novas, **ainda não aplicadas** na produção:
+- **Banco**: sete migrações novas, **ainda não aplicadas** na produção:
   - `supabase/migrations/0012_request_classify.sql`: o app passa a poder pedir o job `classify` (identificar os
     tipos pelo histórico e pelo Gemini), e "Montar semana" numa semana já montada cria as vagas dos eventos
     que o serviço de fundo tipou depois da montagem. Não mexe em dados.
@@ -42,12 +42,22 @@ primeiro passo que não der o resultado esperado.
       onde já tem gente).
     Antes de mudar, guarda o que era em `public._backup_0017`. Motivo: no histórico de um ano, metade dos
     EVENTOS teve 1 pessoa, mas o tipo pedia 8 vagas em todos.
+  - `supabase/migrations/0018_disponibilizador.sql`: coluna `job_roles.no_hours` (função que não ocupa horário:
+    sem horas na carga e sem "horário sobreposto"), `check_eligibility` e `op_job_role_upsert` com ela. **Mexe em
+    dados da produção**:
+    - cria a função Disponibilizador (no setor do Operador Aula), que não ocupa horário;
+    - o DISPONIBILIZAR volta a exigir equipe (a 0013 tinha tirado), com 1 Disponibilizador, e ganha a
+      palavra-chave "*disponibilizar" (título que começa com "*DISPONIBILIZAR" recebe o tipo);
+    - os eventos de agora em diante com esse começo passam para o tipo, e as vagas das semanas montadas são
+      refeitas onde ninguém foi escalado.
+    Antes de mudar, guarda o que era em `public._backup_0018`. Ninguém tem a função ainda: marque quem
+    disponibiliza em Dados > Pessoas.
 - **Dados iniciais da 0016** (fora do repositório, porque trata da equipe pelo e-mail):
   `..\dados-iniciais\aplicar-prioridades.mjs`. Ele grava a ordem das funções de cada pessoa a partir da
   planilha `..\Analise da escala.xlsx`, aba "Prioridade por pessoa": vale a coluna "Sua ordem" quando
   preenchida, senão a sugerida pelo histórico do último ano. Também acrescenta Cinegrafista e Operador Evento
   a Pedro, Fernanda, Tiphany e Juliana.
-- **Desfazer**: `supabase/rollback/0017_down.sql`, `0016_down.sql`, `0015_down.sql`, `0014_down.sql`, `0013_down.sql` e
+- **Desfazer**: `supabase/rollback/0018_down.sql`, `0017_down.sql`, `0016_down.sql`, `0015_down.sql`, `0014_down.sql`, `0013_down.sql` e
   `0012_down.sql` (fora da pasta de migrações, para o `db push` não rodá-los).
 - **Serviço de fundo (NAS)**: **muda**. Ganhou o fornecedor de IA local (`apps/worker/src/ai/local.ts`), lotes
   de 25 vagas (eram 60), resposta da IA aproveitada item por item e o motivo exato da falha guardado no pedido. Depois
@@ -80,7 +90,8 @@ primeiro passo que não der o resultado esperado.
    npx supabase db push --dry-run
    ```
    Deve listar **só** `0012_request_classify.sql`, `0013_type_icon_and_highlight.sql`, `0014_local_ai.sql`,
-   `0015_meetings_by_sector.sql`, `0016_role_priority_level.sql` e `0017_event_size.sql`.
+   `0015_meetings_by_sector.sql`, `0016_role_priority_level.sql`, `0017_event_size.sql` e
+   `0018_disponibilizador.sql`.
    Se listar também as antigas (0001 a 0011), o histórico de migrações do banco não registrou que elas já
    foram aplicadas. **Não rode o push.** Confira com `npx supabase migration list`. Depois de confirmar que o
    esquema existe (as tabelas `people`, `events`, `weeks` estão lá), marque as antigas como aplicadas com
@@ -110,6 +121,11 @@ primeiro passo que não der o resultado esperado.
    select t.name, c.size, sum(c.quantity) as vagas from public.service_types t
      join public.service_type_crew c on c.service_type_id = t.id and c.archived_at is null
     where t.sized group by t.name, c.size order by t.name, c.size;            -- EVENTO 1/3/8, GRAVACAO 1/2/4, PODCAST 1/3/4
+   select name, no_hours from public.job_roles where no_hours;                  -- Disponibilizador
+   select t.name, t.no_team, r.name, c.quantity from public.service_types t
+     join public.service_type_crew c on c.service_type_id = t.id and c.archived_at is null
+     join public.job_roles r on r.id = c.job_role_id
+    where t.name = 'DISPONIBILIZAR';                                            -- 1 Disponibilizador
    ```
 4. **CI verde e merge**: `gh pr checks 2` tudo verde; depois `gh pr merge 2 --merge`. O merge publica o app
    no GitHub Pages sozinho. Em poucos minutos o rodapé do menu mostra `v1.1.0`.
@@ -127,7 +143,7 @@ primeiro passo que não der o resultado esperado.
    - Tipos de serviço: abrir um tipo, escolher um ícone no banco de ícones, salvar, recarregar, o ícone fica.
    - Se for usar o MiniCPM5: Configurações > Geral, fornecedor "Modelo local", endereço e modelo, "Testar
      conexão" deve dizer "Conexão aceita". Depois um Propor escala de verdade numa semana futura.
-7. Depois de alguns dias sem problema: `drop table public._backup_0013; drop table public._backup_0015; drop table public._backup_0017;` e apague esta seção de pendência
+7. Depois de alguns dias sem problema: `drop table public._backup_0013; drop table public._backup_0015; drop table public._backup_0017; drop table public._backup_0018;` e apague esta seção de pendência
    do `CLAUDE.md`.
 
 ## Desfazer
@@ -147,19 +163,21 @@ estimada" da prévia (as vagas, que o banco cria, saem certas).
 2. **Serviço de fundo**: no NAS, volte a imagem anterior. Antes, troque o fornecedor para Gemini na tela, porque
    o worker antigo não conhece o local. Ou deixe como está: o worker novo funciona com o banco antigo.
 3. **Banco**, nesta ordem. Rode cada arquivo inteiro no SQL Editor do painel; cada um roda numa transação só:
-   1. `supabase/rollback/0017_down.sql`: tira o porte, volta EVENTO, GRAVACAO, PODCAST e TRANSMISSAO à equipe
+   1. `supabase/rollback/0018_down.sql`: tira o Disponibilizador e a "função que não ocupa horário", volta o
+      DISPONIBILIZAR a não exigir equipe e os eventos que mudaram de tipo ao que eram.
+   2. `supabase/rollback/0017_down.sql`: tira o porte, volta EVENTO, GRAVACAO, PODCAST e TRANSMISSAO à equipe
       de antes e refaz as vagas deles onde ninguém foi escalado. Depois, todos tocam em "Reler agora".
-   2. `supabase/rollback/0016_down.sql`: tira a ordem e o nível das funções e a marca de trabalho complexo.
-   3. `supabase/rollback/0015_down.sql`: volta as reuniões como eram (REUNIAO INTERNA com a equipe inteira) e
+   3. `supabase/rollback/0016_down.sql`: tira a ordem e o nível das funções e a marca de trabalho complexo.
+   4. `supabase/rollback/0015_down.sql`: volta as reuniões como eram (REUNIAO INTERNA com a equipe inteira) e
       refaz as vagas dos eventos de reunião sem ninguém escalado.
-   4. `supabase/rollback/0014_down.sql`: volta o fornecedor para Gemini e tira as colunas da IA local.
-   5. `supabase/rollback/0013_down.sql`: volta os eventos que mudaram de tipo, o NAO ESCALAR e o
+   5. `supabase/rollback/0014_down.sql`: volta o fornecedor para Gemini e tira as colunas da IA local.
+   6. `supabase/rollback/0013_down.sql`: volta os eventos que mudaram de tipo, o NAO ESCALAR e o
       DISPONIBILIZAR (equipe típica e vagas), apaga FERIAS e FOLGA se ninguém os usou e tira as colunas
       novas. Estrelas e ícones escolhidos depois da 1.1.0 se perdem.
-   6. `supabase/rollback/0012_down.sql`: volta `request_job` e `build_week_internal`.
-   7. Registre no histórico de migrações:
-      `npx supabase migration repair --status reverted 0017 0016 0015 0014 0013 0012`.
-   8. Confira com `select name, no_team, keywords from public.service_types order by name;`. Depois de
-      conferir, apague as cópias: `drop table public._backup_0013; drop table public._backup_0015; drop table public._backup_0017;`.
+   7. `supabase/rollback/0012_down.sql`: volta `request_job` e `build_week_internal`.
+   8. Registre no histórico de migrações:
+      `npx supabase migration repair --status reverted 0018 0017 0016 0015 0014 0013 0012`.
+   9. Confira com `select name, no_team, keywords from public.service_types order by name;`. Depois de
+      conferir, apague as cópias: `drop table public._backup_0013; drop table public._backup_0015; drop table public._backup_0017; drop table public._backup_0018;`.
 4. Os tipos que a identificação gravou nos eventos (por palavra-chave, histórico ou IA) **não** são desfeitos:
    são tipos certos, e o administrador pode trocar qualquer um na tela.

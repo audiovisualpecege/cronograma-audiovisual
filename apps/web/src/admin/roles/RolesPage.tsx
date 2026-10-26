@@ -4,7 +4,7 @@ import { byName, useTable, type EventRow, type JobRoleRow, type SectorRow, type 
 import { firstError } from '../../data/messages';
 import { PageTitle } from '../../layout/PageTitle';
 import { useSyncEngine, useSyncState } from '../../sync/SyncProvider';
-import { Button, Card, Input, Tag } from '../../ui/chiaro';
+import { Button, Card, Checkbox, Input, Tag } from '../../ui/chiaro';
 import { Dialog } from '../../ui/Dialog';
 import { formatStamp } from '../../ui/format';
 import { Select } from '../../ui/Select';
@@ -20,20 +20,22 @@ function RoleEditor({
   role?: JobRoleRow;
   others: string[];
   sectors: SectorRow[];
-  onSave: (name: string, sectorId: string | null) => void;
+  onSave: (name: string, sectorId: string | null, noHours: boolean) => void;
   onCancel?: () => void;
 }) {
   const [name, setName] = useState(role?.name ?? '');
   const [sectorId, setSectorId] = useState(role?.sector_id ?? '');
+  const [noHours, setNoHours] = useState(role?.no_hours ?? false);
   const [tried, setTried] = useState(false);
   const check = validateName(name, others);
   function submit(e: FormEvent) {
     e.preventDefault();
     setTried(true);
     if (!check.ok) return;
-    onSave(check.value, sectorId || null);
+    onSave(check.value, sectorId || null, noHours);
     if (!role) {
       setName('');
+      setNoHours(false);
       setTried(false);
     }
   }
@@ -52,6 +54,7 @@ function RoleEditor({
         placeholder="Sem setor"
         options={sectors.filter((s) => !s.archived_at || s.id === sectorId).map((s) => ({ value: s.id, label: s.name }))}
       />
+      <Checkbox label="Não ocupa horário (não soma horas nem bate com outras atividades)" checked={noHours} onChange={setNoHours} />
       <Button type="submit">{role ? 'Salvar' : 'Adicionar'}</Button>
       {onCancel && (
         <Button type="button" variant="ghost" onClick={onCancel}>
@@ -77,8 +80,12 @@ export function RolesPage() {
   const sectorName = new Map(sectors.map((s) => [s.id, s.name]));
   const names = (except?: string) => list.filter((r) => r.id !== except).map((r) => r.name);
 
-  function save(id: string, name: string, sectorId: string | null) {
-    void engine.enqueue('job_role.upsert', { id, name, sector_id: sectorId }, { target: { table: 'job_roles', id, changes: { name, sector_id: sectorId } } });
+  function save(id: string, name: string, sectorId: string | null, noHours: boolean) {
+    void engine.enqueue(
+      'job_role.upsert',
+      { id, name, sector_id: sectorId, no_hours: noHours },
+      { target: { table: 'job_roles', id, changes: { name, sector_id: sectorId, no_hours: noHours } } },
+    );
     setEditing(null);
   }
 
@@ -143,7 +150,7 @@ export function RolesPage() {
         </Dialog>
       )}
       <Card variant="raised" padding={20}>
-        <RoleEditor others={names()} sectors={sectors} onSave={(name, sectorId) => save(crypto.randomUUID(), name, sectorId)} />
+        <RoleEditor others={names()} sectors={sectors} onSave={(name, sectorId, noHours) => save(crypto.randomUUID(), name, sectorId, noHours)} />
       </Card>
 
       {suggestions.roles.length > 0 && (
@@ -152,7 +159,7 @@ export function RolesPage() {
           <p className="form-text">Funções que aparecem nas planilhas e ainda não estão no cadastro. Toque para adicionar.</p>
           <div className="tag-row" aria-label="Funções sugeridas">
             {suggestions.roles.map((name) => (
-              <Tag key={name} onClick={() => save(crypto.randomUUID(), name, null)}>
+              <Tag key={name} onClick={() => save(crypto.randomUUID(), name, null, false)}>
                 Adicionar {name}
               </Tag>
             ))}
@@ -164,7 +171,7 @@ export function RolesPage() {
         {list.map((r) =>
           editing === r.id ? (
             <li key={r.id} className="catalog-item">
-              <RoleEditor role={r} others={names(r.id)} sectors={sectors} onSave={(name, sectorId) => save(r.id, name, sectorId)} onCancel={() => setEditing(null)} />
+              <RoleEditor role={r} others={names(r.id)} sectors={sectors} onSave={(name, sectorId, noHours) => save(r.id, name, sectorId, noHours)} onCancel={() => setEditing(null)} />
             </li>
           ) : (
             <li key={r.id} className="catalog-item">
@@ -173,6 +180,7 @@ export function RolesPage() {
                 {r.code && <span className="list-row-code">{r.code}</span>}
               </span>
               {r.sector_id && <span className="list-row-sub">{sectorName.get(r.sector_id)}</span>}
+              {r.no_hours && <span className="list-row-sub">não ocupa horário</span>}
               {r.archived_at && <Tag>arquivada</Tag>}
               {pendingRows.has(`job_roles:${r.id}`) && <Tag>a enviar</Tag>}
               <span className="catalog-item-actions">

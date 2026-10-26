@@ -71,25 +71,32 @@ function indexBy<T, K>(items: T[], key: (t: T) => K): Map<K, T> {
   return m;
 }
 
+/** Vagas de função que não ocupa horário (Disponibilizador). */
+function freeSlots(ctx: WeekContext): Set<string> {
+  return new Set(ctx.slots.filter((s) => s.noHours).map((s) => s.id));
+}
+
 function personAssignments(personId: string, ctx: WeekContext, exceptSlotId?: string) {
   const events = indexBy(ctx.events, (e) => e.id);
-  const out: { a: AssignmentLike; e: EventLike }[] = [];
+  const free = freeSlots(ctx);
+  const out: { a: AssignmentLike; e: EventLike; noHours: boolean }[] = [];
   for (const a of ctx.assignments) {
     if (a.personId !== personId || a.slotId === exceptSlotId) continue;
     const e = events.get(a.eventId);
     if (!e || e.status === 'cancelled') continue;
-    out.push({ a, e });
+    out.push({ a, e, noHours: free.has(a.slotId) });
   }
   return out;
 }
 
+/** Horas e atividades da semana; a vaga de função que não ocupa horário conta a atividade, mas não as horas. */
 function loadOf(personId: string, ctx: WeekContext, exceptSlotId?: string) {
   const seen = new Set<string>();
   let hours = 0;
-  for (const { e } of personAssignments(personId, ctx, exceptSlotId)) {
+  for (const { e, noHours } of personAssignments(personId, ctx, exceptSlotId)) {
     if (e.weekStart !== ctx.weekStart || seen.has(e.id)) continue;
     seen.add(e.id);
-    hours += eventHours(e);
+    if (!noHours) hours += eventHours(e);
   }
   return { hours, count: seen.size };
 }
@@ -126,7 +133,8 @@ export function checkEligibility(personId: string, slotId: string, ctx: WeekCont
 
   const busy = busyInterval(event);
   const others = personAssignments(personId, ctx, slotId).filter(({ e }) => e.id !== event.id);
-  if (others.some(({ e }) => overlaps(busyInterval(e), busy))) warnings.push('overlap');
+  // Função que não ocupa horário não bate horário, nem nesta vaga nem nas outras da pessoa.
+  if (!slot.noHours && others.some(({ e, noHours }) => !noHours && overlaps(busyInterval(e), busy))) warnings.push('overlap');
 
   if (
     ctx.absences.some(
@@ -141,7 +149,7 @@ export function checkEligibility(personId: string, slotId: string, ctx: WeekCont
 
   const load = loadOf(personId, { ...ctx, weekStart: event.weekStart }, slotId);
   const alreadyCounted = others.some(({ e }) => e.id === event.id);
-  const extra = alreadyCounted ? 0 : eventHours(event);
+  const extra = alreadyCounted || slot.noHours ? 0 : eventHours(event);
   if (load.hours + extra > person.weeklyLimitHours) warnings.push('over_limit');
 
   if (!person.roleIds.includes(slot.jobRoleId)) warnings.push('role_not_enabled');
@@ -453,7 +461,7 @@ export function buildProposalBatches(
         type: codeOf(ctx.serviceTypes, e.serviceTypeId),
         start: toLocalIso(iv.start),
         end: toLocalIso(iv.end),
-        hours: eventHours(e),
+        hours: s.noHours ? 0 : eventHours(e),
         candidates: ranked.map((c) => {
           loadFor(c.personId);
           return { person: c.code, hist: c.hist, loadHours: c.loadHours, loadCount: c.loadCount, inTieGroup: c.inTieGroup };
