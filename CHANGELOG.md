@@ -11,32 +11,42 @@ PATCH para um conserto, MINOR para algo novo, MAJOR quando o jeito de usar muda.
   cor (verde novo, amarelo mudou, vermelho cancelado). As pendências vêm por último.
 - **Reler agora** pede confirmação antes, porque existe um limite de sincronizações por dia. Vale no Painel e na
   Semana.
-- Tela da Semana reorganizada: "< Semana de 19/10 >" no centro, com "Semana atual", "Próxima semana" etc.
-  embaixo e a anterior e a seguinte esmaecidas dos lados (clique nas setas ou nelas para trocar; a semana nova
-  entra deslizando). Embaixo, a situação da semana e os botões numa linha só (Nova atividade interna, Montar
-  semana, Publicar, Propor escala), depois um cartão com ícone para cada função com quantas pessoas estão
-  disponíveis (quem tem mais de uma conta na que mais fez), a seção **Folga e férias** (ausências cadastradas e
-  eventos da agenda com férias, folga ou ausente no título, com a pessoa reconhecida pelo nome) e a lista de
-  eventos. Saíram a grade por pessoa e os quadros de horas e de carga da lateral. Vaga ainda vazia aparece em
-  destaque.
-- **Propor escala** abre uma tela própria em 2 passos. Passo 1: os tipos de serviço dos eventos. Ao chegar, a
-  tela já identifica os tipos pelas palavras-chave e pede ao serviço de fundo os que sobraram (títulos parecidos
-  do histórico e o Gemini). Os que faltarem ficam em destaque, com sugestões do histórico para usar com um clique.
-  Passo 2: a semana é montada, a IA propõe as pessoas e a revisão acontece ali mesmo (aceitar, trocar,
-  descartar), com as vagas vazias em destaque.
-- **Assistente** (botão com a varinha, na Semana): uma janela em passos para fechar a escala. Primeiro as folgas
-  e férias da semana, para confirmar quem está fora (a folga da agenda confirmada tira a pessoa das sugestões).
-  Depois um dia por vez: cada atividade com o ícone do tipo e a cor da família (lavanda aulas e cursos, pêssego
-  produção, cinza reuniões), e as vagas como fichas (verde confirmada, tracejada sugestão, vermelha aberta);
-  tocar numa ficha troca a pessoa. "Validar e seguir" confirma o dia. No fim, o resumo e o Publicar.
+- Topo da Semana: "< Semana de 19/10 >" no centro, com "Semana atual", "Próxima semana" etc. embaixo e a anterior
+  e a seguinte esmaecidas dos lados (clique nas setas ou nelas para trocar; a semana nova entra deslizando).
+- **A Semana virou uma grade numa tela só**, para montar a escala de olho em tudo:
+  - uma coluna por dia com atividade (dia vazio fica estreito), cada atividade num cartão com a cor da família
+    (lavanda aulas e cursos, pêssego produção, cinza reuniões), o tipo e o porte, o horário, o título, o local e os
+    selos. Reuniões e o que não pede equipe aparecem numa linha fina e cinza no fim do dia;
+  - as vagas são fichas, com a função em cima e a pessoa embaixo: verde confirmada, tracejada sugestão ou proposta,
+    vermelha aberta. Clicar numa sugestão abre Confirmar, Trocar pessoa ou Deixar vaga; clicar numa vaga aberta abre
+    a lista de pessoas;
+  - nas semanas futuras, as vagas abertas já vêm com a sugestão do histórico. Nada grava sem confirmar;
+    "Confirmar sugestões (N)" confirma todas de uma vez, junto com as propostas do serviço de fundo. Na semana atual
+    não há sugestão automática, mas a lista de pessoas vem na ordem da sugestão;
+  - a semana ainda sem montagem já mostra as vagas previstas pelo tipo e monta sozinha na primeira confirmação
+    (saiu o botão Montar semana);
+  - no topo de cada dia, quem está fora ("Fora: Ana (férias)"). Quem está fora não é sugerido; a folga vinda da
+    agenda se desmarca com um clique, se não valer;
+  - no topo, o placar (confirmadas, sugestões, abertas e avisos); clicar num número leva à primeira ficha daquele
+    tipo. Avisos aparecem como um triângulo no cartão (sem tipo, mudou na agenda, equipe típica mudou) ou na
+    ficha (alerta);
+  - passar o mouse numa ficha acende a mesma pessoa na semana toda e mostra as horas dela;
+  - clicar no cartão abre os detalhes à direita, sem sair da grade: tipo, porte, a estrela de atividade principal,
+    a equipe e a descrição da agenda;
+  - a lista de pessoas tem busca pelo nome e diz por que cada uma serve, com a última vez que fez: "fez este
+    evento na semana passada (3 vezes em 8 semanas)", "fez esta função neste tipo há 5 semanas (12 vezes)";
+  - Publicar avisa quantas sugestões ainda não foram confirmadas.
+  Saíram a tela Propor escala (o endereço antigo abre a Semana), o Assistente, os quadros de pessoas disponíveis
+  por função e de folga e férias, e o botão de teste da IA local.
 - **Reuniões sem escala, por setor**: reunião não se escala mais. Cada reunião fica ligada ao setor dela (Reunião
   de Edição à Edição, de Produção à Produção, Técnica Aulas à Técnica, Mediadores à Mediação, Planejamento ao
   Planejamento; a Reunião Interna a todos), e quem é do setor vê a reunião em Minha semana, com o selo "reunião do setor", e no filtro por
   setor ou pessoa da Equipe. Em Tipos de serviço, tipo que não exige equipe ganha "Setores que veem na agenda".
 - **Porte do evento**: EVENTO, GRAVAÇÃO e PODCAST têm porte Simples, Médio ou Grande, cada um com a sua equipe.
   No histórico de um ano, metade dos eventos teve 1 pessoa, mas todo EVENTO pedia 8 vagas. Sem escolha, vale o
-  porte padrão do tipo, tirado do histórico: Simples no EVENTO, Médio na GRAVAÇÃO e no PODCAST. No passo 1 do Propor escala, cada evento desses tipos tem os três botões de porte, e o histórico sugere
-  o porte quando o evento já aconteceu antes ("Usar Médio: 3 pessoas nas últimas vezes", ou todos de uma vez).
+  porte padrão do tipo, tirado do histórico: Simples no EVENTO, Médio na GRAVAÇÃO e no PODCAST. No cartão da
+  Semana, o histórico sugere o porte quando o evento já aconteceu antes ("Sugerido: Médio"); nos detalhes do
+  evento, os três botões de porte trocam a equipe.
   O porte também se troca na página do evento, e o Grande chama primeiro quem é Referência. Em Dados > Tipos de
   serviço, "Tem porte" liga as três equipes em qualquer tipo. A TRANSMISSÃO deixou de pedir Suporte.
 - **Disponibilizador**: o DISPONIBILIZAR volta a pedir equipe, 1 Disponibilizador, uma função nova que não ocupa

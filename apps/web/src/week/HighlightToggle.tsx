@@ -9,7 +9,8 @@ import { useSyncEngine } from '../sync/SyncProvider';
 export function HighlightToggle({ event, readOnly }: { event: EventRow; readOnly: boolean }) {
   const engine = useSyncEngine();
   const on = Boolean(event.highlighted);
-  const title = event.title || 'Sem título';
+  // Só a primeira linha: as de baixo trazem disciplina e professor.
+  const title = event.title.split(/\r?\n/)[0]?.trim() || 'Sem título';
   const label = on ? `Tirar o destaque de ${title}` : `Destacar ${title} como atividade principal`;
   const disabled = readOnly || event.status === 'cancelled';
   if (disabled && !on) return null;

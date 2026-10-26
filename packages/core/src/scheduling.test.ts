@@ -235,6 +235,14 @@ describe('ranking e lotes da pré-escala', () => {
       expect(rankCandidates('v1', titled(ctx, 'Outro'), history).map((c) => c.personId)).toEqual(['p4', 'p3']);
     });
 
+    it('a última vez na função e no mesmo evento, só antes da semana', () => {
+      const history = buildHistoryIndex([fact('p3', '2026-09-28', 'MBA B - Aula 2'), fact('p3', '2026-10-12', 'MBA B - Aula 4'), fact('p3', '2026-11-02', 'MBA B - Aula 7'), fact('p3', '2026-10-05', 'Outro')]);
+      expect(history.lastWeek?.('p3', 'r1', 't1', '2026-10-26')).toBe('2026-10-12');
+      expect(history.lastWeek?.('p4', 'r1', 't1', '2026-10-26')).toBeNull();
+      expect(history.lastSeriesWeek?.('p3', 'r1', 'MBA B - Aula 5', '2026-10-26')).toBe('2026-10-12');
+      expect(history.lastSeriesWeek?.('p3', 'r1', 'MBA C', '2026-10-26')).toBeNull();
+    });
+
     it('no empate, a função principal da pessoa vem antes da carga', () => {
       const { ctx, history } = rankingScenario([
         { id: 'p3', hist: 0, loadHours: 10, extra: { rolePriority: ['r1', 'r2'] } },

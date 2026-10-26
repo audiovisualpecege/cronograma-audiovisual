@@ -13,7 +13,7 @@ import { Select } from '../ui/Select';
 import { dayMonth, eventSpan, needsTeam, slotState, weekContext, type WeekRows } from '../week/model';
 import { PersonPicker } from '../week/PersonPicker';
 import { scheduleModel } from '../week/schedule';
-import { EventSeals } from '../week/ScheduleList';
+import { EventSeals } from '../week/EventSeals';
 import { SlotLine } from '../week/SlotLine';
 import { sendAndRefresh, useNow, useWeekRows } from '../week/useWeek';
 import { changeLines } from './changes';

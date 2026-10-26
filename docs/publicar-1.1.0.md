@@ -143,15 +143,17 @@ primeiro passo que não der o resultado esperado.
    antes `docs/ia-local.md` (subir o Ollama e baixar o modelo).
 6. **Testar no app publicado**, com a conta de administrador:
    - Painel: 3 cartões (semana atual em destaque), avisos com ícone e cor, pendências por último.
-   - Semana: troca de semana com animação, "Semana atual" sob o título, cartões por função, Folga e férias.
-   - Propor escala na semana atual: o passo 1 identifica os tipos sozinho. Primeiro pelas palavras-chave;
-     depois a mensagem "Identificando os outros pelo histórico e pela IA" deve virar "O histórico e a IA
-     identificaram mais N eventos". Se aparecer "ainda não foi liberada no servidor", a 0012 não entrou.
-   - Porte: no passo 1, um EVENTO mostra Simples, Médio e Grande; trocar para Grande muda a equipe estimada.
-   - Estrela: marcar um evento, recarregar a página, a estrela continua.
+   - Semana: troca de semana com animação, "Semana atual" sob o título, a grade com uma coluna por dia, o
+     placar no topo e "Fora: ..." nos dias com folga. Numa semana futura, as vagas abertas vêm tracejadas com a
+     sugestão.
+   - Semana com evento sem tipo: "Identificar os tipos" acha os tipos pelas palavras-chave e pede ao serviço de
+     fundo os outros. Se aparecer "ainda não foi liberada no servidor", a 0012 não entrou.
+   - Porte: clicar num EVENTO abre os detalhes com Simples, Médio e Grande; trocar para Grande muda as vagas.
+   - Estrela: marcar um evento nos detalhes, recarregar a página, a estrela continua no cartão.
    - Tipos de serviço: abrir um tipo, escolher um ícone no banco de ícones, salvar, recarregar, o ícone fica.
    - Se for usar o MiniCPM5: Configurações > Geral, fornecedor "Modelo local", endereço e modelo, "Testar
-     conexão" deve dizer "Conexão aceita". Depois um Propor escala de verdade numa semana futura.
+     conexão" deve dizer "Conexão aceita". A IA só identifica tipos ("Identificar os tipos"): a sugestão de
+     pessoas na grade é a do histórico, que acertou mais que a IA nos testes.
 7. Depois de alguns dias sem problema: `drop table public._backup_0013; drop table public._backup_0015; drop table public._backup_0017; drop table public._backup_0018; drop table public._backup_0019;` e apague esta seção de pendência
    do `CLAUDE.md`.
 

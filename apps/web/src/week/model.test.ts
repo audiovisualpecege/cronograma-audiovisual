@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { row } from '../../test/catalogRows';
 import type { AbsenceRow, EventRow, JobRoleRow, PersonRoleRow, PersonRow } from '../data/catalog';
-import { availabilityByRole, relativeWeekLabel, weekTimeOff, type WeekRows } from './model';
+import { agoText, relativeWeekLabel, weekTimeOff, type WeekRows } from './model';
 
 const WEEK = '2026-10-26';
 const role = (id: string, code: string, name: string) => row(id, { code, name, sector_id: null, archived_at: null }) as unknown as JobRoleRow;
@@ -27,18 +27,11 @@ function rows(extra: Partial<WeekRows> = {}): WeekRows {
   };
 }
 
-describe('availabilityByRole', () => {
-  it('conta cada pessoa ativa uma vez, na função que mais fez no histórico', () => {
-    // p1 fez mais Mediação; p2 sem histórico fica na primeira pelo código (Operador); p4 inativa não conta.
-    const facts = [
-      { personId: 'p1', jobRoleId: 'r2' },
-      { personId: 'p1', jobRoleId: 'r2' },
-      { personId: 'p1', jobRoleId: 'r1' },
-    ];
-    expect(availabilityByRole(rows(), facts)).toEqual([
-      { jobRoleId: 'r2', name: 'Mediação', people: 2 },
-      { jobRoleId: 'r1', name: 'Operador', people: 1 },
-    ]);
+describe('textos da semana', () => {
+  it('agoText conta a última vez a partir da semana em escala', () => {
+    expect(agoText('2026-10-19', WEEK)).toBe('na semana passada');
+    expect(agoText('2026-09-28', WEEK)).toBe('há 4 semanas');
+    expect(agoText('2026-03-02', WEEK)).toBe('há 8 meses');
   });
 
   it('relativeWeekLabel nomeia a semana em relação à atual', () => {
@@ -66,10 +59,5 @@ describe('availabilityByRole', () => {
       // Dois Brunos: sem o sobrenome, fica o título do evento.
       ['Férias Bruno', 'ferias', '2026-10-29', '2026-10-29', null],
     ]);
-  });
-
-  it('quem está ausente a semana inteira não está disponível', () => {
-    const ferias = row('a1', { person_id: 'p3', kind: 'ferias', starts_at: '2026-10-26T00:00:00-03:00', ends_at: '2026-11-02T00:00:00-03:00', all_day: true, note: null, archived_at: null }) as unknown as AbsenceRow;
-    expect(availabilityByRole(rows({ absences: [ferias] }), [])).toEqual([{ jobRoleId: 'r1', name: 'Operador', people: 2 }]);
   });
 });

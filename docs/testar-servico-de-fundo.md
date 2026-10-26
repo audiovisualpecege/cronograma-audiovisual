@@ -21,8 +21,8 @@ O que fica fora do repositório (na pasta `- CRONOGRAM AUDIOVISUAL`, ao lado del
    `docker compose stop`.
 4. Numa janela própria do PowerShell: `& "<pasta>\teste-servico-de-fundo\iniciar.ps1"`. Deixe a janela aberta;
    ela mostra o que o serviço faz. O Painel para de dizer "serviço de fundo parado" em até 1 minuto.
-5. Teste no app (Propor escala > Pedir à IA, ou o passo 1 com a identificação dos tipos). As propostas da IA
-   ficam pendentes até alguém aceitar, como sempre.
+5. Teste no app: numa semana com evento sem tipo, "Identificar os tipos" na Semana. Propostas que o serviço de
+   fundo gravar aparecem tracejadas na grade e ficam pendentes até alguém confirmar, como sempre.
 6. Ao terminar: `Ctrl+C` na janela, **suba o NAS de novo** (`docker compose start`) e apague a chave do
    `worker-teste.env`.
 

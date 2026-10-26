@@ -170,6 +170,17 @@ export interface HistoryIndex {
   recent?(personId: string, jobRoleId: string, serviceTypeId: string | null | undefined, weekStart: string): number;
   /** Vezes que a pessoa fez a função neste mesmo evento (série pelo título) nas 8 semanas antes da semana. */
   series?(personId: string, jobRoleId: string, title: string, weekStart: string): number;
+  /** Semana da última vez que a pessoa fez a função no tipo, antes da semana; nula quando nunca fez. */
+  lastWeek?(personId: string, jobRoleId: string, serviceTypeId: string | null | undefined, weekStart: string): string | null;
+  /** Semana da última vez que a pessoa fez a função neste mesmo evento (série pelo título), antes da semana. */
+  lastSeriesWeek?(personId: string, jobRoleId: string, title: string, weekStart: string): string | null;
+}
+
+/** A semana mais recente da lista antes de `weekStart`. */
+function latestBefore(weeks: readonly string[] | undefined, weekStart: string): string | null {
+  let best: string | null = null;
+  for (const w of weeks ?? []) if (w < weekStart && (!best || w > best)) best = w;
+  return best;
 }
 
 /** Meia-vida do peso do histórico, em semanas. */
@@ -243,6 +254,9 @@ export function buildHistoryIndex(
     }
     return n;
   };
+  index.lastWeek = (personId, jobRoleId, serviceTypeId, weekStart) =>
+    serviceTypeId ? latestBefore(dated.get(`${personId}|${jobRoleId}|${serviceTypeId}`), weekStart) : null;
+  index.lastSeriesWeek = (personId, jobRoleId, title, weekStart) => latestBefore(bySeries.get(`${personId}|${jobRoleId}|${eventSeries(title)}`), weekStart);
   return index;
 }
 

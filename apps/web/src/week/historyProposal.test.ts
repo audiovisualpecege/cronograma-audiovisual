@@ -46,7 +46,16 @@ describe('proposeByHistory', () => {
     const drafts = proposeByHistory(ctx(), history);
     expect(drafts.get('s1')?.personId).toBe('p2');
     expect(drafts.get('s2')?.personId).not.toBe('p2');
-    expect(drafts.get('s1')?.reason).toBe('fez 10 vezes esta função neste tipo; 0 h na semana');
+    expect(drafts.get('s1')?.reason).toBe('fez esta função neste tipo (10 vezes); 0 h na semana');
+  });
+
+  it('o motivo diz quando foi a última vez', () => {
+    const fact = (personId: string, weekStart: string, title: string) => ({ personId, jobRoleId: 'r1', serviceTypeId: 't1', weekStart, title });
+    const history = buildHistoryIndex([fact('p2', '2026-10-19', 'aula'), fact('p2', '2026-10-12', 'aula'), fact('p3', '2026-08-03', 'outro')]);
+    const drafts = proposeByHistory(ctx(), history);
+    expect(drafts.get('s1')?.reason).toBe('fez este evento na semana passada (2 vezes em 8 semanas); 0 h na semana');
+    const p3 = [...drafts.values()].find((d) => d.personId === 'p3');
+    expect(p3?.reason).toBe('fez esta função neste tipo há 12 semanas (1 vez); 0 h na semana');
   });
 
   it('respeita o limite de horas: quem já está no teto fica de fora', () => {

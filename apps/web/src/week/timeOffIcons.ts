@@ -1,4 +1,4 @@
-// Rótulo e ícone de cada tipo de folga, iguais na Semana e no Assistente.
+// Rótulo e ícone de cada tipo de folga.
 import { ClockCircleIcon, SuitcaseIcon, SunIcon } from '@solar-icons/react/bold-duotone';
 
 export const TIME_OFF = {

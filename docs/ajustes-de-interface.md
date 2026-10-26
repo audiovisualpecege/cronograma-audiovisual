@@ -45,7 +45,8 @@ confere no navegador e, quando estiver bom, ele publica.
 ## Cuidados
 
 - **O app no seu computador usa os dados de verdade.** Olhar, abrir telas, filtrar e redimensionar é seguro.
-  **Publicar**, **Escalar**, **Montar semana**, **Aceitar** propostas, cadastros e **Importar** gravam de verdade e a
+  **Publicar**, **Confirmar** (nas fichas e em "Confirmar sugestões", que também monta a semana), escolher pessoa
+  na lista, **Desfazer**, cadastros e **Importar** gravam de verdade e a
   equipe vê. Para testar esses botões, use uma semana futura sem uso e desfaça depois, ou combine antes com o
   Planejamento.
 - Ajuste que mexe no banco de dados (o Claude avisa: "precisa de migração") não se publica só com o merge: chame o

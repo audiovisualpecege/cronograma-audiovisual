@@ -1,32 +1,29 @@
 import { addDays, isWeekPast, localDate, weekStartOf } from '@cronograma/core';
 import { AltArrowLeftIcon, AltArrowRightIcon } from '@solar-icons/react/linear';
-import { useMemo, useState } from 'react';
-import { useTable, type CalendarSourceRow, type HistoryFactRow } from '../data/catalog';
+import { useState } from 'react';
+import { useTable, type CalendarSourceRow } from '../data/catalog';
 import { useHistory } from '../data/history';
 import { navigate, type RouteProps } from '../router';
-import { useSettings } from '../settings/jobs';
-import { useSyncEngine, useSyncState } from '../sync/SyncProvider';
+import { useSyncState } from '../sync/SyncProvider';
 import { OnlineButton } from '../sync/OnlineButton';
-import { AppIcon } from '../ui/AppIcon';
 import { Badge, Button, Card } from '../ui/chiaro';
 import { formatStamp } from '../ui/format';
 import { IconButton } from '../ui/IconButton';
 import { Toast } from '../ui/Toast';
 import { InternalEventForm } from '../event/InternalEventForm';
-import { availabilityByRole, dayMonth, publishSummary, relativeWeekLabel, unpublishedChanges, weekTimeOff, type TimeOff, type WeekRows } from './model';
-import { roleIcon } from './roleIcon';
-import { NO_EVENTS, PreviewList, SourceAlerts } from './PreviewPage';
-import { ProposalBar } from './ProposalBar';
+import { EventPanel } from './EventPanel';
+import { dayMonth, publishSummary, relativeWeekLabel, unpublishedChanges, type WeekRows } from './model';
+import { NO_EVENTS, SourceAlerts } from './PreviewPage';
 import { PublishDialog } from './PublishDialog';
 import { RereadButton } from './RereadButton';
-import { ScheduleEditor, useSchedule } from './ScheduleEditor';
-import { Seal } from './Seal';
-import { TIME_OFF } from './timeOffIcons';
 import { UnpublishedBanner } from './UnpublishedBanner';
-import { AssistantButton, WeekAssistant } from './WeekAssistant';
-import { buildWeek, useBuildPending, useNow, useWeekRows } from './useWeek';
+import { untyped, useIdentifyTypes } from './useIdentifyTypes';
+import { BoardScore, WeekBoard } from './WeekBoard';
+import { useNow, useWeekRows } from './useWeek';
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+const plural = (n: number, one: string, many: string) => (n === 1 ? `1 ${one}` : `${n} ${many}`);
 
 /** Segunda-feira da semana pedida na rota; sem data (ou data inválida), a semana de hoje. */
 export function routeWeek(date: string | undefined, now: Date): string {
@@ -72,7 +69,7 @@ export function WeekSwitcher({ weekStart, currentWeek, base = '/semana' }: { wee
   );
 }
 
-/** Semana do administrador: situação e ações no topo, pessoas disponíveis por função e os eventos. */
+/** Semana do administrador: a grade da escala numa tela só, com o placar e as ações no topo. */
 export function WeekPage({ params }: RouteProps) {
   const now = useNow();
   const today = localDate(now);
@@ -108,97 +105,117 @@ interface BodyProps {
 }
 
 function WeekBody({ rows, sources, now, today }: BodyProps) {
-  const engine = useSyncEngine();
-  const settings = useSettings();
   const history = useHistory();
-  const building = useBuildPending(rows.weekStart);
   const [publishing, setPublishing] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [assisting, setAssisting] = useState(false);
+  const [viewing, setViewing] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const past = isWeekPast(rows.weekStart, now);
   const week = rows.week;
-  const live = rows.events.filter((e) => !e.ignored && e.status !== 'cancelled');
   const changes = unpublishedChanges(rows);
   const publishedBy = rows.people.find((p) => p.id === week?.published_by)?.name;
-  const aiOn = Boolean(settings?.ai_proposal_enabled);
+  const historyLoading = history.rows === null && history.status === 'loading';
+  const identify = useIdentifyTypes(rows, false);
+  const missingType = untyped(rows).length;
+  const viewed = viewing ? rows.events.find((e) => e.id === viewing) : undefined;
 
-  const note = !week
-    ? past
-      ? 'Semana passada fica só para consulta.'
-      : 'Revise os tipos dos eventos e monte a semana: só eventos com tipo ganham vagas.'
-    : week.state === 'published' && week.published_at
-      ? `Publicada em ${formatStamp(week.published_at)}${publishedBy ? ` por ${publishedBy}` : ''}.`
-      : 'Em montagem: a equipe ainda não vê esta semana.';
+  const note = past
+    ? 'Semana passada fica só para consulta.'
+    : !week
+      ? 'Escolha as pessoas: a semana é montada sozinha na primeira confirmação.'
+      : week.state === 'published' && week.published_at
+        ? `Publicada em ${formatStamp(week.published_at)}${publishedBy ? ` por ${publishedBy}` : ''}.`
+        : 'Em montagem: a equipe ainda não vê esta semana.';
+  const newActivity = !past && (
+    <Button variant="secondary" size="sm" onClick={() => setCreating(true)}>
+      Nova atividade interna
+    </Button>
+  );
 
   return (
     <div className="week-built">
       {week?.state === 'published' && <UnpublishedBanner week={week} changes={changes} onPublish={() => setPublishing(true)} onDone={setNotice} />}
       <SourceAlerts sources={sources} />
-      <div className="week-toolbar">
-        <span className="week-status">
-          <Badge tone={week?.state === 'published' ? 'success' : week ? 'brand' : 'soft'}>{stateLabel(rows)}</Badge>
-          <span className="form-text">{note}</span>
-        </span>
-        {!past && (
-          <span className="week-actions-buttons">
-            <Button variant="secondary" size="sm" onClick={() => setCreating(true)}>
-              Nova atividade interna
-            </Button>
-            {!week && live.length > 0 &&
-              (building ? (
-                <Seal>montagem a enviar</Seal>
-              ) : (
-                <Button variant="secondary" size="sm" onClick={() => void buildWeek(engine, rows.weekStart)}>
-                  Montar semana
-                </Button>
-              ))}
-            {week?.state === 'building' && (
-              <OnlineButton variant="secondary" size="sm" onClick={() => setPublishing(true)}>
-                Publicar
-              </OnlineButton>
-            )}
-            {live.length > 0 && <AssistantButton onClick={() => setAssisting(true)} />}
-            {aiOn && live.length > 0 && (
-              <Button size="sm" onClick={() => navigate(`/semana/${rows.weekStart}/proposta`)}>
-                Propor escala
-              </Button>
-            )}
-          </span>
-        )}
-      </div>
-      {week ? (
-        <BuiltWeek rows={rows} now={now} today={today} settings={settings} historyRows={history.rows} />
+      {rows.events.filter((e) => !e.ignored).length === 0 ? (
+        <>
+          <div className="week-toolbar">
+            <span className="week-status">
+              <Badge tone="soft">{stateLabel(rows)}</Badge>
+            </span>
+            <span className="week-actions-buttons">{newActivity}</span>
+          </div>
+          <Card variant="raised" padding={24}>
+            <p className="form-text" style={{ margin: 0 }}>
+              {NO_EVENTS}.
+            </p>
+          </Card>
+        </>
       ) : (
-        <UnbuiltWeek rows={rows} sources={sources} today={today} past={past} historyRows={history.rows} />
-      )}
-
-      {publishing && week && (
-        <PublishDialog
-          week={week}
-          summary={publishSummary(rows)}
-          changes={changes}
-          onClose={() => setPublishing(false)}
-          onDone={(m) => {
-            setPublishing(false);
-            setNotice(m);
-          }}
-        />
-      )}
-      {assisting && (
-        <WeekAssistant
+        <WeekBoard
           rows={rows}
           now={now}
           today={today}
           historyRows={history.rows}
-          historyLoading={history.rows === null && history.status === 'loading'}
-          onClose={() => setAssisting(false)}
-          onPublish={() => {
-            setAssisting(false);
-            setPublishing(true);
-          }}
+          historyLoading={historyLoading}
+          onOpenEvent={setViewing}
+          renderBar={(board, scrollTo) => (
+            <>
+              <div className="week-toolbar board-bar">
+                <span className="week-status">
+                  <Badge tone={week?.state === 'published' ? 'success' : week ? 'brand' : 'soft'}>{stateLabel(rows)}</Badge>
+                  <span className="form-text">{note}</span>
+                </span>
+                <BoardScore counts={board.counts} onGo={scrollTo} />
+                {!past && (
+                  <span className="week-actions-buttons">
+                    {board.toConfirm > 0 && (
+                      <Button size="sm" onClick={board.confirmAll}>
+                        Confirmar sugestões ({board.toConfirm})
+                      </Button>
+                    )}
+                    {newActivity}
+                    {week?.state === 'building' && (
+                      <OnlineButton variant="secondary" size="sm" onClick={() => setPublishing(true)}>
+                        Publicar
+                      </OnlineButton>
+                    )}
+                  </span>
+                )}
+              </div>
+              {!past && (missingType > 0 || board.historyLoading) && (
+                <p className="form-text board-note" role="status">
+                  {board.historyLoading && 'Lendo o histórico da equipe para sugerir as pessoas. '}
+                  {missingType > 0 && `${plural(missingType, 'atividade está', 'atividades estão')} sem tipo de serviço: sem tipo, não há vagas. `}
+                  {missingType > 0 && (
+                    <OnlineButton variant="ghost" size="sm" disabled={identify.running} onClick={() => void identify.identify()}>
+                      {identify.running ? 'Identificando' : 'Identificar os tipos'}
+                    </OnlineButton>
+                  )}
+                </p>
+              )}
+              {identify.error && (
+                <p className="form-message form-message--alert" role="alert">
+                  {identify.error}
+                </p>
+              )}
+              {publishing && week && (
+                <PublishDialog
+                  week={week}
+                  summary={publishSummary(rows)}
+                  suggested={board.drafts}
+                  changes={changes}
+                  onClose={() => setPublishing(false)}
+                  onDone={(m) => {
+                    setPublishing(false);
+                    setNotice(m);
+                  }}
+                />
+              )}
+            </>
+          )}
         />
       )}
+      {viewed && <EventPanel event={viewed} rows={rows} sources={sources} today={today} readOnly={past} onClose={() => setViewing(null)} />}
       {creating && <InternalEventForm defaultDate={rows.weekStart} types={rows.types} onClose={() => setCreating(false)} />}
       {notice && (
         <div className="toast-stack">
@@ -206,120 +223,5 @@ function WeekBody({ rows, sources, now, today }: BodyProps) {
         </div>
       )}
     </div>
-  );
-}
-
-/** Quantas pessoas estão disponíveis em cada função na semana. */
-export function AvailabilityPanel({ rows, historyRows }: { rows: WeekRows; historyRows: readonly HistoryFactRow[] | null }) {
-  const items = useMemo(
-    () => availabilityByRole(rows, (historyRows ?? []).map((r) => ({ personId: r.person_id, jobRoleId: r.job_role_id }))),
-    [rows, historyRows],
-  );
-  return (
-    <Card variant="raised" padding={20}>
-      <section aria-labelledby="disponiveis-title">
-        <h2 id="disponiveis-title" className="section-title">
-          Pessoas disponíveis por função
-        </h2>
-        {items.length === 0 ? (
-          <p className="form-text" style={{ margin: 0 }}>
-            Ninguém disponível nesta semana.
-          </p>
-        ) : (
-          <ul className="plain-list availability-list" aria-label="Pessoas disponíveis por função">
-            {items.map((it) => (
-              <li key={it.jobRoleId} className="availability-item" aria-label={it.name}>
-                <span className="availability-icon">
-                  <AppIcon icon={roleIcon(it.name)} size={26} />
-                </span>
-                <span className="availability-count">{it.people}</span>
-                <span className="availability-role">{it.name}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-        <p className="page-note" style={{ marginBottom: 0 }}>
-          Quem tem mais de uma função conta na que mais fez. Ausências da semana já descontadas.
-        </p>
-      </section>
-    </Card>
-  );
-}
-
-function spanText(t: TimeOff): string {
-  return t.from === t.to ? dayMonth(t.from) : `${dayMonth(t.from)} a ${dayMonth(t.to)}`;
-}
-
-/** Quem está de folga, férias ou ausente na semana, pelas ausências cadastradas e pela agenda. */
-export function TimeOffPanel({ rows }: { rows: WeekRows }) {
-  const items = useMemo(() => weekTimeOff(rows), [rows]);
-  return (
-    <Card variant="raised" padding={20}>
-      <section aria-labelledby="folgas-title">
-        <h2 id="folgas-title" className="section-title">
-          Folga e férias
-        </h2>
-        {items.length === 0 ? (
-          <p className="form-text" style={{ margin: 0 }}>
-            Ninguém de folga ou férias nesta semana.
-          </p>
-        ) : (
-          <ul className="plain-list timeoff-list" aria-label="Folga e férias">
-            {items.map((t) => (
-              <li key={t.key} className={`timeoff-item timeoff-item--${t.kind}`} aria-label={t.name}>
-                <span className="timeoff-icon">
-                  <AppIcon icon={TIME_OFF[t.kind].icon} size={22} />
-                </span>
-                <span className="list-row-main">
-                  <span className="list-row-title">{t.name}</span>
-                  <span className="list-row-sub">
-                    {TIME_OFF[t.kind].label}, {spanText(t)}
-                    {t.agendaTitle && t.personId ? `. Na agenda: ${t.agendaTitle}` : t.agendaTitle ? '. Pela agenda' : ''}
-                  </span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-    </Card>
-  );
-}
-
-interface PartProps {
-  rows: WeekRows;
-  today: string;
-  historyRows: readonly HistoryFactRow[] | null;
-}
-
-function UnbuiltWeek({ rows, sources, today, past, historyRows }: PartProps & { sources: readonly CalendarSourceRow[]; past: boolean }) {
-  const live = rows.events.filter((e) => !e.ignored && e.status !== 'cancelled');
-  return (
-    <>
-      <AvailabilityPanel rows={rows} historyRows={historyRows} />
-      <TimeOffPanel rows={rows} />
-      {live.length === 0 ? (
-        <Card variant="raised" padding={24}>
-          <p className="form-text" style={{ margin: 0 }}>
-            {NO_EVENTS}.
-          </p>
-        </Card>
-      ) : (
-        <PreviewList rows={rows} sources={sources} today={today} readOnly={past} />
-      )}
-    </>
-  );
-}
-
-function BuiltWeek({ rows, now, today, settings, historyRows }: PartProps & { now: Date; settings: ReturnType<typeof useSettings> }) {
-  const week = rows.week as NonNullable<WeekRows['week']>;
-  const schedule = useSchedule(rows, now, today, historyRows);
-  return (
-    <>
-      <ProposalBar week={week} settings={settings} proposed={schedule.proposed} readOnly={schedule.readOnly} />
-      <AvailabilityPanel rows={rows} historyRows={historyRows} />
-      <TimeOffPanel rows={rows} />
-      <ScheduleEditor schedule={schedule} today={today} />
-    </>
   );
 }

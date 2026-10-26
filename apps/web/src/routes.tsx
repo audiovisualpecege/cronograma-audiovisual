@@ -18,7 +18,6 @@ import { NotificationsPage } from './notifications/NotificationsPage';
 import { PreferencesPage } from './preferences/PreferencesPage';
 import { IcalPage } from './ical/IcalPage';
 import { EventPage } from './event/EventPage';
-import { ProposalPage } from './week/ProposalPage';
 import { WeekPage } from './week/WeekPage';
 import { AboutPage } from './about/AboutPage';
 
@@ -40,7 +39,8 @@ export const ROUTES: readonly RouteDef[] = [
   { path: '/painel', access: 'admin', title: 'Painel', component: DashboardPage },
   { path: '/semana', access: 'admin', title: 'Semana', component: WeekPage },
   { path: '/semana/:date', access: 'admin', title: 'Semana', component: WeekPage },
-  { path: '/semana/:date/proposta', access: 'admin', title: 'Propor escala', component: ProposalPage },
+  // "Propor escala" virou a grade da própria semana; o endereço antigo continua abrindo a semana.
+  { path: '/semana/:date/proposta', access: 'admin', title: 'Semana', component: WeekPage },
   { path: '/admin/pessoas', access: 'admin', title: 'Pessoas', component: PeoplePage },
   { path: '/admin/ausencias', access: 'admin', title: 'Ausências', component: AbsencesPage },
   { path: '/admin/funcoes', access: 'admin', title: 'Funções', component: RolesPage },

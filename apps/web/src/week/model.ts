@@ -1,8 +1,7 @@
 // Regras de tela da semana do administrador, puras: contexto das regras do core a partir das linhas da cópia
-// local, equipe estimada, pessoas disponíveis por função, contagens de publicação e alterações não publicadas.
+// local, equipe estimada, folgas da semana, contagens de publicação e alterações não publicadas.
 import {
   addDays,
-  availableHours,
   daysOf,
   diffDays,
   isEventSize,
@@ -13,7 +12,6 @@ import {
   type AbsenceLike,
   type AssignmentLike,
   type EventLike,
-  type HistoryFact,
   type PersonLike,
   type SeriesSize,
   type SizeSuggestion,
@@ -223,40 +221,6 @@ export function sizeSuggestions(rows: WeekRows, seriesSizes: ReadonlyMap<string,
   return out;
 }
 
-export interface RoleAvailability {
-  jobRoleId: string;
-  name: string;
-  people: number;
-}
-
-/**
- * Pessoas disponíveis na semana por função: ativas e com horas livres depois das ausências. Quem tem
- * mais de uma função conta uma vez só, na que mais fez no histórico; sem histórico (ou empate), na
- * primeira pelo código da função. Da função com mais gente para a com menos.
- */
-export function availabilityByRole(rows: WeekRows, facts: readonly Pick<HistoryFact, 'personId' | 'jobRoleId'>[]): RoleAvailability[] {
-  const done = new Map<string, number>();
-  for (const f of facts) {
-    if (f.personId && f.jobRoleId) done.set(`${f.personId}|${f.jobRoleId}`, (done.get(`${f.personId}|${f.jobRoleId}`) ?? 0) + 1);
-  }
-  const roles = new Map(rows.roles.filter((r) => !r.archived_at).map((r) => [r.id, r]));
-  const byCode = (a: string, b: string) => (roles.get(a)?.code ?? '').localeCompare(roles.get(b)?.code ?? '', 'en', { numeric: true });
-  const absences = rows.absences.map(toAbsenceLike);
-  const count = new Map<string, number>();
-  for (const p of rows.people) {
-    if (!p.active) continue;
-    const person = toPersonLike(p, rows.personRoles);
-    const enabled = person.roleIds.filter((r) => roles.has(r)).sort(byCode);
-    if (enabled.length === 0 || availableHours(person, absences, rows.weekStart) <= 0) continue;
-    const times = (r: string) => done.get(`${p.id}|${r}`) ?? 0;
-    const main = enabled.reduce((best, r) => (times(r) > times(best) ? r : best));
-    count.set(main, (count.get(main) ?? 0) + 1);
-  }
-  return [...count]
-    .map(([jobRoleId, people]) => ({ jobRoleId, name: roles.get(jobRoleId)?.name ?? 'Função', people }))
-    .sort((a, b) => b.people - a.people || a.name.localeCompare(b.name, 'pt-BR'));
-}
-
 /** "Semana atual", "Próxima semana", "Semana passada", "Daqui a 3 semanas", "Há 2 semanas". */
 export function relativeWeekLabel(weekStart: string, currentWeek: string): string {
   const n = Math.round(diffDays(currentWeek, weekStart) / 7);
@@ -414,6 +378,14 @@ export function unpublishedChanges(rows: WeekRows): number {
 /** Horas em texto: "12 h" ou "2,5 h". */
 export function hoursText(h: number): string {
   return `${Number.isInteger(h) ? h : h.toFixed(1).replace('.', ',')} h`;
+}
+
+/** Quando foi a última vez, contada da semana em escala: "na semana passada", "há 3 semanas", "há 5 meses". */
+export function agoText(lastWeek: string, weekStart: string): string {
+  const weeks = Math.max(1, Math.round(diffDays(lastWeek, weekStart) / 7));
+  if (weeks === 1) return 'na semana passada';
+  if (weeks <= 12) return `há ${weeks} semanas`;
+  return `há ${Math.round(weeks / 4.35)} meses`;
 }
 
 export function activitiesText(n: number): string {

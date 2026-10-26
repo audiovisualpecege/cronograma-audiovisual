@@ -20,7 +20,8 @@ estiver no ar e firme.
   Teste novo para o que mudou de comportamento; ajuste de visual não precisa de teste novo, mas não pode quebrar
   os que existem.
 - A visualização local (`npm run dev`) usa o banco de verdade, com o login de administrador de quem está testando.
-  Mexer na tela é seguro; **Publicar**, **Escalar**, **Montar semana**, cadastros e importação gravam de verdade e a
+  Mexer na tela é seguro; **Publicar**, **Confirmar** (fichas e "Confirmar sugestões", que montam a semana),
+  escolher pessoa, cadastros e importação gravam de verdade e a
   equipe vê. Avise antes de clicar em qualquer um deles e prefira uma semana futura sem uso.
 - Migração nova em `supabase/migrations/` não se aplica sozinha: ela precisa de `npx supabase db push`, feito pelo
   responsável depois de revisar, antes do merge do código que depende dela. Diga isso no PR.
