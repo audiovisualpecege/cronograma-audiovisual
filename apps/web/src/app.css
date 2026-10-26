@@ -2378,3 +2378,357 @@ body {
   height: 20px;
   width: auto;
 }
+
+/* ---------------------------------------------------------------------------------------------
+   Assistente da semana: passos em bolinhas, uma família de atividade por cor (Lavanda aulas, Pêssego
+   produção, cinza reuniões) e vagas como fichas (verde confirmada, tracejada sugestão, vermelha aberta). */
+
+.wiz {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.wiz-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wiz-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  font: var(--weight-bold) var(--text-caption) var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  cursor: pointer;
+}
+
+.wiz-step.is-done {
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 50%, transparent);
+}
+
+.wiz-step.is-current {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--chiaro-branco);
+}
+
+.wiz-title {
+  margin: 0;
+  color: var(--text-primary);
+  font: var(--weight-bold) 20px/1.2 var(--font-display);
+  text-transform: capitalize;
+}
+
+.wiz-empty,
+.wiz-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.wiz-actions {
+  justify-content: space-between;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* Folgas e férias */
+.wiz-timeoff {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-2);
+}
+
+.wiz-off {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wiz-off:disabled {
+  cursor: default;
+}
+
+.wiz-off.is-off {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+
+.wiz-off-icon {
+  display: inline-flex;
+  padding: 6px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--chiaro-pessego) 18%, transparent);
+  color: var(--chiaro-pessego);
+}
+
+.wiz-off--ferias .wiz-off-icon {
+  background: color-mix(in srgb, var(--chiaro-lavanda) 20%, transparent);
+  color: var(--chiaro-lavanda);
+}
+
+.wiz-off-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  font-size: var(--text-caption);
+  color: var(--text-muted);
+}
+
+.wiz-off-text strong {
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+/* Famílias de atividade */
+.wiz-kind--aula { --wiz-color: var(--chiaro-lavanda); }
+.wiz-kind--producao { --wiz-color: var(--chiaro-pessego); }
+.wiz-kind--reuniao { --wiz-color: var(--neutral-400); }
+.wiz-kind--marcacao { --wiz-color: var(--neutral-600); }
+
+.wiz-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.wiz-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+.wiz-legend-item::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--wiz-color);
+}
+
+.wiz-events {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.wiz-event {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-left: 4px solid var(--wiz-color);
+  border-radius: var(--radius-card);
+  background: var(--surface-raised);
+}
+
+.wiz-event.is-highlighted {
+  box-shadow: 0 0 0 1px var(--wiz-color);
+}
+
+.wiz-event-icon {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 7px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--wiz-color) 18%, transparent);
+  color: var(--wiz-color);
+}
+
+.wiz-event-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.wiz-event-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px var(--space-3);
+}
+
+.wiz-event-title {
+  color: var(--text-primary);
+  font-size: 15px;
+}
+
+.wiz-event-meta {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+/* Vagas como fichas */
+.wiz-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.wiz-slot {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  background: var(--surface-card);
+}
+
+.wiz-slot-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 0;
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.wiz-slot-main:disabled {
+  cursor: default;
+}
+
+.wiz-slot-name {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wiz-slot.is-confirmed {
+  border-color: color-mix(in srgb, var(--success) 55%, transparent);
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+}
+
+.wiz-slot.is-confirmed .wiz-slot-main {
+  color: var(--text-primary);
+}
+
+.wiz-slot.is-confirmed svg:last-of-type {
+  color: var(--success);
+}
+
+.wiz-slot.is-suggested {
+  border-style: dashed;
+  border-color: var(--accent);
+}
+
+.wiz-slot.is-suggested .wiz-slot-main {
+  color: var(--text-primary);
+}
+
+.wiz-slot.is-open {
+  border-color: color-mix(in srgb, var(--danger) 55%, transparent);
+}
+
+.wiz-slot.is-open .wiz-slot-main {
+  color: var(--danger);
+}
+
+.wiz-slot-main:hover:not(:disabled),
+.wiz-slot-main:focus-visible {
+  outline: none;
+  text-decoration: underline;
+}
+
+.wiz-slot-x {
+  padding: 0 10px 0 2px;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.wiz-slot-x:hover {
+  color: var(--danger);
+}
+
+.wiz-slot-pending {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.wiz-markers {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+.wiz-markers-label {
+  margin-right: var(--space-2);
+  padding: 2px 8px;
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-pill);
+}
+
+.wiz-plan {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  font-size: var(--text-caption);
+}
+
+.wiz-plan-ok { color: var(--success); }
+.wiz-plan-open { color: var(--danger); }
+
+/* Resumo */
+.wiz-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+}
+
+.wiz-summary-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  color: var(--text-muted);
+}
+
+.wiz-summary-item strong {
+  font: var(--weight-bold) 32px/1 var(--font-display);
+}
+
+.wiz-summary-item.is-confirmed strong { color: var(--success); }
+.wiz-summary-item.is-suggested strong { color: var(--accent); }
+.wiz-summary-item.is-open strong { color: var(--danger); }
+
+@media (max-width: 560px) {
+  .wiz-summary {
+    grid-template-columns: 1fr;
+  }
+}

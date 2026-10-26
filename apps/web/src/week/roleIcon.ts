@@ -3,6 +3,7 @@ import { normalizeName } from '@cronograma/core';
 import {
   CameraIcon,
   ClipboardListIcon,
+  CloudUploadIcon,
   CrownStarIcon,
   GalleryEditIcon,
   HeadphonesRoundSoundIcon,
@@ -33,6 +34,7 @@ const RULES: [RegExp, Icon][] = [
   [/produ/, ClipboardListIcon],
   [/suporte/, HeadphonesRoundSoundIcon],
   [/lider/, CrownStarIcon],
+  [/disponibiliz/, CloudUploadIcon],
 ];
 
 export function roleIcon(name: string): Icon {

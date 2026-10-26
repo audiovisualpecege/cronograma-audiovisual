@@ -24,6 +24,11 @@ PATCH para um conserto, MINOR para algo novo, MAJOR quando o jeito de usar muda.
   do histórico e o Gemini). Os que faltarem ficam em destaque, com sugestões do histórico para usar com um clique.
   Passo 2: a semana é montada, a IA propõe as pessoas e a revisão acontece ali mesmo (aceitar, trocar,
   descartar), com as vagas vazias em destaque.
+- **Assistente** (botão com a varinha, na Semana): uma janela em passos para fechar a escala. Primeiro as folgas
+  e férias da semana, para confirmar quem está fora (a folga da agenda confirmada tira a pessoa das sugestões).
+  Depois um dia por vez: cada atividade com o ícone do tipo e a cor da família (lavanda aulas e cursos, pêssego
+  produção, cinza reuniões), e as vagas como fichas (verde confirmada, tracejada sugestão, vermelha aberta);
+  tocar numa ficha troca a pessoa. "Validar e seguir" confirma o dia. No fim, o resumo e o Publicar.
 - **Porte do evento**: EVENTO, GRAVAÇÃO e PODCAST têm porte Simples, Médio ou Grande, cada um com a sua equipe.
   No histórico de um ano, metade dos eventos teve 1 pessoa, mas todo EVENTO pedia 8 vagas. Sem escolha, vale o
   porte padrão do tipo, tirado do histórico: Simples no EVENTO, Médio na GRAVAÇÃO e no PODCAST. No passo 1 do Propor escala, cada evento desses tipos tem os três botões de porte, e o histórico sugere

@@ -1,5 +1,4 @@
 import { addDays, isWeekPast, localDate, weekStartOf } from '@cronograma/core';
-import { ClockCircleIcon, SuitcaseIcon, SunIcon } from '@solar-icons/react/bold-duotone';
 import { AltArrowLeftIcon, AltArrowRightIcon } from '@solar-icons/react/linear';
 import { useMemo, useState } from 'react';
 import { useTable, type CalendarSourceRow, type HistoryFactRow } from '../data/catalog';
@@ -22,7 +21,9 @@ import { PublishDialog } from './PublishDialog';
 import { RereadButton } from './RereadButton';
 import { ScheduleEditor, useSchedule } from './ScheduleEditor';
 import { Seal } from './Seal';
+import { TIME_OFF } from './timeOffIcons';
 import { UnpublishedBanner } from './UnpublishedBanner';
+import { AssistantButton, WeekAssistant } from './WeekAssistant';
 import { buildWeek, useBuildPending, useNow, useWeekRows } from './useWeek';
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -113,6 +114,7 @@ function WeekBody({ rows, sources, now, today }: BodyProps) {
   const building = useBuildPending(rows.weekStart);
   const [publishing, setPublishing] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [assisting, setAssisting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const past = isWeekPast(rows.weekStart, now);
   const week = rows.week;
@@ -156,6 +158,7 @@ function WeekBody({ rows, sources, now, today }: BodyProps) {
                 Publicar
               </OnlineButton>
             )}
+            {live.length > 0 && <AssistantButton onClick={() => setAssisting(true)} />}
             {aiOn && live.length > 0 && (
               <Button size="sm" onClick={() => navigate(`/semana/${rows.weekStart}/proposta`)}>
                 Propor escala
@@ -179,6 +182,20 @@ function WeekBody({ rows, sources, now, today }: BodyProps) {
           onDone={(m) => {
             setPublishing(false);
             setNotice(m);
+          }}
+        />
+      )}
+      {assisting && (
+        <WeekAssistant
+          rows={rows}
+          now={now}
+          today={today}
+          historyRows={history.rows}
+          historyLoading={history.rows === null && history.status === 'loading'}
+          onClose={() => setAssisting(false)}
+          onPublish={() => {
+            setAssisting(false);
+            setPublishing(true);
           }}
         />
       )}
@@ -228,12 +245,6 @@ export function AvailabilityPanel({ rows, historyRows }: { rows: WeekRows; histo
     </Card>
   );
 }
-
-const TIME_OFF = {
-  ferias: { label: 'Férias', icon: SuitcaseIcon },
-  folga: { label: 'Folga', icon: SunIcon },
-  ausencia: { label: 'Ausência', icon: ClockCircleIcon },
-} as const;
 
 function spanText(t: TimeOff): string {
   return t.from === t.to ? dayMonth(t.from) : `${dayMonth(t.from)} a ${dayMonth(t.to)}`;
