@@ -9,6 +9,7 @@ export const VALIDATION_MESSAGES: Record<ValidationCode, string> = {
   roles_required: 'Escolha ao menos uma função.',
   invalid_quantity: 'A quantidade por função vai de 1 a 30.',
   type_without_crew: 'Escolha ao menos uma função ou marque "não exige equipe".',
+  size_without_crew: 'Cada porte (Simples, Médio e Grande) precisa de ao menos uma função.',
   end_before_start: 'O fim precisa ser depois do início.',
   notes_too_long: 'A observação vai até 2.000 caracteres.',
 };

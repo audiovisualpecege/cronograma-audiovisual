@@ -1,7 +1,7 @@
 // Leitura dos cadastros na cópia local (ADR-009). As linhas chegam do servidor em snake_case; as que estão
 // na fila trazem também os campos gravados na hora (`role_ids`, `crew`), que o servidor guarda em outras
 // tabelas e só voltam na próxima leitura.
-import type { HistoryFact } from '@cronograma/core';
+import { effectiveSize, isEventSize, SINGLE_CREW_SIZE, type EventSize, type HistoryFact } from '@cronograma/core';
 import { useLocalQuery } from '../sync/SyncProvider';
 import type { Row, TableName } from '../sync/types';
 
@@ -47,6 +47,8 @@ export interface JobRoleRow extends Row {
 export interface CrewItem {
   job_role_id: string;
   quantity: number;
+  /** Porte (1 Simples, 2 Médio, 3 Grande); tipo sem porte guarda a equipe única no 2. Sem o campo, 2. */
+  size?: number;
 }
 
 export interface ServiceTypeRow extends Row {
@@ -58,6 +60,10 @@ export interface ServiceTypeRow extends Row {
   icon?: string | null;
   /** Trabalho complexo: a escala sugerida chama a Referência da função primeiro. */
   complex?: boolean;
+  /** Tem porte (Simples, Médio, Grande), com uma equipe típica para cada um. */
+  sized?: boolean;
+  /** Porte de quem não escolheu (1 Simples, 2 Médio, 3 Grande). */
+  default_size?: number;
   archived_at: string | null;
   crew?: CrewItem[];
 }
@@ -159,6 +165,8 @@ export interface EventRow extends Row {
   source_disconnected?: boolean;
   /** Atividade principal da semana (estrela de quem monta a escala). */
   highlighted?: boolean;
+  /** Porte escolhido (1 Simples, 2 Médio, 3 Grande); vazio vale o porte padrão do tipo. */
+  size?: number | null;
 }
 
 export interface SlotRow extends Row {
@@ -223,12 +231,32 @@ export function levelsOf(person: PersonRow, personRoles: readonly PersonRoleRow[
   return { ...out, ...person.role_levels };
 }
 
-/** Equipe típica do tipo: a da fila, quando há, senão a do servidor. */
-export function crewOf(type: ServiceTypeRow, crew: readonly CrewRow[]): CrewItem[] {
-  if (type.crew) return type.crew;
-  return crew
-    .filter((c) => c.service_type_id === type.id && !c.archived_at)
-    .map((c) => ({ job_role_id: c.job_role_id, quantity: c.quantity }));
+/**
+ * Equipe típica do tipo (a da fila, quando há, senão a do servidor), de todos os portes; com `size`, só a
+ * daquele porte.
+ */
+export function crewOf(type: ServiceTypeRow, crew: readonly CrewRow[], size?: number): CrewItem[] {
+  const all = type.crew ?? crew.filter((c) => c.service_type_id === type.id && !c.archived_at);
+  return all
+    .map((c) => ({ job_role_id: c.job_role_id, quantity: c.quantity, size: c.size ?? SINGLE_CREW_SIZE }))
+    .filter((c) => size === undefined || c.size === size);
+}
+
+/** Porte que vale para o evento deste tipo: o escolhido, senão o padrão do tipo. */
+export function sizeFor(type: ServiceTypeRow, size: number | null | undefined): EventSize {
+  return effectiveSize(size, Boolean(type.sized), type.default_size);
+}
+
+/** Equipe do tipo no porte que vale para o evento (sem porte escolhido, o padrão; tipo sem porte, a única). */
+export function crewForSize(type: ServiceTypeRow, crew: readonly CrewRow[], size: number | null | undefined): CrewItem[] {
+  return crewOf(type, crew, sizeFor(type, size));
+}
+
+/** Total de vagas de cada porte do tipo. */
+export function crewTotals(type: ServiceTypeRow, crew: readonly CrewRow[]): Record<EventSize, number> {
+  const out: Record<EventSize, number> = { 1: 0, 2: 0, 3: 0 };
+  for (const c of crewOf(type, crew)) if (isEventSize(c.size)) out[c.size] += c.quantity;
+  return out;
 }
 
 /** Linha da view history_facts como o PostgREST devolve. */

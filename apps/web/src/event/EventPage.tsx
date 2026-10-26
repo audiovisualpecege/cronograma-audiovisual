@@ -1,6 +1,6 @@
-import { buildHistoryIndex, isWeekPast, localDate, localTime, NOTES_MAX, zonedTime } from '@cronograma/core';
+import { buildHistoryIndex, DEFAULT_SIZE, EVENT_SIZES, isWeekPast, localDate, localTime, NOTES_MAX, SIZE_LABEL, zonedTime } from '@cronograma/core';
 import { useMemo, useState, type FormEvent } from 'react';
-import { toFact, useTable, type CalendarSourceRow, type EventRow } from '../data/catalog';
+import { sizeFor, toFact, useTable, type CalendarSourceRow, type EventRow } from '../data/catalog';
 import { useHistory } from '../data/history';
 import { VALIDATION_MESSAGES } from '../data/messages';
 import { PageTitle } from '../layout/PageTitle';
@@ -299,6 +299,10 @@ function ExtrasCard({ event, rows, editable }: { event: EventRow; rows: WeekRows
   const { pendingRows } = useSyncState();
   const [typeId, setTypeId] = useState(event.service_type_id ?? '');
   const [noTeam, setNoTeam] = useState(Boolean(event.no_team));
+  const [size, setSize] = useState(() => {
+    const type = rows.types.find((t) => t.id === event.service_type_id);
+    return String(type ? sizeFor(type, event.size) : DEFAULT_SIZE);
+  });
   const [notes, setNotes] = useState(event.notes ?? '');
   const day = localDate(new Date(event.starts_at));
   const [periodStart, setPeriodStart] = useState(event.period_start ? localTime(new Date(event.period_start)) : '');
@@ -308,7 +312,10 @@ function ExtrasCard({ event, rows, editable }: { event: EventRow; rows: WeekRows
 
   const built = Boolean(rows.week);
   const hasPeople = rows.assignments.some((a) => a.event_id === event.id && a.person_id && rows.slots.some((s) => s.id === a.slot_id && !s.archived_at));
-  const crewChanged = (typeId || null) !== (event.service_type_id ?? null) || noTeam !== Boolean(event.no_team);
+  const pickedType = rows.types.find((t) => t.id === typeId);
+  const sized = Boolean(pickedType?.sized) && !noTeam;
+  const sizeChanged = sized && pickedType !== undefined && Number(size) !== sizeFor(pickedType, event.size);
+  const crewChanged = (typeId || null) !== (event.service_type_id ?? null) || noTeam !== Boolean(event.no_team) || sizeChanged;
   const askMode = crewChanged && built && hasPeople;
   const notesError = notes.length > NOTES_MAX ? VALIDATION_MESSAGES.notes_too_long : undefined;
   const periodError = event.all_day && periodStart && periodEnd && periodEnd <= periodStart ? VALIDATION_MESSAGES.end_before_start : undefined;
@@ -317,11 +324,13 @@ function ExtrasCard({ event, rows, editable }: { event: EventRow; rows: WeekRows
     e.preventDefault();
     if (notesError || periodError) return;
     const fields: Record<string, unknown> = { service_type_id: typeId || null, no_team: noTeam, notes: notes.trim() || null };
+    if (sizeChanged) fields.size = Number(size);
     if (event.all_day) {
       fields.period_start = periodStart ? zonedTime(day, periodStart).toISOString() : null;
       fields.period_end = periodEnd ? zonedTime(day, periodEnd).toISOString() : null;
     }
-    const changes = { ...fields, ...(crewChanged ? { type_certainty: typeId ? 'alta' : 'baixa', type_source: 'admin' } : {}) };
+    const typeChanged = (typeId || null) !== (event.service_type_id ?? null) || noTeam !== Boolean(event.no_team);
+    const changes = { ...fields, ...(typeChanged ? { type_certainty: typeId ? 'alta' : 'baixa', type_source: 'admin' } : {}) };
     await engine.enqueue('event.update_extras', { id: event.id, ...fields, ...(askMode ? { mode } : {}) }, { baseVersion: event.version, target: { table: 'events', id: event.id, changes } });
     setSaved(true);
     void sendAndRefresh(engine, ['events', 'slots', 'assignments']);
@@ -334,6 +343,16 @@ function ExtrasCard({ event, rows, editable }: { event: EventRow; rows: WeekRows
         <h2 className="section-title">Dados extras</h2>
         {!editable && <p className="form-text">{event.status === 'cancelled' ? 'Evento cancelado: os dados extras ficam só para leitura.' : 'Só leitura.'}</p>}
         <Select label="Tipo de serviço" value={typeId} onChange={(e) => setTypeId(e.target.value)} options={options} disabled={!editable} />
+        {sized && (
+          <Select
+            label="Porte"
+            value={size}
+            onChange={(e) => setSize(e.target.value)}
+            options={EVENT_SIZES.map((s) => ({ value: String(s), label: SIZE_LABEL[s] }))}
+            disabled={!editable}
+            hint="Cada porte tem a sua equipe típica (Dados > Tipos de serviço)."
+          />
+        )}
         <Checkbox label="Não exige equipe" checked={noTeam} onChange={setNoTeam} disabled={!editable} />
         {event.all_day && (
           <div className="form-grid">
@@ -345,7 +364,7 @@ function ExtrasCard({ event, rows, editable }: { event: EventRow; rows: WeekRows
           <fieldset className="check-group">
             <legend className="field-label">O evento já tem pessoas escaladas</legend>
             <Radio name="modo-vagas" label="Manter as vagas atuais" checked={mode === 'keep'} onChange={() => setMode('keep')} />
-            <Radio name="modo-vagas" label="Refazer as vagas pelo tipo novo" checked={mode === 'rebuild'} onChange={() => setMode('rebuild')} />
+            <Radio name="modo-vagas" label={sizeChanged && typeId === (event.service_type_id ?? '') ? 'Refazer as vagas pelo porte novo' : 'Refazer as vagas pelo tipo novo'} checked={mode === 'rebuild'} onChange={() => setMode('rebuild')} />
           </fieldset>
         )}
         <Input

@@ -1,4 +1,15 @@
-import { CREW_QUANTITY_MAX, CREW_QUANTITY_MIN, suggestCrew, validateServiceType } from '@cronograma/core';
+import {
+  CREW_QUANTITY_MAX,
+  CREW_QUANTITY_MIN,
+  DEFAULT_SIZE,
+  EVENT_SIZES,
+  isEventSize,
+  SINGLE_CREW_SIZE,
+  SIZE_LABEL,
+  suggestCrew,
+  validateServiceType,
+  type EventSize,
+} from '@cronograma/core';
 import { AddCircleIcon, TrashBinMinimalisticIcon } from '@solar-icons/react/linear';
 import { useMemo, useState, type FormEvent } from 'react';
 import { byName, crewOf, toFact, useTable, type CrewItem, type CrewRow, type JobRoleRow, type ServiceTypeRow } from '../../data/catalog';
@@ -17,10 +28,71 @@ interface CrewDraft {
   key: string;
   jobRoleId: string;
   quantity: string;
+  /** Porte da linha (1 Simples, 2 Médio, 3 Grande); sem porte, todas ficam no 2. */
+  size: EventSize;
 }
 
 export function crewText(crew: readonly CrewItem[], roleName: Map<string, string>): string {
   return crew.map((c) => `${c.quantity} ${roleName.get(c.job_role_id) ?? '?'}`).join(', ');
+}
+
+/** Equipe do tipo em texto; com porte, "Simples: ... · Médio: ... · Grande: ...". */
+export function typeCrewText(type: ServiceTypeRow, crew: readonly CrewRow[], roleName: Map<string, string>): string {
+  if (!type.sized) return crewText(crewOf(type, crew, SINGLE_CREW_SIZE), roleName);
+  const fallback = isEventSize(type.default_size) ? type.default_size : DEFAULT_SIZE;
+  return EVENT_SIZES.map((s) => `${SIZE_LABEL[s]}${s === fallback ? ' (padrão)' : ''}: ${crewText(crewOf(type, crew, s), roleName) || 'ninguém'}`).join(' · ');
+}
+
+const draftRow = (c: Pick<CrewItem, 'job_role_id' | 'quantity'>, size: EventSize): CrewDraft => ({
+  key: crypto.randomUUID(),
+  jobRoleId: c.job_role_id,
+  quantity: String(c.quantity),
+  size,
+});
+
+/** As linhas de um porte da equipe típica: função, quantidade e tirar; mais "Adicionar função". */
+function CrewRows({
+  rows,
+  roles,
+  label,
+  onChange,
+  onRemove,
+  onAdd,
+}: {
+  rows: CrewDraft[];
+  roles: JobRoleRow[];
+  label: string;
+  onChange: (key: string, patch: Partial<CrewDraft>) => void;
+  onRemove: (key: string) => void;
+  onAdd: () => void;
+}) {
+  return (
+    <fieldset className="check-group">
+      <legend className="field-label">{label}</legend>
+      {rows.map((r) => (
+        <div key={r.key} className="crew-row">
+          <Select
+            label="Função"
+            value={r.jobRoleId}
+            onChange={(e) => onChange(r.key, { jobRoleId: e.target.value })}
+            placeholder="Escolha a função"
+            options={roles.filter((x) => !x.archived_at || x.id === r.jobRoleId).map((x) => ({ value: x.id, label: x.name }))}
+          />
+          <Input
+            label="Quantidade"
+            inputMode="numeric"
+            value={r.quantity}
+            onChange={(e) => onChange(r.key, { quantity: e.target.value })}
+            style={{ maxWidth: 140 }}
+          />
+          <IconButton icon={TrashBinMinimalisticIcon} label="Tirar esta função" onClick={() => onRemove(r.key)} />
+        </div>
+      ))}
+      <Button type="button" variant="ghost" size="sm" onClick={onAdd}>
+        <AppIcon icon={AddCircleIcon} size={18} /> Adicionar função
+      </Button>
+    </fieldset>
+  );
 }
 
 /** Banco de ícones do tipo; "Automático" deixa o app escolher pelo nome. */
@@ -84,22 +156,40 @@ function ServiceTypeForm({
   const [noTeam, setNoTeam] = useState(type?.no_team ?? false);
   const [icon, setIcon] = useState(type?.icon ?? '');
   const [complex, setComplex] = useState(type?.complex ?? false);
+  const [sized, setSized] = useState(type?.sized ?? false);
+  const [defaultSize, setDefaultSize] = useState(String(isEventSize(type?.default_size) ? type.default_size : DEFAULT_SIZE));
   const [rows, setRows] = useState<CrewDraft[]>(() =>
-    (type ? crewOf(type, crew) : []).map((c) => ({ key: crypto.randomUUID(), jobRoleId: c.job_role_id, quantity: String(c.quantity) })),
+    (type ? crewOf(type, crew) : []).filter((c) => type?.sized || c.size === SINGLE_CREW_SIZE).map((c) => draftRow(c, isEventSize(c.size) ? c.size : SINGLE_CREW_SIZE)),
   );
   const [tried, setTried] = useState(false);
   const roleName = new Map(roles.map((r) => [r.id, r.name]));
-  const picked = rows.filter((r) => r.jobRoleId);
-  const items = picked.map((r) => ({ jobRoleId: r.jobRoleId, quantity: Number(r.quantity) }));
+  // Sem porte, só vale a equipe única (as linhas dos outros portes ficam guardadas até salvar, caso volte).
+  const visible = sized ? rows : rows.filter((r) => r.size === SINGLE_CREW_SIZE);
+  const picked = visible.filter((r) => r.jobRoleId);
+  const items = picked.map((r) => ({ jobRoleId: r.jobRoleId, quantity: Number(r.quantity), ...(sized ? { size: r.size } : {}) }));
   const check = validateServiceType(
-    { name, keywords: keywords.split(','), crew: noTeam ? [] : items, noTeam },
+    { name, keywords: keywords.split(','), crew: noTeam ? [] : items, noTeam, sized },
     types.filter((t) => t.id !== id).map((t) => t.name),
   );
   const errors = tried ? check.errors : [];
-  const repeated = new Set(picked.map((r) => r.jobRoleId)).size !== picked.length;
+  const repeated = EVENT_SIZES.some((s) => {
+    const inSize = picked.filter((r) => r.size === s);
+    return new Set(inSize.map((r) => r.jobRoleId)).size !== inSize.length;
+  });
 
   function update(key: string, patch: Partial<CrewDraft>) {
     setRows((list) => list.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+  }
+
+  // Ligar o porte começa Simples e Grande com a equipe de hoje, para ajustar a partir dela.
+  function toggleSized(on: boolean) {
+    setSized(on);
+    if (!on) return;
+    setRows((list) => {
+      const single = list.filter((r) => r.size === SINGLE_CREW_SIZE);
+      const copy = (size: EventSize) => (list.some((r) => r.size === size) ? [] : single.map((r) => ({ ...r, key: crypto.randomUUID(), size })));
+      return [...list, ...copy(1), ...copy(3)];
+    });
   }
 
   async function submit(e: FormEvent) {
@@ -107,12 +197,9 @@ function ServiceTypeForm({
     setTried(true);
     if (!check.ok || repeated) return;
     const v = check.value;
-    const crewPayload = v.crew.map((c) => ({ job_role_id: c.jobRoleId, quantity: c.quantity }));
-    await engine.enqueue(
-      'service_type.upsert',
-      { id, name: v.name, keywords: v.keywords, no_team: v.noTeam, icon: icon || null, complex, crew: crewPayload },
-      { target: { table: 'service_types', id, changes: { name: v.name, keywords: v.keywords, no_team: v.noTeam, icon: icon || null, complex, crew: crewPayload, code: type?.code ?? '' } } },
-    );
+    const crewPayload = v.crew.map((c) => ({ job_role_id: c.jobRoleId, quantity: c.quantity, ...(sized ? { size: c.size } : {}) }));
+    const fields = { name: v.name, keywords: v.keywords, no_team: v.noTeam, icon: icon || null, complex, sized, default_size: Number(defaultSize), crew: crewPayload };
+    await engine.enqueue('service_type.upsert', { id, ...fields }, { target: { table: 'service_types', id, changes: { ...fields, code: type?.code ?? '' } } });
     onClose();
   }
 
@@ -143,46 +230,56 @@ function ServiceTypeForm({
         )}
 
         {!noTeam && (
-          <fieldset className="check-group">
-            <legend className="field-label">Equipe típica</legend>
-            {rows.map((r) => (
-              <div key={r.key} className="crew-row">
-                <Select
-                  label="Função"
-                  value={r.jobRoleId}
-                  onChange={(e) => update(r.key, { jobRoleId: e.target.value })}
-                  placeholder="Escolha a função"
-                  options={roles.filter((x) => !x.archived_at || x.id === r.jobRoleId).map((x) => ({ value: x.id, label: x.name }))}
-                />
-                <Input
-                  label="Quantidade"
-                  inputMode="numeric"
-                  value={r.quantity}
-                  onChange={(e) => update(r.key, { quantity: e.target.value })}
-                  style={{ maxWidth: 140 }}
-                />
-                <IconButton icon={TrashBinMinimalisticIcon} label="Tirar esta função" onClick={() => setRows((list) => list.filter((x) => x.key !== r.key))} />
-              </div>
+          <Checkbox
+            label="Tem porte (Simples, Médio e Grande, com equipe diferente; quem monta a escala escolhe o porte de cada evento)"
+            checked={sized}
+            onChange={toggleSized}
+          />
+        )}
+
+        {!noTeam && (
+          <div className="form-stack">
+            {(sized ? EVENT_SIZES : [SINGLE_CREW_SIZE]).map((s) => (
+              <CrewRows
+                key={s}
+                label={sized ? `Equipe do porte ${SIZE_LABEL[s]}` : 'Equipe típica'}
+                rows={visible.filter((r) => r.size === s)}
+                roles={roles}
+                onChange={update}
+                onRemove={(key) => setRows((list) => list.filter((x) => x.key !== key))}
+                onAdd={() => setRows((list) => [...list, { key: crypto.randomUUID(), jobRoleId: '', quantity: '1', size: s }])}
+              />
             ))}
-            <Button type="button" variant="ghost" size="sm" onClick={() => setRows((list) => [...list, { key: crypto.randomUUID(), jobRoleId: '', quantity: '1' }])}>
-              <AppIcon icon={AddCircleIcon} size={18} /> Adicionar função
-            </Button>
+            {sized && (
+              <Select
+                label="Porte padrão"
+                value={defaultSize}
+                onChange={(e) => setDefaultSize(e.target.value)}
+                options={EVENT_SIZES.map((s) => ({ value: String(s), label: SIZE_LABEL[s] }))}
+                style={{ maxWidth: 220 }}
+              />
+            )}
+            {sized && (
+              <p className="form-text">
+                O padrão vale para o evento sem porte escolhido e sem série no histórico. O porte Grande também chama primeiro quem é Referência na função.
+              </p>
+            )}
             {errors.includes('invalid_quantity') && (
               <span className="field-error" role="alert">
                 A quantidade por função vai de {CREW_QUANTITY_MIN} a {CREW_QUANTITY_MAX}.
               </span>
             )}
-            {errors.includes('type_without_crew') && (
+            {(errors.includes('type_without_crew') || errors.includes('size_without_crew')) && (
               <span className="field-error" role="alert">
-                {firstError(errors, ['type_without_crew'])}
+                {firstError(errors, ['type_without_crew', 'size_without_crew'])}
               </span>
             )}
             {tried && repeated && (
               <span className="field-error" role="alert">
-                Cada função entra uma vez só. Junte as quantidades na mesma linha.
+                Cada função entra uma vez só em cada porte. Junte as quantidades na mesma linha.
               </span>
             )}
-          </fieldset>
+          </div>
         )}
 
         {type && suggested.length > 0 && !noTeam && (
@@ -192,9 +289,9 @@ function ServiceTypeForm({
               type="button"
               size="sm"
               variant="secondary"
-              onClick={() => setRows(suggested.map((c) => ({ key: crypto.randomUUID(), jobRoleId: c.job_role_id, quantity: String(c.quantity) })))}
+              onClick={() => setRows((list) => [...list.filter((r) => r.size !== SINGLE_CREW_SIZE), ...suggested.map((c) => draftRow(c, SINGLE_CREW_SIZE))])}
             >
-              Adotar equipe sugerida
+              {sized ? 'Adotar no porte Médio' : 'Adotar equipe sugerida'}
             </Button>
           </div>
         )}
@@ -255,6 +352,7 @@ export function ServiceTypesPage() {
       <ul className="catalog-list" aria-label="Tipos de serviço">
         {list.map((t) => {
           const items = crewOf(t, crew ?? []);
+          const team = typeCrewText(t, crew ?? [], roleName);
           return (
             <li key={t.id} className="catalog-item">
               <button type="button" className="list-row" onClick={() => setOpen({ id: t.id })} aria-label={`Abrir ${t.name}`}>
@@ -268,7 +366,7 @@ export function ServiceTypesPage() {
                   </span>
                   <span className="list-row-sub">
                     {t.complex ? 'trabalho complexo · ' : ''}
-                    {t.no_team ? 'não exige equipe' : items.length ? crewText(items, roleName) : 'sem equipe típica'}
+                    {t.no_team ? 'não exige equipe' : items.length ? team : 'sem equipe típica'}
                     {t.keywords.length > 0 && ` · palavras-chave: ${t.keywords.join(', ')}`}
                   </span>
                 </span>

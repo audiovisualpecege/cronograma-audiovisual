@@ -49,6 +49,26 @@ describe('Prévia da semana sem montagem', () => {
     );
   });
 
+  it('tipo com porte: vale Simples sem escolha, e trocar o porte muda a equipe estimada e vai pela fila', async () => {
+    const user = userEvent.setup();
+    const types = TYPE_ROWS.map((t) => (t.id === 't1' ? { ...t, sized: true } : t));
+    const crew = [
+      ...CREW_ROWS.filter((c) => c.service_type_id !== 't1'),
+      row('t1:s1', { service_type_id: 't1', job_role_id: 'r1', quantity: 1, size: 1, archived_at: null }),
+      row('t1:s2', { service_type_id: 't1', job_role_id: 'r1', quantity: 2, size: 2, archived_at: null }),
+      row('t1:s3', { service_type_id: 't1', job_role_id: 'r1', quantity: 4, size: 3, archived_at: null }),
+    ];
+    const remote = weekRemote({ week: null, events: [eventRow('b1', { title: 'Gravação aula Biologia' })], extra: { service_types: types, service_type_crew: crew } });
+    await page(remote);
+    const item = await screen.findByRole('listitem', { name: 'Gravação aula Biologia' });
+    expect(within(item).getByLabelText('Equipe estimada')).toHaveTextContent('Equipe estimada: 1 Câmera');
+    expect(within(item).getByRole('button', { name: 'Simples' })).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(within(item).getByRole('button', { name: 'Grande' }));
+    await waitFor(() => expect(within(item).getByLabelText('Equipe estimada')).toHaveTextContent('Equipe estimada: 4 Câmera'));
+    await waitFor(() => expect(remote.applyCalls.flat().find((o) => o.kind === 'event.update_extras')).toMatchObject({ payload: { id: 'b1', size: 3 } }));
+  });
+
   it('UT-155 semana sem eventos mostra "Nenhum evento nesta semana" sem o botão "Montar semana"', async () => {
     await page(weekRemote({ week: null, events: [] }));
     expect(await screen.findByText(`${NO_EVENTS}.`)).toBeInTheDocument();

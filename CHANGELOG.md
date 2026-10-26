@@ -24,6 +24,12 @@ PATCH para um conserto, MINOR para algo novo, MAJOR quando o jeito de usar muda.
   do histórico e o Gemini). Os que faltarem ficam em destaque, com sugestões do histórico para usar com um clique.
   Passo 2: a semana é montada, a IA propõe as pessoas e a revisão acontece ali mesmo (aceitar, trocar,
   descartar), com as vagas vazias em destaque.
+- **Porte do evento**: EVENTO, GRAVAÇÃO e PODCAST têm porte Simples, Médio ou Grande, cada um com a sua equipe.
+  No histórico de um ano, metade dos eventos teve 1 pessoa, mas todo EVENTO pedia 8 vagas. Sem escolha, vale o
+  porte padrão do tipo, tirado do histórico: Simples no EVENTO, Médio na GRAVAÇÃO e no PODCAST. No passo 1 do Propor escala, cada evento desses tipos tem os três botões de porte, e o histórico sugere
+  o porte quando o evento já aconteceu antes ("Usar Médio: 3 pessoas nas últimas vezes", ou todos de uma vez).
+  O porte também se troca na página do evento, e o Grande chama primeiro quem é Referência. Em Dados > Tipos de
+  serviço, "Tem porte" liga as três equipes em qualquer tipo. A TRANSMISSÃO deixou de pedir Suporte.
 - **Escala sugerida pelo histórico, no próprio app**: o passo 2 do Propor escala sugere uma pessoa para cada
   vaga na hora, sem depender da IA. A regra saiu da análise do histórico: testada contra quem foi escalado de
   fato nas últimas 12 semanas, ela acerta a pessoa em 64% das vagas, contra 38% da regra anterior. A ordem é:

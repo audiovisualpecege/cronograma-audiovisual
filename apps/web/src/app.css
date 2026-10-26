@@ -1501,6 +1501,48 @@ body {
   font-weight: var(--weight-bold);
 }
 
+/* Porte do evento (Simples, Médio, Grande): três botões colados, o escolhido em destaque. */
+.size-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin-top: var(--space-1);
+}
+
+.size-picker {
+  display: inline-flex;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.size-option {
+  padding: 2px var(--space-3);
+  border: 0;
+  background: var(--surface-raised);
+  color: var(--text-muted);
+  font: var(--weight-bold) var(--text-caption) var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  cursor: pointer;
+}
+
+.size-option + .size-option {
+  border-left: 1px solid var(--border-subtle);
+}
+
+.size-option:hover,
+.size-option:focus-visible {
+  color: var(--text-primary);
+  outline: none;
+}
+
+.size-option.is-selected {
+  background: var(--border-brand);
+  color: var(--surface-page);
+}
+
 .pen-button {
   display: inline-flex;
   align-items: center;

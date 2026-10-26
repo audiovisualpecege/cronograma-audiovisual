@@ -1,6 +1,6 @@
-import { classifyTitle, isWeekPast, jaccard, JACCARD_MIN, localDate, titleWords } from '@cronograma/core';
+import { buildSeriesSizes, classifyTitle, isWeekPast, jaccard, JACCARD_MIN, localDate, titleWords, type SeriesSize } from '@cronograma/core';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { useTable, type CalendarSourceRow, type EventRow, type HistoryFactRow, type ServiceTypeRow } from '../data/catalog';
+import { toFact, useTable, type CalendarSourceRow, type EventRow, type HistoryFactRow, type ServiceTypeRow } from '../data/catalog';
 import { EventQuickView } from './EventQuickView';
 import { useHistory } from '../data/history';
 import { PageTitle } from '../layout/PageTitle';
@@ -13,8 +13,8 @@ import { Dialog } from '../ui/Dialog';
 import { Select } from '../ui/Select';
 import { DraftContext, proposeByHistory, type Draft, type DraftApi } from './historyProposal';
 import { LOCAL_AI_MODEL, proposeWithLocalAi, type LocalAiProgress } from './localAi';
-import { dayMonth, isMeetingEvent, needsTeam, publishSummary, slotState, type WeekRows } from './model';
-import { changeType, NO_EVENTS, PreviewList, SourceAlerts } from './PreviewPage';
+import { dayMonth, isMeetingEvent, needsTeam, publishSummary, sizedType, sizeSuggestions, slotState, type WeekRows } from './model';
+import { changeSize, changeType, NO_EVENTS, PreviewList, SourceAlerts } from './PreviewPage';
 import { AI_OFF, isRunning, ProposalActions, ProposalMessage, useProposalRequest } from './ProposalBar';
 import { ScheduleEditor, useSchedule } from './ScheduleEditor';
 import { routeWeek } from './WeekPage';
@@ -107,6 +107,7 @@ export function ProposalPage({ params }: RouteProps) {
   // Função estável: as linhas da lista são memorizadas e não se redesenham ao abrir a janela.
   const open = useCallback((e: EventRow) => setViewing(e.id), []);
   const titleIndex = useMemo(() => buildTitleIndex(history.rows), [history.rows]);
+  const seriesSizes = useMemo(() => buildSeriesSizes((history.rows ?? []).map(toFact)), [history.rows]);
 
   return (
     <section className="page week-page proposal-page">
@@ -121,7 +122,7 @@ export function ProposalPage({ params }: RouteProps) {
       {!rows ? (
         <p className="form-text">Abrindo a semana.</p>
       ) : step === 1 ? (
-        <TypesStep rows={rows} sources={sources} today={today} now={now} titleIndex={titleIndex} onNext={() => setStep(2)} onOpenEvent={open} />
+        <TypesStep rows={rows} sources={sources} today={today} now={now} titleIndex={titleIndex} seriesSizes={seriesSizes} onNext={() => setStep(2)} onOpenEvent={open} />
       ) : (
         <PeopleStep
           rows={rows}
@@ -144,6 +145,8 @@ interface TypesProps {
   today: string;
   now: Date;
   titleIndex: readonly TitleWords[];
+  /** Pessoas de cada vez de cada série do histórico, para sugerir o porte. */
+  seriesSizes: ReadonlyMap<string, readonly SeriesSize[]>;
   onNext: () => void;
   onOpenEvent: (e: EventRow) => void;
 }
@@ -161,12 +164,14 @@ function selection(s: ReadonlySet<string>, action: EventRow | 'clear'): Readonly
   return next;
 }
 
-function TypesStep({ rows, sources, today, now, titleIndex, onNext, onOpenEvent }: TypesProps) {
+function TypesStep({ rows, sources, today, now, titleIndex, seriesSizes, onNext, onOpenEvent }: TypesProps) {
   const engine = useSyncEngine();
   const past = isWeekPast(rows.weekStart, now);
   const live = rows.events.filter((e) => !e.ignored && e.status !== 'cancelled');
   const missing = live.filter((e) => !e.service_type_id);
   const suggestions = useMemo(() => typeSuggestions(rows, titleIndex), [rows, titleIndex]);
+  const sizeHints = useMemo(() => sizeSuggestions(rows, seriesSizes), [rows, seriesSizes]);
+  const sized = live.filter((e) => sizedType(e, rows.types));
   const id = useIdentifyTypes(rows, !past);
   const [onlyMissing, setOnlyMissing] = useState(false);
   // O dispatch do reducer é estável: as linhas memorizadas da lista não se redesenham à toa.
@@ -218,6 +223,11 @@ function TypesStep({ rows, sources, today, now, titleIndex, onNext, onOpenEvent 
                 {suggestions.size === 1 ? 'Usar a sugestão do histórico' : `Usar as ${suggestions.size} sugestões do histórico`}
               </Button>
             )}
+            {!past && sizeHints.size > 0 && (
+              <Button variant="secondary" size="sm" onClick={() => rows.events.forEach((e) => sizeHints.has(e.id) && void changeSize(engine, e, sizeHints.get(e.id)?.size ?? 1))}>
+                {sizeHints.size === 1 ? 'Usar o porte sugerido' : `Usar os ${sizeHints.size} portes sugeridos`}
+              </Button>
+            )}
             <Button size="sm" onClick={onNext} disabled={past || missing.length > 0}>
               Próximo passo
             </Button>
@@ -231,6 +241,12 @@ function TypesStep({ rows, sources, today, now, titleIndex, onNext, onOpenEvent 
         {id.error && (
           <p className="form-message form-message--alert" role="alert">
             {id.error}
+          </p>
+        )}
+        {!past && sized.length > 0 && (
+          <p className="page-note">
+            {plural(sized.length, 'evento tem', 'eventos têm')} porte (Simples, Médio ou Grande): sem escolha, vale o padrão do tipo. Confira os maiores antes de seguir
+            {sizeHints.size > 0 ? '; o histórico sugere outro porte onde aparece "Usar".' : '.'}
           </p>
         )}
         {!past && <p className="page-note">Dica: clique com o botão direito nos eventos para selecionar vários e definir o tipo de uma vez.</p>}
@@ -247,6 +263,7 @@ function TypesStep({ rows, sources, today, now, titleIndex, onNext, onOpenEvent 
         readOnly={past}
         highlight
         suggestions={suggestions}
+        sizeSuggestions={sizeHints}
         onOpenEvent={onOpenEvent}
         filter={onlyMissing ? isUntyped : undefined}
         selected={selected}

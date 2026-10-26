@@ -1,5 +1,6 @@
+import { EVENT_SIZES, SIZE_LABEL, type EventSize, type SizeSuggestion } from '@cronograma/core';
 import { memo, useMemo, useState } from 'react';
-import type { CalendarSourceRow, CrewRow, EventRow, JobRoleRow, ServiceTypeRow } from '../data/catalog';
+import { sizeFor, type CalendarSourceRow, type CrewRow, type EventRow, type JobRoleRow, type ServiceTypeRow } from '../data/catalog';
 import type { SyncEngine } from '../sync/syncEngine';
 import { useSyncEngine, useSyncState } from '../sync/SyncProvider';
 import { formatStamp } from '../ui/format';
@@ -7,7 +8,7 @@ import { Select } from '../ui/Select';
 import { HighlightToggle } from './HighlightToggle';
 import { AppIcon } from '../ui/AppIcon';
 import { typeIcon } from '../ui/typeIcons';
-import { CERTAINTY_LABEL, estimatedCrew, eventsByDay, eventSpan, isMarker, markersLast, weekDays, type WeekRows } from './model';
+import { CERTAINTY_LABEL, estimatedCrew, eventsByDay, eventSpan, isMarker, markersLast, sizedType, weekDays, type WeekRows } from './model';
 import { EventSeals } from './ScheduleList';
 import { Seal } from './Seal';
 
@@ -36,6 +37,46 @@ export function changeType(engine: SyncEngine, e: EventRow, typeId: string | nul
   return engine.enqueue('event.update_extras', { id: e.id, service_type_id: typeId }, { baseVersion: e.version, target: { table: 'events', id: e.id, changes } });
 }
 
+/** Troca o porte do evento pela fila; as vagas são refeitas como numa troca de tipo. */
+export function changeSize(engine: SyncEngine, e: EventRow, size: EventSize) {
+  return engine.enqueue('event.update_extras', { id: e.id, size }, { baseVersion: e.version, target: { table: 'events', id: e.id, changes: { size } } });
+}
+
+/** Porte do evento de tipo com porte: os três botões e, quando há, a sugestão da série no histórico. */
+function SizeLine({
+  event,
+  type,
+  readOnly,
+  suggestion,
+  onSize,
+}: {
+  event: EventRow;
+  type: ServiceTypeRow;
+  readOnly: boolean;
+  suggestion?: SizeSuggestion;
+  onSize: (e: EventRow, size: EventSize) => void;
+}) {
+  const current = sizeFor(type, event.size);
+  const title = event.title || 'Sem título';
+  if (readOnly || event.status === 'cancelled') return <span className="list-row-sub">Porte: {SIZE_LABEL[current]}</span>;
+  return (
+    <span className="size-line">
+      <span className="size-picker" role="group" aria-label={`Porte de ${title}`}>
+        {EVENT_SIZES.map((s) => (
+          <button key={s} type="button" className={`size-option${s === current ? ' is-selected' : ''}`} aria-pressed={s === current} onClick={() => s !== current && onSize(event, s)}>
+            {SIZE_LABEL[s]}
+          </button>
+        ))}
+      </span>
+      {suggestion && (
+        <button type="button" className="text-button" onClick={() => onSize(event, suggestion.size)} aria-label={`Usar porte ${SIZE_LABEL[suggestion.size]} em ${title}`}>
+          Usar {SIZE_LABEL[suggestion.size]}: {suggestion.people === 1 ? '1 pessoa' : `${suggestion.people} pessoas`} nas últimas vezes
+        </button>
+      )}
+    </span>
+  );
+}
+
 interface RowProps {
   event: EventRow;
   types: readonly ServiceTypeRow[];
@@ -49,7 +90,10 @@ interface RowProps {
   highlight: boolean;
   /** Tipo sugerido pelo histórico para o evento sem tipo. */
   suggestion?: ServiceTypeRow;
+  /** Porte sugerido pela série do evento no histórico. */
+  sizeSuggestion?: SizeSuggestion;
   onType: (e: EventRow, typeId: string | null) => void;
+  onSize: (e: EventRow, size: EventSize) => void;
   /** Abre os detalhes numa janela, em vez de ir para a página do evento. */
   onOpen?: (e: EventRow) => void;
   selected: boolean;
@@ -58,12 +102,13 @@ interface RowProps {
 }
 
 /** Uma linha da prévia; memorizada para semanas com 100 eventos ou mais (US-010 EC-8). */
-const PreviewEvent = memo(function PreviewEvent({ event, types, crew, roles, sourceLabel, today, readOnly, pending, highlight, suggestion, onType, onOpen, selected, onSelect }: RowProps) {
+const PreviewEvent = memo(function PreviewEvent({ event, types, crew, roles, sourceLabel, today, readOnly, pending, highlight, suggestion, sizeSuggestion, onType, onSize, onOpen, selected, onSelect }: RowProps) {
   const [editing, setEditing] = useState(false);
   // Funções na ordem do código (R1, R2...), como no cadastro do tipo.
   const code = (id: string) => roles.get(id)?.code ?? '';
   const estimated = [...estimatedCrew(event, types, crew)].sort((a, b) => code(a.job_role_id).localeCompare(code(b.job_role_id), 'en', { numeric: true }));
   const type = types.find((t) => t.id === event.service_type_id);
+  const sized = sizedType(event, types);
   // O seletor só nasce quando a pessoa vai trocar: semanas com 100 eventos ou mais abrem sem travar.
   const options = editing
     ? [{ value: TYPE_UNDEFINED, label: 'a definir' }, ...types.filter((t) => !t.archived_at || t.id === event.service_type_id).map((t) => ({ value: t.id, label: t.name }))]
@@ -104,6 +149,7 @@ const PreviewEvent = memo(function PreviewEvent({ event, types, crew, roles, sou
         <span className="list-row-sub" aria-label="Equipe estimada">
           {noTeam ? 'Não exige equipe' : estimated.length === 0 ? 'Sem equipe estimada' : `Equipe estimada: ${estimated.map((c) => `${c.quantity} ${roles.get(c.job_role_id)?.name ?? 'Função'}`).join(', ')}`}
         </span>
+        {sized && <SizeLine event={event} type={sized} readOnly={readOnly} suggestion={sizeSuggestion} onSize={onSize} />}
       </span>
       <span className="list-row-tags">
         <EventSeals event={event} today={today} />
@@ -170,6 +216,8 @@ interface PreviewListProps {
   highlight?: boolean;
   /** Tipo sugerido pelo histórico, por evento. */
   suggestions?: ReadonlyMap<string, ServiceTypeRow>;
+  /** Porte sugerido pelo histórico, por evento. */
+  sizeSuggestions?: ReadonlyMap<string, SizeSuggestion>;
   onOpenEvent?: (e: EventRow) => void;
   /** Mostra só os eventos que passam no filtro (por exemplo, os sem tipo). */
   filter?: (e: EventRow) => boolean;
@@ -181,7 +229,7 @@ interface PreviewListProps {
  * Eventos da semana sem montagem por dia (US-010): origem, tipo previsto, certeza e equipe estimada, com
  * a troca de tipo. Só eventos com tipo ganham vagas ao montar.
  */
-export function PreviewList({ rows, sources, today, readOnly, highlight = false, suggestions, onOpenEvent, filter, selected, onSelect }: PreviewListProps) {
+export function PreviewList({ rows, sources, today, readOnly, highlight = false, suggestions, sizeSuggestions, onOpenEvent, filter, selected, onSelect }: PreviewListProps) {
   const engine = useSyncEngine();
   const { pendingRows } = useSyncState();
   const roles = useMemo(() => new Map(rows.roles.map((r) => [r.id, r])), [rows.roles]);
@@ -189,6 +237,7 @@ export function PreviewList({ rows, sources, today, readOnly, highlight = false,
   const visible = useMemo(() => rows.events.filter((e) => !e.ignored && (!filter || filter(e))), [rows.events, filter]);
   const byDay = useMemo(() => eventsByDay(rows.weekStart, visible), [rows.weekStart, visible]);
   const onType = useMemo(() => (e: EventRow, typeId: string | null) => void changeType(engine, e, typeId), [engine]);
+  const onSize = useMemo(() => (e: EventRow, size: EventSize) => void changeSize(engine, e, size), [engine]);
 
   return (
     <div className="week-preview">
@@ -214,7 +263,9 @@ export function PreviewList({ rows, sources, today, readOnly, highlight = false,
                   pending={pendingRows.has(`events:${e.id}`)}
                   highlight={highlight}
                   suggestion={suggestions?.get(e.id)}
+                  sizeSuggestion={sizeSuggestions?.get(e.id)}
                   onType={onType}
+                  onSize={onSize}
                   onOpen={onOpenEvent}
                   selected={selected?.has(e.id) ?? false}
                   onSelect={onSelect}

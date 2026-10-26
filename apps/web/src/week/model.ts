@@ -5,20 +5,26 @@ import {
   availableHours,
   daysOf,
   diffDays,
+  isEventSize,
   localDate,
   localTime,
   nameTokens,
+  suggestSize,
   type AbsenceLike,
   type AssignmentLike,
   type EventLike,
   type HistoryFact,
   type PersonLike,
+  type SeriesSize,
+  type SizeSuggestion,
   type SlotLike,
   type WeekContext,
 } from '@cronograma/core';
 import {
-  crewOf,
+  crewForSize,
+  crewTotals,
   hasRoleOrder,
+  sizeFor,
   levelsOf,
   rolesOf,
   type AbsenceRow,
@@ -112,9 +118,10 @@ export function needsTeam(e: EventRow, types: readonly ServiceTypeRow[]): boolea
 }
 
 export function toEventLike(e: EventRow, types: readonly ServiceTypeRow[]): EventLike {
+  const type = types.find((t) => t.id === e.service_type_id);
   return {
-    // Trabalho complexo: tipo marcado como complexo ou evento com estrela de atividade principal.
-    complex: Boolean(e.highlighted) || Boolean(types.find((t) => t.id === e.service_type_id)?.complex),
+    // Trabalho complexo: tipo marcado como complexo, evento de porte Grande ou com estrela de atividade principal.
+    complex: Boolean(e.highlighted) || Boolean(type?.complex) || Boolean(type?.sized && sizeFor(type, e.size) === 3),
     id: e.id,
     weekStart: e.week_start,
     startsAt: new Date(e.starts_at),
@@ -176,12 +183,37 @@ export function weekContext(rows: WeekRows, now: Date): WeekContext {
   };
 }
 
-/** Equipe estimada do evento pelo tipo; vazia sem tipo, para tipo sem equipe ou evento que não exige equipe. */
+/**
+ * Equipe estimada do evento pelo tipo, no porte do evento; vazia sem tipo, para tipo sem equipe ou evento que não
+ * exige equipe.
+ */
 export function estimatedCrew(e: EventRow, types: readonly ServiceTypeRow[], crew: readonly CrewRow[]): CrewItem[] {
   if (!e.service_type_id || e.no_team || e.status === 'cancelled' || e.ignored) return [];
   const type = types.find((t) => t.id === e.service_type_id);
   if (!type || type.no_team) return [];
-  return crewOf(type, crew);
+  return crewForSize(type, crew, e.size);
+}
+
+/** Tipo do evento quando ele tem porte (Simples, Médio, Grande). */
+export function sizedType(e: EventRow, types: readonly ServiceTypeRow[]): ServiceTypeRow | undefined {
+  const type = types.find((t) => t.id === e.service_type_id);
+  return type?.sized && !type.no_team && !e.no_team ? type : undefined;
+}
+
+/**
+ * Porte sugerido pelo histórico para cada evento da semana com tipo com porte e ainda sem porte escolhido: o da
+ * série do título, quando ela tem passado e é diferente do padrão do tipo. Sem série, fica no padrão.
+ */
+export function sizeSuggestions(rows: WeekRows, seriesSizes: ReadonlyMap<string, readonly SeriesSize[]>): Map<string, SizeSuggestion> {
+  const out = new Map<string, SizeSuggestion>();
+  for (const e of rows.events) {
+    if (e.ignored || e.status === 'cancelled' || isEventSize(e.size)) continue;
+    const type = sizedType(e, rows.types);
+    if (!type) continue;
+    const s = suggestSize(e.title, seriesSizes, crewTotals(type, rows.crew), rows.weekStart);
+    if (s && s.size !== sizeFor(type, e.size)) out.set(e.id, s);
+  }
+  return out;
 }
 
 export interface RoleAvailability {
