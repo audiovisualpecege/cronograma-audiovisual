@@ -14,6 +14,7 @@ import type {
   SlotRow,
   WeekRow,
 } from '../data/catalog';
+import { previewWeekRows, usePreviewSizes } from '../dev/sizePreview';
 import type { LocalStore } from '../sync/localStore';
 import type { SyncEngine } from '../sync/syncEngine';
 import { useLocalQuery } from '../sync/SyncProvider';
@@ -46,7 +47,10 @@ export async function readWeekRows(store: LocalStore, weekStart: string): Promis
 }
 
 export function useWeekRows(weekStart: string): WeekRows | undefined {
-  return useLocalQuery((store) => readWeekRows(store, weekStart), [weekStart]);
+  const rows = useLocalQuery((store) => readWeekRows(store, weekStart), [weekStart]);
+  // No app local, sem a migração 0017 no banco, a semana aparece como ficaria com o porte (dev/sizePreview).
+  const sizes = usePreviewSizes();
+  return useMemo(() => rows && previewWeekRows(rows, sizes), [rows, sizes]);
 }
 
 /** Relógio da tela, atualizado a cada minuto (selo "hoje", aviso do serviço de fundo). */

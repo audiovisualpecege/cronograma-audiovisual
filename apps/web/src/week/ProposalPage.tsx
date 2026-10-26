@@ -1,6 +1,7 @@
 import { buildSeriesSizes, classifyTitle, isWeekPast, jaccard, JACCARD_MIN, localDate, titleWords, type SeriesSize } from '@cronograma/core';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { toFact, useTable, type CalendarSourceRow, type EventRow, type HistoryFactRow, type ServiceTypeRow } from '../data/catalog';
+import { isSimulating, previewMissingSlots } from '../dev/sizePreview';
 import { EventQuickView } from './EventQuickView';
 import { useHistory } from '../data/history';
 import { PageTitle } from '../layout/PageTitle';
@@ -172,6 +173,7 @@ function TypesStep({ rows, sources, today, now, titleIndex, seriesSizes, onNext,
   const suggestions = useMemo(() => typeSuggestions(rows, titleIndex), [rows, titleIndex]);
   const sizeHints = useMemo(() => sizeSuggestions(rows, seriesSizes), [rows, seriesSizes]);
   const sized = live.filter((e) => sizedType(e, rows.types));
+  const missingSlots = sized.reduce((n, e) => n + previewMissingSlots(rows, e), 0);
   const id = useIdentifyTypes(rows, !past);
   const [onlyMissing, setOnlyMissing] = useState(false);
   // O dispatch do reducer é estável: as linhas memorizadas da lista não se redesenham à toa.
@@ -241,6 +243,13 @@ function TypesStep({ rows, sources, today, now, titleIndex, seriesSizes, onNext,
         {id.error && (
           <p className="form-message form-message--alert" role="alert">
             {id.error}
+          </p>
+        )}
+        {isSimulating() && sized.length > 0 && (
+          <p className="form-message" role="note">
+            Simulação do porte no app local: o banco ainda não tem essa mudança, então o porte escolhido fica só neste navegador e as vagas vazias que
+            sobram no porte somem da tela.
+            {missingSlots > 0 && ` Numa semana montada a simulação não cria vagas: ${plural(missingSlots, 'vaga pedida pelo porte não aparece', 'vagas pedidas pelo porte não aparecem')}.`}
           </p>
         )}
         {!past && sized.length > 0 && (

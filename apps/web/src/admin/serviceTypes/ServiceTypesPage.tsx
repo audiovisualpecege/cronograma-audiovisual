@@ -14,6 +14,7 @@ import { AddCircleIcon, TrashBinMinimalisticIcon } from '@solar-icons/react/line
 import { useMemo, useState, type FormEvent } from 'react';
 import { byName, crewOf, toFact, useTable, type CrewItem, type CrewRow, type JobRoleRow, type ServiceTypeRow } from '../../data/catalog';
 import { firstError } from '../../data/messages';
+import { previewActive, previewCatalog } from '../../dev/sizePreview';
 import { PageTitle } from '../../layout/PageTitle';
 import { useSyncEngine, useSyncState } from '../../sync/SyncProvider';
 import { AppIcon } from '../../ui/AppIcon';
@@ -139,6 +140,7 @@ function ServiceTypeForm({
   types,
   crew,
   suggested,
+  simulated,
   onClose,
 }: {
   type?: ServiceTypeRow;
@@ -147,6 +149,8 @@ function ServiceTypeForm({
   types: ServiceTypeRow[];
   crew: CrewRow[];
   suggested: CrewItem[];
+  /** Simulação do porte no app local: só para ver; salvar gravaria a equipe errada no banco antigo. */
+  simulated: boolean;
   onClose: () => void;
 }) {
   const engine = useSyncEngine();
@@ -297,9 +301,14 @@ function ServiceTypeForm({
         )}
         {type && <p className="form-text">Mudar a equipe vale para os eventos ainda sem escala; os já escalados mantêm as vagas e mostram "equipe típica mudou".</p>}
 
+        {simulated && (
+          <p className="form-message" role="note">
+            Simulação do porte no app local: o banco ainda não tem a mudança, então aqui dá só para ver. Salvar volta a funcionar quando ela for publicada.
+          </p>
+        )}
         <div className="dialog-actions">
           {type && !type.archived_at && (
-            <Button type="button" variant="ghost" onClick={() => void archive()}>
+            <Button type="button" variant="ghost" onClick={() => void archive()} disabled={simulated}>
               Arquivar
             </Button>
           )}
@@ -307,7 +316,9 @@ function ServiceTypeForm({
           <Button type="button" variant="secondary" onClick={onClose}>
             Cancelar
           </Button>
-          <Button type="submit">Salvar</Button>
+          <Button type="submit" disabled={simulated}>
+            Salvar
+          </Button>
         </div>
       </form>
     </Dialog>
@@ -316,9 +327,14 @@ function ServiceTypeForm({
 
 export function ServiceTypesPage() {
   const { pendingRows } = useSyncState();
-  const types = useTable<ServiceTypeRow>('service_types');
-  const crew = useTable<CrewRow>('service_type_crew');
+  const serverTypes = useTable<ServiceTypeRow>('service_types');
+  const serverCrew = useTable<CrewRow>('service_type_crew');
   const roles = [...(useTable<JobRoleRow>('job_roles') ?? [])].sort(byName);
+  // App local sem a 0017 no banco: mostra os tipos como ficariam com o porte (dev/sizePreview), só para ver.
+  const preview = serverTypes && serverCrew ? previewCatalog(serverTypes, serverCrew, roles) : undefined;
+  const simulated = Boolean(serverTypes && previewActive(serverTypes));
+  const types = preview?.types;
+  const crew = preview?.crew;
   const suggestions = useCatalogSuggestions(roles, types);
   const [open, setOpen] = useState<{ id?: string; name?: string } | null>(null);
   const list = [...(types ?? [])].sort((a, b) => Number(Boolean(a.archived_at)) - Number(Boolean(b.archived_at)) || byName(a, b));
@@ -389,6 +405,7 @@ export function ServiceTypesPage() {
           roles={roles}
           types={types}
           crew={crew}
+          simulated={simulated}
           suggested={editing ? suggestCrew(facts, editing.id).map((c) => ({ job_role_id: c.jobRoleId, quantity: c.quantity })) : []}
           onClose={() => setOpen(null)}
         />

@@ -1,4 +1,5 @@
-import { buildHistoryIndex, DEFAULT_SIZE, EVENT_SIZES, isWeekPast, localDate, localTime, NOTES_MAX, SIZE_LABEL, zonedTime } from '@cronograma/core';
+import { buildHistoryIndex, DEFAULT_SIZE, EVENT_SIZES, isWeekPast, localDate, localTime, NOTES_MAX, SIZE_LABEL, zonedTime, type EventSize } from '@cronograma/core';
+import { isSimulating, setPreviewSize } from '../dev/sizePreview';
 import { useMemo, useState, type FormEvent } from 'react';
 import { sizeFor, toFact, useTable, type CalendarSourceRow, type EventRow } from '../data/catalog';
 import { useHistory } from '../data/history';
@@ -315,7 +316,9 @@ function ExtrasCard({ event, rows, editable }: { event: EventRow; rows: WeekRows
   const pickedType = rows.types.find((t) => t.id === typeId);
   const sized = Boolean(pickedType?.sized) && !noTeam;
   const sizeChanged = sized && pickedType !== undefined && Number(size) !== sizeFor(pickedType, event.size);
-  const crewChanged = (typeId || null) !== (event.service_type_id ?? null) || noTeam !== Boolean(event.no_team) || sizeChanged;
+  // Na simulação do app local (banco sem a 0017), o porte fica só neste navegador e não mexe nas vagas.
+  const simulated = isSimulating();
+  const crewChanged = (typeId || null) !== (event.service_type_id ?? null) || noTeam !== Boolean(event.no_team) || (sizeChanged && !simulated);
   const askMode = crewChanged && built && hasPeople;
   const notesError = notes.length > NOTES_MAX ? VALIDATION_MESSAGES.notes_too_long : undefined;
   const periodError = event.all_day && periodStart && periodEnd && periodEnd <= periodStart ? VALIDATION_MESSAGES.end_before_start : undefined;
@@ -324,7 +327,8 @@ function ExtrasCard({ event, rows, editable }: { event: EventRow; rows: WeekRows
     e.preventDefault();
     if (notesError || periodError) return;
     const fields: Record<string, unknown> = { service_type_id: typeId || null, no_team: noTeam, notes: notes.trim() || null };
-    if (sizeChanged) fields.size = Number(size);
+    if (sizeChanged && simulated) setPreviewSize(event.id, Number(size) as EventSize);
+    else if (sizeChanged) fields.size = Number(size);
     if (event.all_day) {
       fields.period_start = periodStart ? zonedTime(day, periodStart).toISOString() : null;
       fields.period_end = periodEnd ? zonedTime(day, periodEnd).toISOString() : null;

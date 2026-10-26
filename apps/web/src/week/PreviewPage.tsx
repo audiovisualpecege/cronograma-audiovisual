@@ -1,6 +1,7 @@
 import { EVENT_SIZES, SIZE_LABEL, type EventSize, type SizeSuggestion } from '@cronograma/core';
 import { memo, useMemo, useState } from 'react';
 import { sizeFor, type CalendarSourceRow, type CrewRow, type EventRow, type JobRoleRow, type ServiceTypeRow } from '../data/catalog';
+import { isSimulating, setPreviewSize } from '../dev/sizePreview';
 import type { SyncEngine } from '../sync/syncEngine';
 import { useSyncEngine, useSyncState } from '../sync/SyncProvider';
 import { formatStamp } from '../ui/format';
@@ -37,8 +38,12 @@ export function changeType(engine: SyncEngine, e: EventRow, typeId: string | nul
   return engine.enqueue('event.update_extras', { id: e.id, service_type_id: typeId }, { baseVersion: e.version, target: { table: 'events', id: e.id, changes } });
 }
 
-/** Troca o porte do evento pela fila; as vagas são refeitas como numa troca de tipo. */
+/**
+ * Troca o porte do evento pela fila; as vagas são refeitas como numa troca de tipo. Na simulação do app local
+ * (banco ainda sem a 0017), o porte fica só neste navegador.
+ */
 export function changeSize(engine: SyncEngine, e: EventRow, size: EventSize) {
+  if (isSimulating()) return Promise.resolve(setPreviewSize(e.id, size));
   return engine.enqueue('event.update_extras', { id: e.id, size }, { baseVersion: e.version, target: { table: 'events', id: e.id, changes: { size } } });
 }
 
