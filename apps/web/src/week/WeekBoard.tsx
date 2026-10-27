@@ -15,7 +15,9 @@ import {
   crewOrigin,
   eventAlerts,
   isPlanned,
+  knownSeries,
   plannedRows,
+  reviewReasons,
   shortTitle,
   slotKeys,
   timeOffAbsences,
@@ -32,6 +34,7 @@ import {
   autoSizes,
   eventSpan,
   hoursText,
+  isMarker,
   isMeetingEvent,
   needsTeam,
   sizedType,
@@ -75,8 +78,14 @@ interface Pick {
   override?: boolean;
 }
 
+/** Onde o placar leva: a primeira ficha da situação, o primeiro aviso ou o próximo cartão para revisar. */
+export type BoardTarget = ChipState | 'alert' | 'review';
+
 export interface BoardState {
   counts: BoardCounts;
+  /** "Só o que precisa de olho": apaga os cartões sem pendência. */
+  onlyReview: boolean;
+  toggleReview: () => void;
   /** Sugestões e propostas que "Confirmar sugestões" grava. */
   toConfirm: number;
   confirmAll: () => void;
@@ -93,7 +102,7 @@ interface BoardProps {
   historyLoading: boolean;
   onOpenEvent: (eventId: string) => void;
   /** A barra do topo (placar e "Confirmar sugestões") fica na página; a grade passa o que ela mostra. */
-  renderBar: (state: BoardState, scrollTo: (what: ChipState | 'alert') => void) => ReactNode;
+  renderBar: (state: BoardState, scrollTo: (what: BoardTarget) => void) => ReactNode;
 }
 
 /**
@@ -235,7 +244,7 @@ export function WeekBoard({ rows, now, today, historyRows, historyLoading, onOpe
     void removeSlot(engine, slot).then(() => sendAndRefresh(engine, ['slots', 'assignments']));
   }
 
-  const counts = useMemo(() => boardCounts(model, drafts, built), [model, drafts, built]);
+  const base = useMemo(() => boardCounts(model, drafts, built), [model, drafts, built]);
   const toConfirm = drafts.size + schedule.proposed.length;
   function confirmAll() {
     confirm([...drafts].map(([slotId, d]) => draftPick(slotId, d)));
@@ -259,6 +268,21 @@ export function WeekBoard({ rows, now, today, historyRows, historyLoading, onOpe
     void setSeriesTitular(engine, a.series, a.roleId, people.filter((p): p is string => Boolean(p))).catch(() => undefined);
   }
 
+  // Revisão só das exceções: cada cartão com o porquê de precisar de olho.
+  const known = useMemo(() => (historyLoading ? null : knownSeries(historyRows)), [historyLoading, historyRows]);
+  const reviews = useMemo(() => {
+    const out = new Map<string, string[]>();
+    for (const e of model.events) {
+      if (isMarker(e, board.types)) continue;
+      const input = { slots: model.slotsByEvent.get(e.id) ?? [], bySlot: model.bySlot, drafts, built, types: board.types, known, asks: asks.get(e.id)?.length ?? 0 };
+      const reasons = reviewReasons(e, input);
+      if (reasons.length > 0) out.set(e.id, reasons);
+    }
+    return out;
+  }, [model, board.types, drafts, built, known, asks]);
+  const counts = useMemo(() => ({ ...base, review: reviews.size }), [base, reviews]);
+  const [onlyReview, setOnlyReview] = useState(false);
+
   // Tipo e porte sugeridos pelo histórico, no cartão. Sem montagem, o porte já vai sozinho (auto).
   const titleIndex = useMemo(() => buildTitleIndex(historyRows), [historyRows]);
   const typeHints = useMemo(() => typeSuggestions(rows, titleIndex), [rows, titleIndex]);
@@ -275,14 +299,31 @@ export function WeekBoard({ rows, now, today, historyRows, historyLoading, onOpe
   const pickAssignment = picking ? model.bySlot.get(picking) : undefined;
 
   const boardId = useId();
-  function scrollTo(what: ChipState | 'alert') {
-    const el = document.getElementById(boardId)?.querySelector<HTMLElement>(what === 'alert' ? '[data-alert]' : `[data-chip="${what}"]`);
+  // "Próximo": o cartão para revisar depois do que está em foco (volta ao primeiro no fim).
+  function scrollTo(what: BoardTarget) {
+    const root = document.getElementById(boardId);
+    let el: HTMLElement | null | undefined;
+    if (what === 'review') {
+      const all = [...(root?.querySelectorAll<HTMLElement>('[data-review]') ?? [])];
+      const at = all.findIndex((c) => c.contains(document.activeElement));
+      el = all[(at + 1) % Math.max(all.length, 1)];
+    } else {
+      el = root?.querySelector<HTMLElement>(what === 'alert' ? '[data-alert]' : `[data-chip="${what}"]`);
+    }
     if (!el) return;
     el.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
     (el.querySelector<HTMLElement>('button') ?? el).focus({ preventScroll: true });
   }
 
-  const state: BoardState = { counts, toConfirm: readOnly ? 0 : toConfirm, confirmAll, drafts: drafts.size, historyLoading };
+  const state: BoardState = {
+    counts,
+    onlyReview,
+    toggleReview: () => setOnlyReview((on) => !on),
+    toConfirm: readOnly ? 0 : toConfirm,
+    confirmAll,
+    drafts: drafts.size,
+    historyLoading,
+  };
   const chipProps = {
     model,
     drafts,
@@ -306,6 +347,8 @@ export function WeekBoard({ rows, now, today, historyRows, historyLoading, onOpe
     auto,
     asks,
     onAnswer: answer,
+    reviews,
+    onlyReview,
   };
   return (
     <>
@@ -378,6 +421,9 @@ type ChipProps = {
   /** Perguntas "virou o titular?" por evento. */
   asks: ReadonlyMap<string, TitularAsk[]>;
   onAnswer: (a: TitularAsk, yes: boolean) => void;
+  /** Por que cada cartão precisa de olho; sem entrada, não precisa. */
+  reviews: ReadonlyMap<string, string[]>;
+  onlyReview: boolean;
 };
 
 function DayColumn({
@@ -502,10 +548,12 @@ function EventCard({
   const title = shortTitle(event.title);
   const cancelled = event.status === 'cancelled';
   const canAdd = !readOnly && !cancelled && Boolean(event.service_type_id) && needsTeam(event, rows.types);
+  const review = chip.reviews.get(event.id);
   return (
     <article
-      className={`board-card board-kind--${kind}${event.highlighted ? ' is-highlighted' : ''}${cancelled ? ' board-card--cancelled' : ''}`}
+      className={`board-card board-kind--${kind}${event.highlighted ? ' is-highlighted' : ''}${cancelled ? ' board-card--cancelled' : ''}${chip.onlyReview && !review ? ' is-dim' : ''}`}
       aria-label={title}
+      data-review={review ? '' : undefined}
       onClick={(ev) => {
         if (!(ev.target as HTMLElement).closest('button, a, input, select')) onOpen(event.id);
       }}
@@ -566,6 +614,7 @@ function EventCard({
           )}
         </span>
       )}
+      {chip.onlyReview && review && <span className="board-review-why">Para revisar: {review.join(', ')}</span>}
       {(chip.asks.get(event.id) ?? []).map((a) => {
         const name = chip.model.personName(a.personId);
         const role = chip.model.roleName(a.roleId);
@@ -799,8 +848,8 @@ function ChipMenu({ children, onClose, label }: { children: ReactNode; onClose: 
 }
 
 /** Placar e ações da escala, na barra da semana. */
-export function BoardScore({ counts, onGo }: { counts: BoardCounts; onGo: (what: ChipState | 'alert') => void }) {
-  const item = (what: ChipState | 'alert', n: number, one: string, many: string) => (
+export function BoardScore({ counts, onGo }: { counts: BoardCounts; onGo: (what: BoardTarget) => void }) {
+  const item = (what: BoardTarget, n: number, one: string, many: string) => (
     <button type="button" className={`board-score-item is-${what}`} disabled={n === 0} onClick={() => onGo(what)}>
       <strong>{n}</strong> {n === 1 ? one : many}
     </button>
@@ -811,6 +860,24 @@ export function BoardScore({ counts, onGo }: { counts: BoardCounts; onGo: (what:
       {item('suggested', counts.suggested, 'sugestão', 'sugestões')}
       {item('open', counts.open, 'aberta', 'abertas')}
       {item('alert', counts.alerts, 'aviso', 'avisos')}
+    </span>
+  );
+}
+
+/** "Só o que precisa de olho", com quantos cartões e o "Próximo" que pula de um em um. */
+export function BoardReview({ state, onGo }: { state: BoardState; onGo: (what: BoardTarget) => void }) {
+  const n = state.counts.review ?? 0;
+  return (
+    <span className="board-review" role="group" aria-label="Revisão">
+      <button type="button" className={`board-review-toggle${state.onlyReview ? ' is-on' : ''}`} aria-pressed={state.onlyReview} onClick={state.toggleReview}>
+        Só o que precisa de olho
+      </button>
+      <span className="board-review-count">
+        <strong>{n}</strong> para revisar
+      </span>
+      <button type="button" className="text-button" disabled={n === 0} onClick={() => onGo('review')}>
+        Próximo
+      </button>
     </span>
   );
 }

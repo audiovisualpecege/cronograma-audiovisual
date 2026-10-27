@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CREW_ROWS, eventRow, ROLE_ROWS, TYPE_ROWS, WEEK_B } from '../../test/weekFixtures';
 import type { AssignmentRow, CrewRow, EventRow, HistoryFactRow, JobRoleRow, ServiceTypeRow, SlotRow } from '../data/catalog';
-import { activityKind, chipState, eventAlerts, isPlanned, plannedRows, shortTitle, slotKeys, timeOffAbsences, titularAsks } from './board';
+import { activityKind, chipState, eventAlerts, isPlanned, plannedRows, reviewReasons, shortTitle, slotKeys, timeOffAbsences, titularAsks } from './board';
 import type { WeekRows } from './model';
 
 const types = TYPE_ROWS as unknown as ServiceTypeRow[];
@@ -58,6 +58,20 @@ describe('grade da semana', () => {
     // Respondido "Sim", Bia é a titular gravada: não pergunta mais.
     const answered = rows({ events: [event], seriesRules: [{ id: 'x', version: 1, updated_at: '', series: 'mba agro', service_type_id: null, titulars: { r1: ['bia', 'ana'] } }] });
     expect(titularAsks(answered, slots, facts)).toEqual([]);
+  });
+
+  it('precisa de olho: vaga sem sugestão, alerta na vaga, tipo incerto, série nova; sugerido limpo não precisa', () => {
+    const e = (id: string, extra: Record<string, unknown> = {}) => eventRow(id, { title: 'MBA Agro', type_certainty: 'alta', ...extra }) as unknown as EventRow;
+    const slot = { id: 's1', event_id: 'a', job_role_id: 'r1', archived_at: null } as SlotRow;
+    const open = { slot_id: 's1', person_id: null, status: null } as AssignmentRow;
+    const base = { slots: [slot], bySlot: new Map([['s1', open]]), drafts: new Map(), built: true, types, known: new Set(['mba agro']), asks: 0 };
+    expect(reviewReasons(e('a'), { ...base, drafts: new Map([['s1', { personId: 'p1', reason: '' }]]) })).toEqual([]);
+    expect(reviewReasons(e('a'), base)).toEqual(['vaga sem sugestão']);
+    expect(reviewReasons(e('a'), { ...base, drafts: new Map([['s1', { personId: 'p1', reason: '', warnings: ['off_hours'] }]]) })).toEqual(['alerta na vaga']);
+    expect(reviewReasons(e('a', { type_certainty: 'media' }), { ...base, drafts: new Map([['s1', { personId: 'p1', reason: '' }]]) })).toEqual(['tipo incerto']);
+    expect(reviewReasons(e('a', { title: 'Curso Novo' }), { ...base, drafts: new Map([['s1', { personId: 'p1', reason: '' }]]), asks: 1 })).toEqual(['série nova', 'titular a confirmar']);
+    // Histórico ainda carregando: nada é série nova.
+    expect(reviewReasons(e('a', { title: 'Curso Novo' }), { ...base, drafts: new Map([['s1', { personId: 'p1', reason: '' }]]), known: null })).toEqual([]);
   });
 
   it('a chave da vaga é a mesma antes e depois da montagem (evento, função e ordem na função)', () => {

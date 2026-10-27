@@ -159,6 +159,27 @@ describe('Semana: grade', () => {
     expect(within(aula).queryByRole('group', { name: /virou titular/ })).toBeNull();
   });
 
+  it('"Só o que precisa de olho" apaga os cartões sem pendência e conta os que precisam; "Próximo" leva ao cartão', async () => {
+    const user = userEvent.setup();
+    // Biologia tem sugestão limpa e série conhecida; Química só tem vaga de Mediação, que ninguém de P1 a P13 faz.
+    const fact = { event_id: 'h1', week_start: '2026-10-19', event_date: '2026-10-19', title: 'Gravação aula Biologia', service_type_id: 't1', service_type_name: 'T1', job_role_id: 'r1', job_role_name: 'Câmera', person_id: 'p3', person_name: 'p3', raw_name: null, hours: 3, source: 'platform' };
+    const quimica = { ...fact, event_id: 'h2', title: 'Gravação aula Química' };
+    const remote = weekRemote({ events: [AULA, TARDE], slots: [slotWith('ea', 'r1'), slotWith('eb', 'r4')], people: peopleRows(13), personRoles: personRoleRows(13) });
+    remote.views = { ...remote.views, history_facts: [fact, quimica] };
+    await page(remote);
+    const review = await screen.findByRole('group', { name: 'Revisão' });
+    await waitFor(() => expect(review).toHaveTextContent('1 para revisar'));
+    await user.click(within(review).getByRole('button', { name: 'Só o que precisa de olho' }));
+    expect(await card('Gravação aula Biologia')).toHaveClass('is-dim');
+    const quimicaCard = await card('Gravação aula Química');
+    expect(quimicaCard).not.toHaveClass('is-dim');
+    expect(quimicaCard).toHaveTextContent('Para revisar: vaga sem sugestão');
+    // O jsdom não rola a tela.
+    Element.prototype.scrollIntoView = vi.fn();
+    await user.click(within(review).getByRole('button', { name: 'Próximo' }));
+    expect(document.activeElement?.closest('article')).toBe(quimicaCard);
+  });
+
   it('"Confirmar sugestões (N)" grava as sugestões e aceita as propostas do serviço de fundo; o placar conta cada situação', async () => {
     const user = userEvent.setup();
     const remote = weekRemote({ events: [AULA, TARDE], slots: [slotWith('ea', 'r1'), slotWith('ea', 'r5', 'p17', 'proposed'), slotWith('eb', 'r1', 'p3')] });

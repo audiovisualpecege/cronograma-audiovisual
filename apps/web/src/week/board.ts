@@ -201,11 +201,52 @@ export function titularAsks(rows: WeekRows, slots: ReadonlyMap<string, readonly 
   return out;
 }
 
+/** Séries que o histórico já conhece (o resto é série nova, para revisar). */
+export function knownSeries(facts: readonly HistoryFactRow[] | null): Set<string> {
+  return new Set((facts ?? []).map((f) => eventSeries(f.title ?? '')).filter(Boolean));
+}
+
+export interface ReviewInput {
+  slots: readonly SlotRow[];
+  bySlot: ReadonlyMap<string, AssignmentRow>;
+  drafts: ReadonlyMap<string, Draft>;
+  built: boolean;
+  types: readonly ServiceTypeRow[];
+  /** Séries do histórico; nulo enquanto ele carrega (nenhuma série conta como nova). */
+  known: ReadonlySet<string> | null;
+  asks: number;
+}
+
+/**
+ * Por que o cartão precisa de olho (vazio: a sugestão dá conta sozinha). Pedido do Raoni em 27/10/2026: quem monta
+ * revisa só as exceções. Vagas sem sugestão, alertas na vaga (fora do horário, horário sobreposto...), avisos do
+ * evento, tipo incerto, série nova e "virou o titular?".
+ */
+export function reviewReasons(e: EventRow, r: ReviewInput): string[] {
+  const out = new Set(eventAlerts(e, r.slots.length, r.built, r.types));
+  if (e.status === 'cancelled') return [...out];
+  if (e.service_type_id && e.type_certainty && e.type_certainty !== 'alta') out.add('tipo incerto');
+  if (needsTeam(e, r.types)) {
+    if (r.known && !r.known.has(eventSeries(e.title))) out.add('série nova');
+    for (const s of r.slots) {
+      const a = r.bySlot.get(s.id);
+      const draft = r.drafts.get(s.id);
+      if (chipState(a, draft) === 'open') out.add('vaga sem sugestão');
+      const warnings = slotState(a) === 'open' ? (draft?.warnings ?? []) : (a?.warnings ?? []);
+      if (warnings.some((w) => w !== 'role_archived')) out.add('alerta na vaga');
+    }
+  }
+  if (r.asks > 0) out.add('titular a confirmar');
+  return [...out];
+}
+
 export interface BoardCounts {
   confirmed: number;
   suggested: number;
   open: number;
   alerts: number;
+  /** Cartões que precisam de olho (reviewReasons). */
+  review?: number;
 }
 
 /** Placar da semana: vagas dos eventos que pedem equipe por situação, e os avisos (vagas e eventos). */

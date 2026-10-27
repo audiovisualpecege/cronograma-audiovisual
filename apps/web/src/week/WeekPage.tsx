@@ -18,7 +18,7 @@ import { PublishDialog } from './PublishDialog';
 import { RereadButton } from './RereadButton';
 import { UnpublishedBanner } from './UnpublishedBanner';
 import { untyped, useIdentifyTypes } from './useIdentifyTypes';
-import { BoardScore, WeekBoard } from './WeekBoard';
+import { BoardReview, BoardScore, WeekBoard } from './WeekBoard';
 import { useNow, useWeekRows } from './useWeek';
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -166,6 +166,7 @@ function WeekBody({ rows, sources, now, today }: BodyProps) {
                   <span className="form-text">{note}</span>
                 </span>
                 <BoardScore counts={board.counts} onGo={scrollTo} />
+                {!past && <BoardReview state={board} onGo={scrollTo} />}
                 {!past && (
                   <span className="week-actions-buttons">
                     {board.toConfirm > 0 && (
