@@ -59,12 +59,24 @@ primeiro passo que não der o resultado esperado.
     e a nova grava os setores. **Mexe em dados da produção**: REUNIAO EDICAO, PRODUCAO, PLANEJAMENTO, TECNICA
     AULAS e MEDIADORES deixam de pedir equipe (as vagas vazias somem) e ficam ligadas ao setor de cada uma.
     REUNIAO INTERNA fica ligada a todos os setores ativos (toda a equipe vê). Antes de mudar, guarda o que era em `public._backup_0019`.
+  - `supabase/migrations/0020_type_rules.sql`: tipo pelo começo do título e pela série. Palavra-chave de começo
+    (`^reuniao`) vale só no começo do título e vem antes das outras e do histórico; funções `name_tokens`,
+    `event_series` (espelho do `eventSeries` do core) e `prefix_type`; tabela `series_rules` (o que cada série
+    aprendeu; a troca de tipo à mão grava o tipo da série e muda os eventos futuros da série com tipo automático);
+    `type_source` aceita `series`. **Mexe em dados da produção**:
+    - os tipos ganham as regras de começo claras do histórico (Reunião, Reunião Mediadores, Reunião Técnica, MBA,
+      Faculdade, Poli, Especialização, Minicurso, Curso, English, Webinar, Evento, Tratamento);
+    - os eventos de agora em diante com tipo automático mudam para o tipo da regra (as vagas são refeitas onde
+      ninguém foi escalado);
+    - o histórico importado passa a ter o tipo da regra (49 reuniões estavam como AULA MBA).
+    Antes de mudar, guarda o que era em `public._backup_0020`. Motivo: "Reunião Mediadores POLI USP PRO" virou
+    AULA MBA pelo histórico (pedido do Raoni em 27/10/2026).
 - **Dados iniciais da 0016** (fora do repositório, porque trata da equipe pelo e-mail):
   `..\dados-iniciais\aplicar-prioridades.mjs`. Ele grava a ordem das funções de cada pessoa a partir da
   planilha `..\Analise da escala.xlsx`, aba "Prioridade por pessoa": vale a coluna "Sua ordem" quando
   preenchida, senão a sugerida pelo histórico do último ano. Também acrescenta Cinegrafista e Operador Evento
   a Pedro, Fernanda, Tiphany e Juliana.
-- **Desfazer**: `supabase/rollback/0019_down.sql`, `0018_down.sql`, `0017_down.sql`, `0016_down.sql`, `0015_down.sql`, `0014_down.sql`, `0013_down.sql` e
+- **Desfazer**: `supabase/rollback/0020_down.sql`, `0019_down.sql`, `0018_down.sql`, `0017_down.sql`, `0016_down.sql`, `0015_down.sql`, `0014_down.sql`, `0013_down.sql` e
   `0012_down.sql` (fora da pasta de migrações, para o `db push` não rodá-los).
 - **Serviço de fundo (NAS)**: **muda**. Ganhou o fornecedor de IA local (`apps/worker/src/ai/local.ts`), lotes
   de 25 vagas (eram 60), resposta da IA aproveitada item por item e o motivo exato da falha guardado no pedido. Depois
@@ -98,7 +110,7 @@ primeiro passo que não der o resultado esperado.
    ```
    Deve listar **só** `0012_request_classify.sql`, `0013_type_icon_and_highlight.sql`, `0014_local_ai.sql`,
    `0015_meetings_by_sector.sql`, `0016_role_priority_level.sql`, `0017_event_size.sql`,
-   `0018_disponibilizador.sql` e `0019_meeting_sectors.sql`.
+   `0018_disponibilizador.sql`, `0019_meeting_sectors.sql` e `0020_type_rules.sql`.
    Se listar também as antigas (0001 a 0011), o histórico de migrações do banco não registrou que elas já
    foram aplicadas. **Não rode o push.** Confira com `npx supabase migration list`. Depois de confirmar que o
    esquema existe (as tabelas `people`, `events`, `weeks` estão lá), marque as antigas como aplicadas com
@@ -135,6 +147,10 @@ primeiro passo que não der o resultado esperado.
     where t.name = 'DISPONIBILIZAR';                                            -- 1 Disponibilizador
    select t.name, t.no_team, array(select s.name from public.sectors s where s.id = any (t.sector_ids)) as setores
      from public.service_types t where t.name like 'REUNIAO%' order by t.name;  -- sem equipe, cada uma no seu setor
+   select public.event_series('MBA em Gestão de Projetos - Aula 3');            -- mba em gestao de projetos
+   select t.name from public.service_types t
+    where t.id = public.prefix_type('Reunião Mediadores POLI USP PRO');         -- REUNIAO MEDIADORES
+   select kind, count(*) from public._backup_0020 group by kind;                -- eventos e histórico que mudaram
    ```
 4. **CI verde e merge**: `gh pr checks 2` tudo verde; depois `gh pr merge 2 --merge`. O merge publica o app
    no GitHub Pages sozinho. Em poucos minutos o rodapé do menu mostra `v1.1.0`.
@@ -174,6 +190,8 @@ estimada" da prévia (as vagas, que o banco cria, saem certas).
 2. **Serviço de fundo**: no NAS, volte a imagem anterior. Antes, troque o fornecedor para Gemini na tela, porque
    o worker antigo não conhece o local. Ou deixe como está: o worker novo funciona com o banco antigo.
 3. **Banco**, nesta ordem. Rode cada arquivo inteiro no SQL Editor do painel; cada um roda numa transação só:
+   0. `supabase/rollback/0020_down.sql`: tira as regras de começo e o que as séries aprenderam, e volta os
+      eventos e o histórico que mudaram de tipo ao que eram.
    1. `supabase/rollback/0019_down.sql`: as reuniões de setor voltam a pedir equipe e a equipe deixa de ler os
       tipos e as reuniões.
    2. `supabase/rollback/0018_down.sql`: tira o Disponibilizador e a "função que não ocupa horário", volta o

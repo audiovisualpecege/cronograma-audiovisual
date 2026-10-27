@@ -36,10 +36,16 @@ export const TEAM_TABLES = [
 export const ADMIN_TABLES = [
   ...TEAM_TABLES,
   'service_type_crew', 'calendar_sources', 'slots', 'assignments', 'publications', 'jobs',
-  'settings',
+  'settings', 'series_rules',
 ] as const;
 
 export type TableName = (typeof ADMIN_TABLES)[number];
+
+/**
+ * Tabelas de migração que pode ainda não estar no banco (series_rules, da 0020): a leitura recusada fica vazia
+ * em vez de parar a sincronização.
+ */
+export const OPTIONAL_TABLES: readonly TableName[] = ['series_rules'];
 
 /** Tabelas com aviso pelo Realtime (migrações 0008 e 0010); o aviso só dispara a leitura incremental. */
 export const REALTIME_TABLES: readonly TableName[] = [

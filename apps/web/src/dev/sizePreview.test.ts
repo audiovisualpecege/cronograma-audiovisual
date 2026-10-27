@@ -55,4 +55,20 @@ describe('simulação do porte no app local', () => {
     expect(medium.events[0]?.size).toBe(2);
     expect(medium.slots.filter((s) => !s.archived_at).map((s) => s.id)).toEqual(['s-op', 's-cin2', 's-fot']);
   });
+
+  it('0020: a reunião marcada como aula pelo histórico vira reunião; a escolha à mão e a semana passada ficam', () => {
+    const meeting = type('rm', 'REUNIAO MEDIADORES');
+    const typed = (id: string, title: string, source: string, weekStart = '2099-01-05') =>
+      ({ ...event(id, 'mba'), title, week_start: weekStart, type_source: source }) as EventRow;
+    const rows = {
+      weekStart: '2099-01-05', week: null, slots: [], assignments: [], published: [], people: [], personRoles: [], absences: [], roles: ROLES,
+      types: [...TYPES, meeting], crew: CREW,
+      events: [typed('e1', 'Reunião Mediadores POLI USP PRO', 'history'), typed('e2', 'Reunião Mediadores POLI USP PRO', 'admin'), typed('e3', 'POLI USP Indústria 4.0', 'history')],
+    } as WeekRows;
+    const sim = simulateWeek(rows, {});
+    expect(sim.events.map((e) => [e.id, e.service_type_id, e.type_source])).toEqual([['e1', 'rm', 'keyword'], ['e2', 'mba', 'admin'], ['e3', 'mba', 'history']]);
+    expect(simulateWeek({ ...rows, weekStart: '2020-01-06' }, {}).events[0]?.service_type_id).toBe('mba');
+    // A troca à mão ensinou a série: o evento automático da mesma série segue a escolha.
+    expect(simulateWeek(rows, {}, { 'reuniao mediadores poli usp pro': 'ev' }).events[0]?.service_type_id).toBe('ev');
+  });
 });

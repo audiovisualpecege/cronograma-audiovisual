@@ -34,6 +34,7 @@ import {
   type PersonRoleRow,
   type PersonRow,
   type PublishedRow,
+  type SeriesRuleRow,
   type ServiceTypeRow,
   type SlotRow,
   type WeekRow,
@@ -52,6 +53,8 @@ export interface WeekRows {
   roles: JobRoleRow[];
   types: ServiceTypeRow[];
   crew: CrewRow[];
+  /** O que cada série aprendeu com quem monta a escala (migração 0020); vazio antes dela. */
+  seriesRules?: SeriesRuleRow[];
 }
 
 export type SlotState = 'open' | 'proposed' | 'confirmed';

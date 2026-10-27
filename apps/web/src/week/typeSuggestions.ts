@@ -1,7 +1,7 @@
-// Tipo de serviço sugerido para os eventos ainda sem tipo: palavra-chave do cadastro primeiro, depois o título
-// mais parecido do histórico.
+// Tipo de serviço sugerido para os eventos ainda sem tipo: o tipo aprendido pela série e o começo do título,
+// depois a palavra-chave do cadastro e, por fim, o título mais parecido do histórico.
 import { classifyTitle, jaccard, JACCARD_MIN, titleWords } from '@cronograma/core';
-import type { HistoryFactRow, ServiceTypeRow } from '../data/catalog';
+import { seriesTypesOf, type HistoryFactRow, type ServiceTypeRow } from '../data/catalog';
 import type { WeekRows } from './model';
 
 export interface TitleWords {
@@ -34,8 +34,9 @@ export function typeSuggestions(rows: WeekRows, index: readonly TitleWords[]): M
   const types = rows.types.filter((t) => !t.archived_at);
   const byId = new Map(types.map((t) => [t.id, t]));
   const like = types.map((t) => ({ id: t.id, code: t.code, keywords: t.keywords ?? [] }));
+  const series = seriesTypesOf(rows.seriesRules);
   for (const e of missing) {
-    const c = classifyTitle(e.title, like, []);
+    const c = classifyTitle(e.title, like, [], series);
     let typeId = c.typeId;
     if (!typeId) {
       const target = titleWords(e.title);

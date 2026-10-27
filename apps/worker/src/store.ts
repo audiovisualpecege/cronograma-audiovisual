@@ -69,7 +69,7 @@ export interface StoredEventRow {
 export interface EventType {
   service_type_id: string | null;
   certainty: 'alta' | 'media' | 'baixa';
-  source: 'keyword' | 'history' | 'ai' | null;
+  source: 'series' | 'keyword' | 'history' | 'ai' | null;
   no_team: boolean;
 }
 
@@ -209,6 +209,8 @@ export interface CalendarStore extends NoticeStore {
 export interface ClassifierStore extends SettingsStore {
   serviceTypes(): Promise<ServiceTypeRow[]>;
   historyTitles(): Promise<{ title: string; serviceTypeId: string }[]>;
+  /** Tipo que cada série aprendeu com a correção do administrador (migração 0020). */
+  seriesTypes(): Promise<Map<string, string>>;
   secret(name: string): Promise<string | null>;
   unclassifiedEvents(fromWeek: string): Promise<{ id: string; title: string }[]>;
   setEventType(eventId: string, type: EventType): Promise<void>;
@@ -434,6 +436,14 @@ export class SupabaseStore implements Store {
       out.push({ title: r.title, serviceTypeId: r.service_type_id });
     }
     return out;
+  }
+
+  async seriesTypes() {
+    const rows = await this.all<{ series: string; service_type_id: string }>(
+      (a, b) => this.db.from('series_rules').select('series, service_type_id').not('service_type_id', 'is', null).order('series').range(a, b),
+      'seriesTypes',
+    );
+    return new Map(rows.map((r) => [r.series, r.service_type_id]));
   }
 
   async secret(name: string): Promise<string | null> {

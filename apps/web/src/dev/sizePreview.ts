@@ -2,15 +2,34 @@
 // 0018 não estão no banco: o app finge que elas já entraram. EVENTO, GRAVACAO e PODCAST ganham porte e as equipes
 // por porte da 0017, a TRANSMISSAO perde o Suporte, o DISPONIBILIZAR pede 1 Disponibilizador (função que não ocupa
 // horário) e reconhece "*DISPONIBILIZAR" no começo do título. O porte escolhido em cada evento fica só neste
-// navegador e, nas semanas montadas, as vagas vazias que sobram somem da tela. Nada disso vai para o banco. Some
-// sozinha quando o banco tiver a 0017 (os tipos chegam com "sized") e nunca roda no app publicado nem nos testes.
-import { EVENT_SIZES, isEventSize, normalizeName, type EventSize } from '@cronograma/core';
+// navegador e, nas semanas montadas, as vagas vazias que sobram somem da tela. A 0020: os tipos ganham as
+// palavras-chave de começo ("^reuniao") e os eventos de agora em diante com tipo automático trocam de tipo pelo
+// começo do título e pela série; a troca de tipo à mão ensina a série só neste navegador. Nada disso vai para o
+// banco. Some sozinha quando o banco tiver a 0017 (os tipos chegam com "sized") e nunca roda no app publicado nem
+// nos testes.
+import { classifyTitle, EVENT_SIZES, eventSeries, isEventSize, isPrefixKeyword, normalizeName, weekStartOf, type EventSize } from '@cronograma/core';
 import { useSyncExternalStore } from 'react';
-import { crewForSize, type CrewRow, type EventRow, type JobRoleRow, type PersonRoleRow, type SectorRow, type ServiceTypeRow } from '../data/catalog';
+import { crewForSize, seriesTypesOf, type CrewRow, type EventRow, type JobRoleRow, type PersonRoleRow, type SectorRow, type ServiceTypeRow } from '../data/catalog';
 import type { WeekRows } from '../week/model';
 
 const ENABLED = import.meta.env.DEV && import.meta.env.MODE !== 'test';
 const STORAGE_KEY = 'cronograma:simulacao-porte';
+const SERIES_KEY = 'cronograma:simulacao-serie';
+
+/** A 0020: palavras-chave de começo, pelo nome normalizado do tipo. */
+const OPENINGS: Record<string, string[]> = {
+  'reuniao interna': ['^reuniao'],
+  'reuniao mediadores': ['^reuniao mediadores', '^reuniao mediacao'],
+  'reuniao tecnica aulas': ['^reuniao tecnica'],
+  'reuniao edicao': ['^reuniao edicao'],
+  'reuniao producao': ['^reuniao producao'],
+  'reuniao planejamento': ['^reuniao planejamento'],
+  'aula mba': ['^mba', '^faculdade', '^poli', '^especializacao', '^minicurso'],
+  'curso online': ['^curso', '^english'],
+  webinar: ['^webinar'],
+  evento: ['^evento'],
+  'edicao fotos': ['^tratamento'],
+};
 
 /** A equipe da 0017: tipo, porte, função e quantidade, pelos nomes normalizados. */
 const PLAN: Record<string, { defaultSize: EventSize; crew: [EventSize, string, number][] }> = {
@@ -128,62 +147,102 @@ export function simulateCatalog(
     }
     outTypes.push({ ...t, sized: false, default_size: 1 });
   }
-  return { types: outTypes, crew: outCrew, roles };
+  const withOpenings = outTypes.map((t) => {
+    const add = t.archived_at ? undefined : OPENINGS[normalizeName(t.name)];
+    return add ? { ...t, keywords: [...new Set([...(t.keywords ?? []), ...add])] } : t;
+  });
+  return { types: withOpenings, crew: outCrew, roles };
 }
 
 // ---------------------------------------------------------------------------------------------
-// Porte escolhido em cada evento, só neste navegador.
+// Porte escolhido em cada evento e tipo aprendido por série, só neste navegador.
+
+/** Um mapa guardado no navegador, com aviso para as telas quando muda. */
+function localMap<T>(key: string, valid: (v: unknown) => v is T) {
+  const listeners = new Set<() => void>();
+  let cache: Readonly<Record<string, T>> | null = null;
+  const read = (): Readonly<Record<string, T>> => {
+    if (cache) return cache;
+    try {
+      const raw = JSON.parse(window.localStorage.getItem(key) ?? '{}') as Record<string, unknown>;
+      cache = Object.fromEntries(Object.entries(raw).filter((e): e is [string, T] => valid(e[1])));
+    } catch {
+      cache = {};
+    }
+    return cache;
+  };
+  const set = (id: string, value: T) => {
+    cache = { ...read(), [id]: value };
+    try {
+      window.localStorage.setItem(key, JSON.stringify(cache));
+    } catch {
+      // Sem armazenamento: vale até recarregar a página.
+    }
+    listeners.forEach((l) => l());
+  };
+  const subscribe = (l: () => void) => {
+    listeners.add(l);
+    return () => listeners.delete(l);
+  };
+  return { read, set, subscribe };
+}
 
 type Sizes = Readonly<Record<string, EventSize>>;
-const listeners = new Set<() => void>();
-let cache: Sizes | null = null;
-
-function readSizes(): Sizes {
-  if (cache) return cache;
-  try {
-    const raw = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}') as Record<string, unknown>;
-    cache = Object.fromEntries(Object.entries(raw).filter((e): e is [string, EventSize] => isEventSize(e[1])));
-  } catch {
-    cache = {};
-  }
-  return cache;
-}
+type Learned = Readonly<Record<string, string>>;
+const sizeStore = localMap(STORAGE_KEY, isEventSize);
+const seriesStore = localMap(SERIES_KEY, (v): v is string => typeof v === 'string');
 
 export function setPreviewSize(eventId: string, size: EventSize) {
-  cache = { ...readSizes(), [eventId]: size };
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(cache));
-  } catch {
-    // Sem armazenamento: vale até recarregar a página.
-  }
-  listeners.forEach((l) => l());
+  sizeStore.set(eventId, size);
 }
 
-const EMPTY: Sizes = {};
+/** A 0020: a troca de tipo à mão ensina a série (aqui, só neste navegador). */
+export function learnPreviewSeries(title: string, typeId: string) {
+  const series = eventSeries(title);
+  if (series) seriesStore.set(series, typeId);
+}
+
+const EMPTY = {};
 
 export function usePreviewSizes(): Sizes {
-  return useSyncExternalStore(
-    (l) => {
-      listeners.add(l);
-      return () => listeners.delete(l);
-    },
-    () => (ENABLED ? readSizes() : EMPTY),
-  );
+  return useSyncExternalStore(sizeStore.subscribe, () => (ENABLED ? sizeStore.read() : EMPTY));
+}
+
+export function usePreviewSeries(): Learned {
+  return useSyncExternalStore(seriesStore.subscribe, () => (ENABLED ? seriesStore.read() : EMPTY));
 }
 
 /**
- * A semana como ficaria com a 0017: tipos e equipes por porte, o porte escolhido neste navegador e, nas semanas
- * montadas, só as vagas do porte em cada evento com porte (as vazias que sobram somem; vaga com gente fica).
+ * A semana como ficaria com a 0017 a 0020: tipos e equipes por porte, o porte escolhido neste navegador, o tipo
+ * pelo começo do título e pela série nos eventos de agora em diante e, nas semanas montadas, só as vagas que o
+ * tipo e o porte pedem (as vazias que sobram somem; vaga com gente fica).
  */
-export function previewWeekRows(rows: WeekRows, sizes: Sizes): WeekRows {
+export function previewWeekRows(rows: WeekRows, sizes: Sizes, learned: Learned = {}): WeekRows {
   previewCatalog(rows.types, rows.crew, rows.roles);
-  return previewActive(rows.types) ? simulateWeek(rows, sizes) : rows;
+  return previewActive(rows.types) ? simulateWeek(rows, sizes, learned) : rows;
 }
 
-/** A semana como ficaria com a 0017 (ver previewWeekRows). */
-export function simulateWeek(rows: WeekRows, sizes: Sizes): WeekRows {
+/**
+ * A 0020 nos eventos de agora em diante com tipo automático: o tipo da série ou do começo do título, quando é
+ * outro. Título com asterisco fica como está.
+ */
+function retype(events: readonly EventRow[], types: readonly ServiceTypeRow[], series: ReadonlyMap<string, string>, weekStart: string): EventRow[] {
+  if (weekStart < weekStartOf(new Date())) return [...events];
+  // Só a série e as palavras-chave de começo, como a 0020 faz no banco.
+  const openings = types.filter((t) => !t.archived_at).map((t) => ({ id: t.id, code: t.code, keywords: (t.keywords ?? []).filter(isPrefixKeyword) }));
+  return events.map((e) => {
+    if (e.status === 'cancelled' || e.type_source === 'admin' || e.title.trimStart().startsWith('*')) return e;
+    const c = classifyTitle(e.title, openings, [], series);
+    if (!c.typeId || c.typeId === e.service_type_id) return e;
+    return { ...e, service_type_id: c.typeId, type_source: c.source, type_certainty: 'alta' };
+  });
+}
+
+/** A semana como ficaria com a 0017 a 0020 (ver previewWeekRows). */
+export function simulateWeek(rows: WeekRows, sizes: Sizes, learned: Learned = {}): WeekRows {
   const { types, crew, roles } = simulateCatalog(rows.types, rows.crew, rows.roles);
-  const events: EventRow[] = rows.events.map((e) => (sizes[e.id] ? { ...e, size: sizes[e.id] } : e));
+  const series = new Map([...seriesTypesOf(rows.seriesRules), ...Object.entries(learned)]);
+  const events: EventRow[] = retype(rows.events, types, series, rows.weekStart).map((e) => (sizes[e.id] ? { ...e, size: sizes[e.id] } : e));
   const filled = new Set(rows.assignments.filter((a) => a.person_id).map((a) => a.slot_id));
   const hidden = new Set<string>();
   for (const e of events) {

@@ -1,6 +1,6 @@
 import { EVENT_SIZES, SIZE_LABEL, type EventSize, type SizeSuggestion } from '@cronograma/core';
 import { sizeFor, type CalendarSourceRow, type EventRow, type ServiceTypeRow } from '../data/catalog';
-import { isSimulating, setPreviewSize } from '../dev/sizePreview';
+import { isSimulating, learnPreviewSeries, setPreviewSize } from '../dev/sizePreview';
 import type { SyncEngine } from '../sync/syncEngine';
 import { formatStamp } from '../ui/format';
 
@@ -21,8 +21,12 @@ export function SourceAlerts({ sources }: { sources: readonly CalendarSourceRow[
   );
 }
 
-/** Troca o tipo de serviço do evento pela fila; o tipo escolhido à mão vale com certeza alta. */
+/**
+ * Troca o tipo de serviço do evento pela fila; o tipo escolhido à mão vale com certeza alta e ensina a série
+ * (no servidor, migração 0020; na simulação do app local, só neste navegador).
+ */
 export function changeType(engine: SyncEngine, e: EventRow, typeId: string | null) {
+  if (typeId && isSimulating()) learnPreviewSeries(e.title, typeId);
   const changes = { service_type_id: typeId, type_certainty: typeId ? 'alta' : 'baixa', type_source: 'admin' };
   return engine.enqueue('event.update_extras', { id: e.id, service_type_id: typeId }, { baseVersion: e.version, target: { table: 'events', id: e.id, changes } });
 }

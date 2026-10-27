@@ -5,7 +5,7 @@
 // eventos tipados pelo serviço de fundo numa semana já montada.
 import { classifyTitle } from '@cronograma/core';
 import { useEffect, useRef, useState } from 'react';
-import type { EventRow } from '../data/catalog';
+import { seriesTypesOf, type EventRow } from '../data/catalog';
 import { isFinished, useJob, useRefreshWhenFinished } from '../settings/jobs';
 import { RemoteError } from '../supabase';
 import { useSyncEngine } from '../sync/SyncProvider';
@@ -18,13 +18,14 @@ export function untyped(rows: WeekRows): EventRow[] {
   return rows.events.filter((e) => !e.ignored && e.status !== 'cancelled' && !e.service_type_id && e.type_source !== 'admin');
 }
 
-/** Tipo pela palavra-chave do cadastro (certeza alta), para cada evento sem tipo. */
+/** Tipo pela série ou pela palavra-chave do cadastro (certeza alta), para cada evento sem tipo. */
 export function keywordTypes(rows: WeekRows): Map<string, string> {
   const types = rows.types.filter((t) => !t.archived_at).map((t) => ({ id: t.id, code: t.code, keywords: t.keywords ?? [] }));
+  const series = seriesTypesOf(rows.seriesRules);
   const out = new Map<string, string>();
   for (const e of untyped(rows)) {
-    const c = classifyTitle(e.title, types, []);
-    if (c.typeId && c.source === 'keyword') out.set(e.id, c.typeId);
+    const c = classifyTitle(e.title, types, [], series);
+    if (c.typeId && (c.source === 'keyword' || c.source === 'series')) out.set(e.id, c.typeId);
   }
   return out;
 }

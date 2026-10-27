@@ -1,5 +1,5 @@
 import { buildHistoryIndex, DEFAULT_SIZE, EVENT_SIZES, isWeekPast, localDate, localTime, NOTES_MAX, SIZE_LABEL, zonedTime, type EventSize } from '@cronograma/core';
-import { isSimulating, setPreviewSize } from '../dev/sizePreview';
+import { isSimulating, learnPreviewSeries, setPreviewSize } from '../dev/sizePreview';
 import { useMemo, useState, type FormEvent } from 'react';
 import { sizeFor, toFact, useTable, type CalendarSourceRow, type EventRow } from '../data/catalog';
 import { useHistory } from '../data/history';
@@ -334,6 +334,7 @@ function ExtrasCard({ event, rows, editable }: { event: EventRow; rows: WeekRows
       fields.period_end = periodEnd ? zonedTime(day, periodEnd).toISOString() : null;
     }
     const typeChanged = (typeId || null) !== (event.service_type_id ?? null) || noTeam !== Boolean(event.no_team);
+    if (typeChanged && typeId && simulated) learnPreviewSeries(event.title, typeId);
     const changes = { ...fields, ...(typeChanged ? { type_certainty: typeId ? 'alta' : 'baixa', type_source: 'admin' } : {}) };
     await engine.enqueue('event.update_extras', { id: event.id, ...fields, ...(askMode ? { mode } : {}) }, { baseVersion: event.version, target: { table: 'events', id: event.id, changes } });
     setSaved(true);

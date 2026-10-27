@@ -10,11 +10,12 @@ import type {
   PersonRoleRow,
   PersonRow,
   PublishedRow,
+  SeriesRuleRow,
   ServiceTypeRow,
   SlotRow,
   WeekRow,
 } from '../data/catalog';
-import { previewWeekRows, usePreviewSizes } from '../dev/sizePreview';
+import { previewWeekRows, usePreviewSeries, usePreviewSizes } from '../dev/sizePreview';
 import type { LocalStore } from '../sync/localStore';
 import type { SyncEngine } from '../sync/syncEngine';
 import { useLocalQuery } from '../sync/SyncProvider';
@@ -35,22 +36,24 @@ export async function readWeekRows(store: LocalStore, weekStart: string): Promis
   const published = week
     ? ((await store.mirror('published_assignments').where('week_id').equals(week.id).toArray()) as unknown as PublishedRow[])
     : [];
-  const [people, personRoles, absences, roles, types, crew] = await Promise.all([
+  const [people, personRoles, absences, roles, types, crew, seriesRules] = await Promise.all([
     all<PersonRow>(store, 'people'),
     all<PersonRoleRow>(store, 'person_roles'),
     all<AbsenceRow>(store, 'absences'),
     all<JobRoleRow>(store, 'job_roles'),
     all<ServiceTypeRow>(store, 'service_types'),
     all<CrewRow>(store, 'service_type_crew'),
+    all<SeriesRuleRow>(store, 'series_rules'),
   ]);
-  return { weekStart, week: week ?? null, events, slots, assignments, published, people, personRoles, absences, roles, types, crew };
+  return { weekStart, week: week ?? null, events, slots, assignments, published, people, personRoles, absences, roles, types, crew, seriesRules };
 }
 
 export function useWeekRows(weekStart: string): WeekRows | undefined {
   const rows = useLocalQuery((store) => readWeekRows(store, weekStart), [weekStart]);
-  // No app local, sem a migração 0017 no banco, a semana aparece como ficaria com o porte (dev/sizePreview).
+  // No app local, sem as migrações 0017 a 0020 no banco, a semana aparece como ficaria com elas (dev/sizePreview).
   const sizes = usePreviewSizes();
-  return useMemo(() => rows && previewWeekRows(rows, sizes), [rows, sizes]);
+  const learned = usePreviewSeries();
+  return useMemo(() => rows && previewWeekRows(rows, sizes, learned), [rows, sizes, learned]);
 }
 
 /** Relógio da tela, atualizado a cada minuto (selo "hoje", aviso do serviço de fundo). */

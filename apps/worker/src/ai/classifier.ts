@@ -1,5 +1,6 @@
-// Tipo de serviço dos eventos (ADR-012 item 5): palavra-chave (certeza alta), título parecido no histórico
-// (média) e, se settings.ai_classification_enabled, a IA para o resto, em lotes de até 80 títulos.
+// Tipo de serviço dos eventos (ADR-012 item 5): o tipo que a série aprendeu, o começo do título e a palavra-chave
+// (certeza alta), título parecido no histórico (média) e, se settings.ai_classification_enabled, a IA para o
+// resto, em lotes de até 80 títulos.
 // Certeza baixa deixa o tipo "a definir".
 import { classifyTitle, weekStartOf } from '@cronograma/core';
 import { errorMessage, type Logger } from '../log.ts';
@@ -25,16 +26,17 @@ export class Classifier {
   async classify(items: { id: string; title: string }[]): Promise<ClassifyOutcome> {
     const out: ClassifyOutcome = { types: new Map(), aiCalls: 0, aiQuotaHits: 0 };
     if (items.length === 0) return out;
-    const [types, history, settings] = await Promise.all([
+    const [types, history, series, settings] = await Promise.all([
       this.store.serviceTypes(),
       this.store.historyTitles(),
+      this.store.seriesTypes(),
       this.store.settings(),
     ]);
     const byId = new Map(types.map((t) => [t.id, t]));
     const byCode = new Map(types.map((t) => [t.code, t]));
     const rest: { id: string; title: string }[] = [];
     for (const it of items) {
-      const c = classifyTitle(it.title, types, history);
+      const c = classifyTitle(it.title, types, history, series);
       const t = c.typeId ? byId.get(c.typeId) : undefined;
       out.types.set(it.id, { service_type_id: c.typeId, certainty: c.certainty, source: c.source, no_team: t?.no_team ?? false });
       if (!c.typeId) rest.push(it);

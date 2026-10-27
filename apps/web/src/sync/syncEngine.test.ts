@@ -174,6 +174,14 @@ describe('SyncEngine e LocalStore', () => {
     expect(await store.mirror('events').count()).toBe(2);
   });
 
+  it('tabela de migração ainda não aplicada (series_rules) lê vazio em vez de parar a sincronização', async () => {
+    const fetch = fakeFetch(() => json({ code: 'PGRST205', message: "Could not find the table 'public.series_rules'" }, 404));
+    const remote = createSupabaseRemote({ url: 'http://supabase.test', key: 'chave-publica', fetch, storage: memoryStorage() });
+    const engine = new SyncEngine({ store: new LocalStore('sem-0020'), remote, profile: 'admin', now, newId });
+    expect(await engine.pull('series_rules')).toBe(0);
+    await expect(engine.pull('events')).rejects.toThrow();
+  });
+
   it('UT-080 evento Realtime de notifications dispara pull("notifications") e nenhuma outra tabela', async () => {
     const remote = new FakeRemote();
     const { engine } = await setup({ remote, online: false });

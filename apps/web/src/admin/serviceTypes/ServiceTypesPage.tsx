@@ -235,7 +235,7 @@ function ServiceTypeForm({
           label="Palavras-chave"
           value={keywords}
           onChange={(e) => setKeywords(e.target.value)}
-          hint='Separadas por vírgula. Um título com a palavra recebe este tipo com certeza alta. Com asterisco ("*disponibilizar"), vale quando o título começa com ela e ganha das outras.'
+          hint='Separadas por vírgula. Um título com a palavra recebe este tipo com certeza alta. Com "^" ("^reuniao"), só vale quando o título começa com ela e vem antes das outras e do histórico; a mais longa ganha. Com asterisco ("*disponibilizar"), vale quando o título começa com "*" e a palavra, e ganha de todas.'
         />
         <IconPicker name={name} value={icon} onChange={setIcon} />
         <Checkbox label="Não exige equipe (não gera vagas; só os setores marcados abaixo veem na agenda)" checked={noTeam} onChange={setNoTeam} />
