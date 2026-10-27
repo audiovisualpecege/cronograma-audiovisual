@@ -4,6 +4,7 @@ import {
   addDays,
   daysOf,
   diffDays,
+  eventSeries,
   isEventSize,
   localDate,
   localTime,
@@ -12,6 +13,7 @@ import {
   type AbsenceLike,
   type AssignmentLike,
   type EventLike,
+  type EventSize,
   type PersonLike,
   type SeriesSize,
   type SizeSuggestion,
@@ -22,6 +24,7 @@ import {
   crewForSize,
   crewTotals,
   hasRoleOrder,
+  seriesRuleMap,
   sizeFor,
   levelsOf,
   rolesOf,
@@ -195,11 +198,43 @@ export function weekContext(rows: WeekRows, now: Date): WeekContext {
  * Equipe estimada do evento pelo tipo, no porte do evento; vazia sem tipo, para tipo sem equipe ou evento que não
  * exige equipe.
  */
-export function estimatedCrew(e: EventRow, types: readonly ServiceTypeRow[], crew: readonly CrewRow[]): CrewItem[] {
+export function estimatedCrew(e: EventRow, types: readonly ServiceTypeRow[], crew: readonly CrewRow[], rule?: SeriesRuleRow): CrewItem[] {
   if (!e.service_type_id || e.no_team || e.status === 'cancelled' || e.ignored) return [];
   const type = types.find((t) => t.id === e.service_type_id);
   if (!type || type.no_team) return [];
-  return crewForSize(type, crew, e.size);
+  // As vagas aprendidas pela série valem enquanto ela tem o mesmo tipo (create_event_slots, migração 0021).
+  if (rule?.crew && rule.crew_type_id === e.service_type_id) return rule.crew.map((c) => ({ job_role_id: c.job_role_id, quantity: c.quantity }));
+  return crewForSize(type, crew, e.size ?? rule?.size);
+}
+
+/** De onde vêm as vagas do evento sem montagem: da série (aprendidas ou porte dela), do histórico ou do tipo. */
+export type CrewOrigin = 'series' | 'history' | null;
+
+export interface AutoSize {
+  size: EventSize;
+  from: 'series' | 'history';
+}
+
+/**
+ * Porte aplicado sozinho em cada evento de tipo com porte ainda sem porte escolhido: o que a série aprendeu, senão o
+ * sugerido pelo histórico da série (quando é outro que o padrão do tipo). Vai na montagem da semana.
+ */
+export function autoSizes(rows: WeekRows, seriesSizes: ReadonlyMap<string, readonly SeriesSize[]>): Map<string, AutoSize> {
+  const out = new Map<string, AutoSize>();
+  const rules = seriesRuleMap(rows.seriesRules);
+  for (const e of rows.events) {
+    if (e.ignored || e.status === 'cancelled' || isEventSize(e.size)) continue;
+    const type = sizedType(e, rows.types);
+    if (!type) continue;
+    const learned = rules.get(eventSeries(e.title))?.size;
+    if (isEventSize(learned)) {
+      out.set(e.id, { size: learned, from: 'series' });
+      continue;
+    }
+    const s = suggestSize(e.title, seriesSizes, crewTotals(type, rows.crew), rows.weekStart);
+    if (s && s.size !== sizeFor(type, e.size)) out.set(e.id, { size: s.size, from: 'history' });
+  }
+  return out;
 }
 
 /** Tipo do evento quando ele tem porte (Simples, Médio, Grande). */

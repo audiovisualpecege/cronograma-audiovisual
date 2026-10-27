@@ -74,9 +74,11 @@ interface PersonPickerProps {
   onClose: () => void;
   /** Recebe a escolha em vez de gravar na vaga (vaga prevista, gravada depois da montagem). */
   onChoose?: (personId: string, warnings: string[], override: boolean) => void;
+  /** "Tirar esta vaga" no fim da lista (a vaga aberta não tem menu na grade). */
+  onRemove?: () => void;
 }
 
-export function PersonPicker({ ctx, slot, assignment, people, history, title, roleName, eventTitle, onClose, onChoose }: PersonPickerProps) {
+export function PersonPicker({ ctx, slot, assignment, people, history, title, roleName, eventTitle, onClose, onChoose, onRemove }: PersonPickerProps) {
   const engine = useSyncEngine();
   const [pending, setPending] = useState<Choice | null>(null);
   const [query, setQuery] = useState('');
@@ -162,6 +164,19 @@ export function PersonPicker({ ctx, slot, assignment, people, history, title, ro
                 {shownOthers.map(row)}
               </ul>
             </>
+          )}
+          {onRemove && (
+            <div className="dialog-actions" style={{ justifyContent: 'flex-start' }}>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  onRemove();
+                  onClose();
+                }}
+              >
+                Tirar esta vaga
+              </Button>
+            </div>
           )}
         </>
       )}

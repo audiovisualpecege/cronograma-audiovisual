@@ -1,10 +1,10 @@
 // Regras da grade da semana, puras: as vagas previstas da semana ainda não montada (para sugerir e escolher antes
 // da montagem), a chave estável de cada vaga, os dias em colunas com as folgas, a família de cada atividade (cor
 // do cartão), os avisos do evento e o placar.
-import { addDays, nameTokens, zonedTime, type AbsenceLike } from '@cronograma/core';
-import type { AssignmentRow, EventRow, ServiceTypeRow, SlotRow } from '../data/catalog';
+import { addDays, eventSeries, nameTokens, zonedTime, type AbsenceLike } from '@cronograma/core';
+import { seriesRuleMap, type AssignmentRow, type EventRow, type ServiceTypeRow, type SlotRow } from '../data/catalog';
 import type { Draft } from './historyProposal';
-import { estimatedCrew, eventsByDay, isMarker, isMeetingEvent, needsTeam, slotState, weekDays, type TimeOff, type WeekRows } from './model';
+import { estimatedCrew, eventsByDay, isMarker, isMeetingEvent, needsTeam, slotState, weekDays, type AutoSize, type CrewOrigin, type TimeOff, type WeekRows } from './model';
 import type { ScheduleModel } from './schedule';
 
 const PLAN = 'plan:';
@@ -12,17 +12,30 @@ const PLAN = 'plan:';
 /** Vaga prevista (semana ainda sem montagem): existe só na tela, até a montagem criar a de verdade. */
 export const isPlanned = (slotId: string) => slotId.startsWith(PLAN);
 
+/** De onde vieram as vagas previstas do evento (marca "pela série" no cartão). */
+export const crewOrigin = (e: EventRow): CrewOrigin => (e.crew_origin as CrewOrigin | undefined) ?? null;
+
 /**
- * A semana como ficaria montada: sem montagem, cada evento que pede equipe ganha as vagas da equipe do tipo (no
- * porte do evento), com a alocação aberta. Assim a grade mostra, sugere e escolhe pessoas antes de montar.
+ * A semana como ficaria montada: sem montagem, cada evento que pede equipe ganha as vagas que a montagem criaria,
+ * com a alocação aberta: as aprendidas pela série, senão a equipe do porte (o escolhido, senão o aplicado sozinho
+ * pela série ou pelo histórico, senão o padrão do tipo). Assim a grade mostra, sugere e escolhe pessoas antes de
+ * montar.
  */
-export function plannedRows(rows: WeekRows): WeekRows {
+export function plannedRows(rows: WeekRows, auto: ReadonlyMap<string, AutoSize> = new Map()): WeekRows {
   if (rows.week) return rows;
+  const rules = seriesRuleMap(rows.seriesRules);
   const slots: SlotRow[] = [];
   const assignments: AssignmentRow[] = [];
-  for (const e of rows.events) {
+  const events = rows.events.map((e) => {
+    const rule = rules.get(eventSeries(e.title));
+    const learned = Boolean(rule?.crew && rule.crew_type_id === e.service_type_id);
+    const size = auto.get(e.id);
+    if (!learned && !size) return e;
+    return { ...e, ...(size && !learned ? { size: size.size } : {}), crew_origin: learned ? 'series' : size?.from };
+  });
+  for (const e of events) {
     if (!needsTeam(e, rows.types)) continue;
-    for (const c of estimatedCrew(e, rows.types, rows.crew)) {
+    for (const c of estimatedCrew(e, rows.types, rows.crew, rules.get(eventSeries(e.title)))) {
       for (let i = 0; i < c.quantity; i++) {
         const id = `${PLAN}${e.id}:${c.job_role_id}:${i}`;
         slots.push({ id, version: 0, updated_at: e.updated_at, event_id: e.id, job_role_id: c.job_role_id, archived_at: null });
@@ -30,7 +43,7 @@ export function plannedRows(rows: WeekRows): WeekRows {
       }
     }
   }
-  return { ...rows, slots, assignments };
+  return { ...rows, events, slots, assignments };
 }
 
 /**

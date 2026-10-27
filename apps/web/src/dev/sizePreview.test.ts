@@ -69,6 +69,6 @@ describe('simulação do porte no app local', () => {
     expect(sim.events.map((e) => [e.id, e.service_type_id, e.type_source])).toEqual([['e1', 'rm', 'keyword'], ['e2', 'mba', 'admin'], ['e3', 'mba', 'history']]);
     expect(simulateWeek({ ...rows, weekStart: '2020-01-06' }, {}).events[0]?.service_type_id).toBe('mba');
     // A troca à mão ensinou a série: o evento automático da mesma série segue a escolha.
-    expect(simulateWeek(rows, {}, { 'reuniao mediadores poli usp pro': 'ev' }).events[0]?.service_type_id).toBe('ev');
+    expect(simulateWeek(rows, {}, { 'reuniao mediadores poli usp pro': { type: 'ev' } }).events[0]?.service_type_id).toBe('ev');
   });
 });

@@ -2387,6 +2387,34 @@ button.board-off-item {
   box-shadow: 0 0 0 2px var(--accent);
 }
 
+/* "+ vaga": ficha tracejada e discreta no fim das vagas. */
+.board-chip--add {
+  border-style: dashed;
+  background: none;
+}
+
+.board-chip-add {
+  padding: 4px 10px 5px;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.25;
+  cursor: pointer;
+}
+
+.board-chip-add:hover,
+.board-chip-add:focus-visible {
+  color: var(--text-primary);
+}
+
+/* "pela série": as vagas ou o porte vieram do que a série aprendeu. */
+.board-card-origin {
+  color: var(--accent);
+  text-transform: none;
+}
+
 .board-menu {
   position: absolute;
   top: calc(100% + 4px);
@@ -2395,6 +2423,8 @@ button.board-off-item {
   display: flex;
   flex-direction: column;
   min-width: 170px;
+  max-height: 260px;
+  overflow-y: auto;
   padding: 4px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-card);

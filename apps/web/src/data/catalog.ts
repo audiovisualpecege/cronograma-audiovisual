@@ -193,11 +193,16 @@ export interface AssignmentRow extends Row {
   decided_at?: string | null;
 }
 
-/** O que uma série (eventSeries do título) aprendeu com quem monta a escala (migração 0020). */
+/** O que uma série (eventSeries do título) aprendeu com quem monta a escala (migrações 0020 e 0021). */
 export interface SeriesRuleRow extends Row {
   series: string;
   /** Tipo da última correção de tipo num evento da série. */
   service_type_id: string | null;
+  /** Vagas do último evento da série em que alguém pôs ou tirou vaga, valendo para o tipo crew_type_id. */
+  crew?: { job_role_id: string; quantity: number }[] | null;
+  crew_type_id?: string | null;
+  /** Porte da última troca de porte num evento da série. */
+  size?: number | null;
 }
 
 /** Tipo aprendido de cada série, para o classifyTitle. */
@@ -205,6 +210,11 @@ export function seriesTypesOf(rules: readonly SeriesRuleRow[] | undefined): Map<
   const out = new Map<string, string>();
   for (const r of rules ?? []) if (r.service_type_id) out.set(r.series, r.service_type_id);
   return out;
+}
+
+/** O que cada série aprendeu, pela série. */
+export function seriesRuleMap(rules: readonly SeriesRuleRow[] | undefined): Map<string, SeriesRuleRow> {
+  return new Map((rules ?? []).map((r) => [r.series, r]));
 }
 
 export interface PublishedRow extends Row {

@@ -36,7 +36,7 @@ export function changeType(engine: SyncEngine, e: EventRow, typeId: string | nul
  * (banco ainda sem a 0017), o porte fica só neste navegador.
  */
 export function changeSize(engine: SyncEngine, e: EventRow, size: EventSize) {
-  if (isSimulating()) return Promise.resolve(setPreviewSize(e.id, size));
+  if (isSimulating()) return Promise.resolve(setPreviewSize(e.id, size, e.title));
   return engine.enqueue('event.update_extras', { id: e.id, size }, { baseVersion: e.version, target: { table: 'events', id: e.id, changes: { size } } });
 }
 

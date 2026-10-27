@@ -15,12 +15,12 @@ import type {
   SlotRow,
   WeekRow,
 } from '../data/catalog';
-import { previewWeekRows, usePreviewSeries, usePreviewSizes } from '../dev/sizePreview';
+import { isSimulating, previewWeekRows, setPreviewSize, usePreviewSeries, usePreviewSizes } from '../dev/sizePreview';
 import type { LocalStore } from '../sync/localStore';
 import type { SyncEngine } from '../sync/syncEngine';
 import { useLocalQuery } from '../sync/SyncProvider';
 import type { TableName } from '../sync/types';
-import type { WeekRows } from './model';
+import type { AutoSize, WeekRows } from './model';
 
 async function all<T>(store: LocalStore, table: TableName): Promise<T[]> {
   return (await store.mirror(table).toArray()) as unknown as T[];
@@ -113,10 +113,26 @@ export async function sendAndRefresh(engine: SyncEngine, tables: TableName[]): P
 
 export const WEEK_TABLES: TableName[] = ['weeks', 'events', 'slots', 'assignments', 'published_assignments', 'publications'];
 
-/** "Montar semana" (US-012): cria as vagas pelos tipos dos eventos, pela fila (`week.build`). */
-export async function buildWeek(engine: SyncEngine, weekStart: string): Promise<void> {
-  await engine.enqueue('week.build', { week_start: weekStart });
+/**
+ * "Montar semana" (US-012): cria as vagas pelos tipos dos eventos, pela fila (`week.build`). `sizes` leva o porte
+ * aplicado sozinho (série ou histórico) dos eventos sem porte; na simulação do app local, fica neste navegador.
+ */
+export async function buildWeek(engine: SyncEngine, weekStart: string, sizes: ReadonlyMap<string, AutoSize> = new Map()): Promise<void> {
+  if (isSimulating()) for (const [id, s] of sizes) setPreviewSize(id, s.size);
+  const payload = sizes.size > 0 ? { week_start: weekStart, sizes: Object.fromEntries([...sizes].map(([id, s]) => [id, s.size])) } : { week_start: weekStart };
+  await engine.enqueue('week.build', payload);
   await sendAndRefresh(engine, WEEK_TABLES);
+}
+
+/** Vaga a mais no evento; ensina a série (migração 0021). Sem versão de base: pôr vaga não entra em conflito. */
+export function addSlot(engine: SyncEngine, eventId: string, roleId: string) {
+  const id = crypto.randomUUID();
+  return engine.enqueue('slot.add', { id, event_id: eventId, job_role_id: roleId }, { target: { table: 'slots', id, changes: { event_id: eventId, job_role_id: roleId, extra: true, archived_at: null } } });
+}
+
+/** Tira a vaga do evento, mesmo com alguém nela (a pessoa é liberada); ensina a série (migração 0021). */
+export function removeSlot(engine: SyncEngine, slot: SlotRow) {
+  return engine.enqueue('slot.remove', { id: slot.id }, { baseVersion: slot.version, target: { table: 'slots', id: slot.id, changes: { archived_at: new Date().toISOString() } } });
 }
 
 /** Montagem da semana ainda na fila de envio (sem internet). */

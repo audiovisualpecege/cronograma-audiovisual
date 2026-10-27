@@ -327,7 +327,7 @@ function ExtrasCard({ event, rows, editable }: { event: EventRow; rows: WeekRows
     e.preventDefault();
     if (notesError || periodError) return;
     const fields: Record<string, unknown> = { service_type_id: typeId || null, no_team: noTeam, notes: notes.trim() || null };
-    if (sizeChanged && simulated) setPreviewSize(event.id, Number(size) as EventSize);
+    if (sizeChanged && simulated) setPreviewSize(event.id, Number(size) as EventSize, event.title);
     else if (sizeChanged) fields.size = Number(size);
     if (event.all_day) {
       fields.period_start = periodStart ? zonedTime(day, periodStart).toISOString() : null;

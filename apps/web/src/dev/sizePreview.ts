@@ -9,7 +9,18 @@
 // nos testes.
 import { classifyTitle, EVENT_SIZES, eventSeries, isEventSize, isPrefixKeyword, normalizeName, weekStartOf, type EventSize } from '@cronograma/core';
 import { useSyncExternalStore } from 'react';
-import { crewForSize, seriesTypesOf, type CrewRow, type EventRow, type JobRoleRow, type PersonRoleRow, type SectorRow, type ServiceTypeRow } from '../data/catalog';
+import {
+  crewForSize,
+  seriesRuleMap,
+  seriesTypesOf,
+  type CrewRow,
+  type EventRow,
+  type JobRoleRow,
+  type PersonRoleRow,
+  type SectorRow,
+  type SeriesRuleRow,
+  type ServiceTypeRow,
+} from '../data/catalog';
 import type { WeekRows } from '../week/model';
 
 const ENABLED = import.meta.env.DEV && import.meta.env.MODE !== 'test';
@@ -187,19 +198,55 @@ function localMap<T>(key: string, valid: (v: unknown) => v is T) {
   return { read, set, subscribe };
 }
 
-type Sizes = Readonly<Record<string, EventSize>>;
-type Learned = Readonly<Record<string, string>>;
-const sizeStore = localMap(STORAGE_KEY, isEventSize);
-const seriesStore = localMap(SERIES_KEY, (v): v is string => typeof v === 'string');
+/** O que a série aprendeu neste navegador (0020 e 0021). */
+export interface LearnedSeries {
+  type?: string;
+  crew?: { job_role_id: string; quantity: number }[] | null;
+  crewType?: string | null;
+  size?: number;
+}
 
-export function setPreviewSize(eventId: string, size: EventSize) {
+type Sizes = Readonly<Record<string, EventSize>>;
+type Learned = Readonly<Record<string, LearnedSeries>>;
+const sizeStore = localMap(STORAGE_KEY, isEventSize);
+const seriesStore = localMap(SERIES_KEY, (v): v is LearnedSeries => typeof v === 'object' && v !== null);
+
+function learn(title: string, patch: LearnedSeries) {
+  const series = eventSeries(title);
+  if (series) seriesStore.set(series, { ...seriesStore.read()[series], ...patch });
+}
+
+/** A 0021: o porte escolhido vira o da série e esquece as vagas aprendidas (aqui, só neste navegador). */
+export function setPreviewSize(eventId: string, size: EventSize, title?: string) {
   sizeStore.set(eventId, size);
+  if (title) learn(title, { size, crew: null, crewType: null });
 }
 
 /** A 0020: a troca de tipo à mão ensina a série (aqui, só neste navegador). */
 export function learnPreviewSeries(title: string, typeId: string) {
-  const series = eventSeries(title);
-  if (series) seriesStore.set(series, typeId);
+  learn(title, { type: typeId });
+}
+
+/** A 0021: pôr ou tirar vaga ensina as vagas da série (aqui, só neste navegador). */
+export function learnPreviewCrew(title: string, typeId: string, roleIds: readonly string[]) {
+  const counts = new Map<string, number>();
+  for (const r of roleIds) counts.set(r, (counts.get(r) ?? 0) + 1);
+  learn(title, { crew: [...counts].map(([job_role_id, quantity]) => ({ job_role_id, quantity })), crewType: typeId });
+}
+
+/** O aprendido neste navegador por cima do que veio do banco, como linhas de series_rules. */
+function mergeRules(rules: readonly SeriesRuleRow[] | undefined, learned: Learned): SeriesRuleRow[] {
+  const out = seriesRuleMap(rules);
+  for (const [series, l] of Object.entries(learned)) {
+    const r = out.get(series) ?? ({ id: `sim:${series}`, version: 0, updated_at: '', series, service_type_id: null } as SeriesRuleRow);
+    out.set(series, {
+      ...r,
+      ...(l.type ? { service_type_id: l.type } : {}),
+      ...(l.crew !== undefined ? { crew: l.crew, crew_type_id: l.crewType ?? null } : {}),
+      ...(l.size !== undefined ? { size: l.size } : {}),
+    });
+  }
+  return [...out.values()];
 }
 
 const EMPTY = {};
@@ -241,8 +288,8 @@ function retype(events: readonly EventRow[], types: readonly ServiceTypeRow[], s
 /** A semana como ficaria com a 0017 a 0020 (ver previewWeekRows). */
 export function simulateWeek(rows: WeekRows, sizes: Sizes, learned: Learned = {}): WeekRows {
   const { types, crew, roles } = simulateCatalog(rows.types, rows.crew, rows.roles);
-  const series = new Map([...seriesTypesOf(rows.seriesRules), ...Object.entries(learned)]);
-  const events: EventRow[] = retype(rows.events, types, series, rows.weekStart).map((e) => (sizes[e.id] ? { ...e, size: sizes[e.id] } : e));
+  const seriesRules = mergeRules(rows.seriesRules, learned);
+  const events: EventRow[] = retype(rows.events, types, seriesTypesOf(seriesRules), rows.weekStart).map((e) => (sizes[e.id] ? { ...e, size: sizes[e.id] } : e));
   const filled = new Set(rows.assignments.filter((a) => a.person_id).map((a) => a.slot_id));
   const hidden = new Set<string>();
   for (const e of events) {
@@ -263,7 +310,7 @@ export function simulateWeek(rows: WeekRows, sizes: Sizes, learned: Learned = {}
     }
   }
   const slots = hidden.size ? rows.slots.map((s) => (hidden.has(s.id) ? { ...s, archived_at: 'simulacao' } : s)) : rows.slots;
-  return { ...rows, types, crew, roles, events, slots, personRoles: simulatePersonRoles(rows.personRoles, roles) };
+  return { ...rows, types, crew, roles, events, slots, seriesRules, personRoles: simulatePersonRoles(rows.personRoles, roles) };
 }
 
 /** A 0018 dá Disponibilizador, por último na lista, a quem tem Operador Aula. */

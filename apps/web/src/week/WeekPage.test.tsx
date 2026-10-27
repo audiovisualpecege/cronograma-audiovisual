@@ -97,6 +97,32 @@ describe('Semana: grade', () => {
     expect(chip.closest('li')).toHaveClass('is-open');
   });
 
+  it('"+ vaga" põe uma vaga da função escolhida; "Tirar esta vaga" tira, mesmo com gente, e a vaga aberta sai pela lista', async () => {
+    const user = userEvent.setup();
+    const filled = slotWith('ea', 'r1', 'p3');
+    // Ninguém de P1 a P13 tem Mediação: a vaga fica aberta, sem sugestão.
+    const open = slotWith('ea', 'r4');
+    const remote = weekRemote({ events: [AULA], slots: [filled, open], people: peopleRows(13), personRoles: personRoleRows(13) });
+    await page(remote);
+    const aula = await card('Gravação aula Biologia');
+    await user.click(within(aula).getByRole('button', { name: 'Pôr mais uma vaga em Gravação aula Biologia' }));
+    // As funções que o evento já tem vêm primeiro.
+    const menu = within(screen.getByRole('menu', { name: 'Função da vaga a mais em Gravação aula Biologia' }));
+    expect(menu.getAllByRole('menuitem').slice(0, 2).map((b) => b.textContent)).toEqual(['Câmera', 'Mediação']);
+    await user.click(menu.getByRole('menuitem', { name: 'Mediação' }));
+    await waitFor(() => expect(ops(remote).find((o) => o.kind === 'slot.add')).toMatchObject({ payload: { event_id: 'ea', job_role_id: 'r4' }, baseVersion: null }));
+
+    await user.click(within(aula).getByRole('button', { name: 'Câmera: Pessoa Exemplo 03' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Tirar esta vaga' }));
+    await waitFor(() => expect(ops(remote).find((o) => o.kind === 'slot.remove')).toMatchObject({ payload: { id: filled.slot.id } }));
+
+    // A vaga de Mediação posta acima também aparece, aberta como a que já existia.
+    await user.click(within(aula).getAllByRole('button', { name: 'Mediação: vaga aberta' })[0] as HTMLElement);
+    await user.click(await screen.findByRole('button', { name: 'Tirar esta vaga' }));
+    await waitFor(() => expect(ops(remote).filter((o) => o.kind === 'slot.remove')).toHaveLength(2));
+    expect((ops(remote).filter((o) => o.kind === 'slot.remove')[1]?.payload as { id: string }).id).not.toBe(filled.slot.id);
+  });
+
   it('"Confirmar sugestões (N)" grava as sugestões e aceita as propostas do serviço de fundo; o placar conta cada situação', async () => {
     const user = userEvent.setup();
     const remote = weekRemote({ events: [AULA, TARDE], slots: [slotWith('ea', 'r1'), slotWith('ea', 'r5', 'p17', 'proposed'), slotWith('eb', 'r1', 'p3')] });
@@ -266,6 +292,45 @@ describe('Semana sem montagem', () => {
     await user.click(within(panel).getByRole('button', { name: 'Grande' }));
     await waitFor(() => expect(chips(aula)).toHaveLength(4));
     await waitFor(() => expect(ops(remote).find((o) => o.kind === 'event.update_extras')).toMatchObject({ payload: { id: 'b1', size: 3 } }));
+  });
+
+  it('semana sem montagem: as vagas que a série aprendeu valem, com "pela série"; tirar uma vaga prevista a some e monta a semana', async () => {
+    const user = userEvent.setup();
+    const rule = row('sr1', { series: 'gravacao biologia', service_type_id: null, crew: [{ job_role_id: 'r1', quantity: 2 }, { job_role_id: 'r4', quantity: 1 }], crew_type_id: 't1', size: null });
+    const remote = weekRemote({ week: null, events: [eventRow('b1', { title: 'Gravação aula Biologia' })], extra: { series_rules: [rule] } });
+    await page(remote);
+    const aula = await card('Gravação aula Biologia');
+    await waitFor(() => expect(chips(aula).map((b) => b.getAttribute('aria-label')?.split(':')[0])).toEqual(['Câmera', 'Câmera', 'Mediação']));
+    expect(aula).toHaveTextContent('pela série');
+
+    // Com a sugestão, a ficha abre o menu.
+    await user.click(await within(aula).findByRole('button', { name: /^Mediação: .+ \(sugestão\)$/ }));
+    await user.click(screen.getByRole('menuitem', { name: 'Tirar esta vaga' }));
+    await waitFor(() => expect(chips(aula)).toHaveLength(2));
+    await waitFor(() => expect(ops(remote).some((o) => o.kind === 'week.build')).toBe(true));
+  });
+
+  it('semana sem montagem: o porte sugerido pela série no histórico já vale e vai na montagem', async () => {
+    const user = userEvent.setup();
+    const types = TYPE_ROWS.map((t) => (t.id === 't1' ? { ...t, sized: true, default_size: 1 } : t));
+    const crew = [
+      ...CREW_ROWS.filter((c) => c.service_type_id !== 't1'),
+      row('t1:s1', { service_type_id: 't1', job_role_id: 'r1', quantity: 1, size: 1, archived_at: null }),
+      row('t1:s2', { service_type_id: 't1', job_role_id: 'r1', quantity: 2, size: 2, archived_at: null }),
+      row('t1:s3', { service_type_id: 't1', job_role_id: 'r1', quantity: 4, size: 3, archived_at: null }),
+    ];
+    // As últimas vezes da série tiveram 2 pessoas: porte Médio.
+    const history = ['2026-10-12', '2026-10-19'].flatMap((w, i) =>
+      ['p3', 'p4'].map((p) => ({ event_id: `h${i}`, week_start: w, event_date: w, title: 'Gravação aula Biologia', service_type_id: 't1', service_type_name: 'T1', job_role_id: 'r1', job_role_name: 'Câmera', person_id: p, person_name: p, raw_name: null, hours: 3, source: 'import' })),
+    );
+    const remote = weekRemote({ week: null, events: [eventRow('b1', { title: 'Gravação aula Biologia' })], extra: { service_types: types, service_type_crew: crew } });
+    remote.views = { ...remote.views, history_facts: history };
+    await page(remote);
+    const aula = await card('Gravação aula Biologia');
+    await waitFor(() => expect(aula).toHaveTextContent('· Médio · pela série'));
+    await waitFor(() => expect(chips(aula)).toHaveLength(2));
+    await user.click(await screen.findByRole('button', { name: /Confirmar sugestões/ }));
+    await waitFor(() => expect(ops(remote).find((o) => o.kind === 'week.build')).toMatchObject({ payload: { sizes: { b1: 2 } } }));
   });
 
   it('evento sem tipo: cartão com aviso e a sugestão de tipo; sem tipo, sem vagas', async () => {

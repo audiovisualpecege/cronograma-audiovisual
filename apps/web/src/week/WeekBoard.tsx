@@ -6,11 +6,13 @@ import { useSyncEngine, useSyncState } from '../sync/SyncProvider';
 import { AppIcon } from '../ui/AppIcon';
 import { Button } from '../ui/chiaro';
 import { typeIcon } from '../ui/typeIcons';
+import { isSimulating, learnPreviewCrew } from '../dev/sizePreview';
 import {
   activityKind,
   boardCounts,
   boardDays,
   chipState,
+  crewOrigin,
   eventAlerts,
   isPlanned,
   plannedRows,
@@ -23,23 +25,42 @@ import {
 } from './board';
 import { EventSeals } from './EventSeals';
 import { proposeByHistory, type Draft } from './historyProposal';
-import { activitiesText, eventSpan, hoursText, isMeetingEvent, needsTeam, sizedType, sizeSuggestions, slotState, WARNING_LABEL, weekTimeOff, type TimeOff, type WeekRows } from './model';
+import {
+  activitiesText,
+  autoSizes,
+  eventSpan,
+  hoursText,
+  isMeetingEvent,
+  needsTeam,
+  sizedType,
+  sizeSuggestions,
+  slotState,
+  WARNING_LABEL,
+  weekTimeOff,
+  type AutoSize,
+  type TimeOff,
+  type WeekRows,
+} from './model';
 import { PersonPicker } from './PersonPicker';
 import { changeSize, changeType } from './PreviewPage';
 import { useSchedule } from './schedule';
 import { Seal } from './Seal';
 import { TIME_OFF } from './timeOffIcons';
 import { buildTitleIndex, typeSuggestions } from './typeSuggestions';
-import { acceptProposal, buildWeek, clearSlot, discardProposal, setPerson, useBuildPending } from './useWeek';
+import { acceptProposal, addSlot, buildWeek, clearSlot, discardProposal, removeSlot, sendAndRefresh, setPerson, useBuildPending } from './useWeek';
 
 const NO_DRAFTS: ReadonlyMap<string, Draft> = new Map();
 
-/** Escolha feita numa vaga prevista: gravada na vaga de verdade assim que a montagem a criar. */
+/**
+ * Escolha feita numa vaga prevista: gravada na vaga de verdade assim que a montagem a criar. Com `remove`, a vaga
+ * prevista sai: some da tela na hora e é tirada assim que a montagem a criar.
+ */
 interface QueuedPick {
   key: string;
   personId: string;
   warnings: string[];
   override: boolean;
+  remove?: boolean;
 }
 
 interface Pick {
@@ -80,7 +101,20 @@ export function WeekBoard({ rows, now, today, historyRows, historyLoading, onOpe
   const engine = useSyncEngine();
   const { pendingRows } = useSyncState();
   const building = useBuildPending(rows.weekStart);
-  const board = useMemo(() => plannedRows(rows), [rows]);
+  // Semana sem montagem: as vagas que a montagem criaria, com o porte da série aplicado sozinho.
+  const seriesSizes = useMemo(() => buildSeriesSizes((historyRows ?? []).map(toFact)), [historyRows]);
+  const auto = useMemo(() => autoSizes(rows, seriesSizes), [rows, seriesSizes]);
+  const planned = useMemo(() => plannedRows(rows, auto), [rows, auto]);
+  const keys = useMemo(() => slotKeys(planned.slots), [planned.slots]);
+  // Escolhas e vagas tiradas em vagas previstas, gravadas quando a montagem criar as vagas.
+  const [queue, setQueue] = useState<QueuedPick[]>([]);
+  const queued = useMemo(() => new Map(queue.filter((q) => !q.remove).map((q) => [q.key, q])), [queue]);
+  const removed = useMemo(() => new Set(queue.filter((q) => q.remove).map((q) => q.key)), [queue]);
+  const board = useMemo(() => {
+    if (removed.size === 0) return planned;
+    const gone = new Set(planned.slots.filter((s) => removed.has(keys.get(s.id) ?? '')).map((s) => s.id));
+    return { ...planned, slots: planned.slots.filter((s) => !gone.has(s.id)), assignments: planned.assignments.filter((a) => !gone.has(a.slot_id)) };
+  }, [planned, removed, keys]);
   const schedule = useSchedule(board, now, today, historyRows);
   const { model, index, readOnly } = schedule;
   const built = Boolean(rows.week);
@@ -96,7 +130,6 @@ export function WeekBoard({ rows, now, today, historyRows, historyLoading, onOpe
   }, [days, board.types]);
 
   // Sugestões: só nas semanas futuras, pelo histórico. "Deixar vaga" tira a vaga da sugestão (pela chave estável).
-  const keys = useMemo(() => slotKeys(board.slots), [board.slots]);
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(() => new Set());
   const suggesting = !readOnly && rows.weekStart > weekStartOf(today) && !historyLoading;
   // A sugestão da semana toda leva um tempo numa semana grande: a grade aparece antes e as sugestões chegam logo
@@ -122,9 +155,6 @@ export function WeekBoard({ rows, now, today, historyRows, historyLoading, onOpe
     [suggesting, proposed, model.bySlot, dismissed, keys],
   );
 
-  // Escolhas em vagas previstas, gravadas quando a montagem criar as vagas.
-  const [queue, setQueue] = useState<QueuedPick[]>([]);
-  const queued = useMemo(() => new Map(queue.map((q) => [q.key, q])), [queue]);
   const sent = useRef(new Set<string>());
   useEffect(() => {
     if (!rows.week || queue.length === 0) return;
@@ -140,7 +170,9 @@ export function WeekBoard({ rows, now, today, historyRows, historyLoading, onOpe
       if (a) {
         sent.current.add(q.key);
         done.push(q.key);
-        if (slotState(a) === 'open') writes.push(setPerson(engine, a, q.personId, q.warnings, q.override));
+        const real = rows.slots.find((s) => s.id === slotId);
+        if (q.remove && real) writes.push(removeSlot(engine, real));
+        else if (!q.remove && slotState(a) === 'open') writes.push(setPerson(engine, a, q.personId, q.warnings, q.override));
         continue;
       }
       // A vaga ainda não chegou da montagem: espera; se o evento já tem vagas e não esta, a escolha se perde.
@@ -164,11 +196,39 @@ export function WeekBoard({ rows, now, today, historyRows, historyLoading, onOpe
     }
     if (later.length === 0) return;
     setQueue((q) => [...q.filter((x) => !later.some((l) => l.key === x.key)), ...later]);
-    if (!rows.week && !building) void buildWeek(engine, rows.weekStart);
+    if (!rows.week && !building) void buildWeek(engine, rows.weekStart, auto);
   }
 
   const dismiss = (slotId: string) => setDismissed((s) => new Set([...s, keys.get(slotId) ?? slotId]));
   const unqueue = (slotId: string) => setQueue((q) => q.filter((x) => x.key !== keys.get(slotId)));
+
+  // Pôr e tirar vaga: vale para o evento e ensina a série (no banco, migração 0021; na simulação, no navegador).
+  const roleIdsOf = (eventId: string) => (model.slotsByEvent.get(eventId) ?? []).map((s) => s.job_role_id);
+  function addRole(e: EventRow, roleId: string) {
+    if (isSimulating() && e.service_type_id) learnPreviewCrew(e.title, e.service_type_id, [...roleIdsOf(e.id), roleId]);
+    void (async () => {
+      if (!rows.week) await buildWeek(engine, rows.weekStart, auto);
+      await addSlot(engine, e.id, roleId);
+      await sendAndRefresh(engine, ['slots', 'assignments']);
+    })();
+  }
+  function dropSlot(slotId: string) {
+    const slot = board.slots.find((s) => s.id === slotId);
+    const e = slot && board.events.find((x) => x.id === slot.event_id);
+    if (!slot || !e) return;
+    if (isSimulating() && e.service_type_id) {
+      const rest = (model.slotsByEvent.get(e.id) ?? []).filter((s) => s.id !== slotId).map((s) => s.job_role_id);
+      learnPreviewCrew(e.title, e.service_type_id, rest);
+    }
+    if (isPlanned(slotId)) {
+      const key = keys.get(slotId);
+      if (!key) return;
+      setQueue((q) => [...q.filter((x) => x.key !== key), { key, personId: '', warnings: [], override: false, remove: true }]);
+      if (!rows.week && !building) void buildWeek(engine, rows.weekStart, auto);
+      return;
+    }
+    void removeSlot(engine, slot).then(() => sendAndRefresh(engine, ['slots', 'assignments']));
+  }
 
   const counts = useMemo(() => boardCounts(model, drafts, built), [model, drafts, built]);
   const toConfirm = drafts.size + schedule.proposed.length;
@@ -177,11 +237,10 @@ export function WeekBoard({ rows, now, today, historyRows, historyLoading, onOpe
     for (const a of schedule.proposed) void acceptProposal(engine, a);
   }
 
-  // Tipo e porte sugeridos pelo histórico, no cartão.
+  // Tipo e porte sugeridos pelo histórico, no cartão. Sem montagem, o porte já vai sozinho (auto).
   const titleIndex = useMemo(() => buildTitleIndex(historyRows), [historyRows]);
   const typeHints = useMemo(() => typeSuggestions(rows, titleIndex), [rows, titleIndex]);
-  const seriesSizes = useMemo(() => buildSeriesSizes((historyRows ?? []).map(toFact)), [historyRows]);
-  const sizeHints = useMemo(() => sizeSuggestions(rows, seriesSizes), [rows, seriesSizes]);
+  const sizeHints = useMemo(() => (built ? sizeSuggestions(rows, seriesSizes) : new Map<string, SizeSuggestion>()), [built, rows, seriesSizes]);
 
   // Passar o mouse numa ficha acende a mesma pessoa na semana toda.
   const [lit, setLit] = useState<string | null>(null);
@@ -220,6 +279,9 @@ export function WeekBoard({ rows, now, today, historyRows, historyLoading, onOpe
     onAccept: (a: AssignmentRow) => void acceptProposal(engine, a),
     onDiscard: (a: AssignmentRow) => void discardProposal(engine, a),
     onClear: (a: AssignmentRow) => void clearSlot(engine, a),
+    onRemoveSlot: dropSlot,
+    onAddRole: addRole,
+    auto,
   };
   return (
     <>
@@ -259,6 +321,7 @@ export function WeekBoard({ rows, now, today, historyRows, historyLoading, onOpe
           roleName={model.roleName(pickSlot.job_role_id)}
           eventTitle={pickEvent.title}
           onChoose={isPlanned(pickSlot.id) ? (personId, warnings, override) => confirm([{ slotId: pickSlot.id, personId, warnings, override }]) : undefined}
+          onRemove={readOnly || pickEvent.status === 'cancelled' ? undefined : () => dropSlot(pickSlot.id)}
           onClose={() => setPicking(null)}
         />
       )}
@@ -284,6 +347,10 @@ type ChipProps = {
   onAccept: (a: AssignmentRow) => void;
   onDiscard: (a: AssignmentRow) => void;
   onClear: (a: AssignmentRow) => void;
+  onRemoveSlot: (slotId: string) => void;
+  onAddRole: (e: EventRow, roleId: string) => void;
+  /** Porte aplicado sozinho, que vai junto quando a montagem cria as vagas. */
+  auto: ReadonlyMap<string, AutoSize>;
 };
 
 function DayColumn({
@@ -407,6 +474,7 @@ function EventCard({
   const alerts = eventAlerts(event, slots.length, built, rows.types);
   const title = shortTitle(event.title);
   const cancelled = event.status === 'cancelled';
+  const canAdd = !readOnly && !cancelled && Boolean(event.service_type_id) && needsTeam(event, rows.types);
   return (
     <article
       className={`board-card board-kind--${kind}${event.highlighted ? ' is-highlighted' : ''}${cancelled ? ' board-card--cancelled' : ''}`}
@@ -424,6 +492,12 @@ function EventCard({
         <span className="board-card-type">
           {type ? type.name : 'Tipo a definir'}
           {sized && ` · ${SIZE_LABEL[sizeFor(sized, event.size)]}`}
+          {crewOrigin(event) && (
+            <span className="board-card-origin" title={crewOrigin(event) === 'series' ? 'Vagas como a série aprendeu nas últimas semanas' : 'Porte pelas últimas vezes da série no histórico'}>
+              {' '}
+              · pela série
+            </span>
+          )}
         </span>
         {alerts.length > 0 && (
           <span className="board-alert" data-alert title={alerts.join('; ')} role="img" aria-label={`Avisos: ${alerts.join('; ')}`}>
@@ -470,20 +544,63 @@ function EventCard({
           {slots.map((s) => (
             <Chip key={s.id} slot={s} event={event} {...chip} />
           ))}
+          {canAdd && <AddSlot event={event} rows={rows} slots={slots} onAdd={chip.onAddRole} />}
         </ul>
       ) : (
         needsTeam(event, rows.types) && (
-          <span className="board-card-meta">
-            {!event.service_type_id ? 'Escolha o tipo para ver as vagas.' : 'Sem vagas.'}{' '}
-            {built && event.service_type_id && !readOnly && (
-              <Button size="sm" variant="ghost" onClick={() => void buildWeek(engine, rows.weekStart)}>
-                Criar as vagas
-              </Button>
+          <>
+            <span className="board-card-meta">
+              {!event.service_type_id ? 'Escolha o tipo para ver as vagas.' : 'Sem vagas.'}{' '}
+              {built && event.service_type_id && !readOnly && (
+                <Button size="sm" variant="ghost" onClick={() => void buildWeek(engine, rows.weekStart, chip.auto)}>
+                  Criar as vagas
+                </Button>
+              )}
+            </span>
+            {canAdd && (
+              <ul className="plain-list board-chips" aria-label={`Vagas de ${title}`}>
+                <AddSlot event={event} rows={rows} slots={slots} onAdd={chip.onAddRole} />
+              </ul>
             )}
-          </span>
+          </>
         )
       )}
     </article>
+  );
+}
+
+/** "+ vaga": a lista de funções para pôr mais uma vaga no evento (as que o evento já tem primeiro). */
+function AddSlot({ event, rows, slots, onAdd }: { event: EventRow; rows: WeekRows; slots: readonly SlotRow[]; onAdd: (e: EventRow, roleId: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const title = shortTitle(event.title);
+  const has = new Set(slots.map((s) => s.job_role_id));
+  const roles = rows.roles
+    .filter((r) => !r.archived_at)
+    .sort((a, b) => Number(has.has(b.id)) - Number(has.has(a.id)) || a.name.localeCompare(b.name, 'pt-BR'));
+  return (
+    <li className="board-chip board-chip--add">
+      <button type="button" className="board-chip-add" aria-haspopup="menu" aria-expanded={open} aria-label={`Pôr mais uma vaga em ${title}`} title="Pôr mais uma vaga (vale para as próximas semanas da série)" onClick={() => setOpen((o) => !o)}>
+        + vaga
+      </button>
+      {open && (
+        <ChipMenu onClose={() => setOpen(false)} label={`Função da vaga a mais em ${title}`}>
+          {roles.map((r) => (
+            <button
+              key={r.id}
+              type="button"
+              role="menuitem"
+              className="board-menu-item"
+              onClick={() => {
+                setOpen(false);
+                onAdd(event, r.id);
+              }}
+            >
+              {r.name}
+            </button>
+          ))}
+        </ChipMenu>
+      )}
+    </li>
   );
 }
 
@@ -533,7 +650,7 @@ function MarkerLine({ event, types, onOpen }: { event: EventRow; types: readonly
   );
 }
 
-function Chip({ slot, event, model, drafts, queued, keys, readOnly, pendingRows, lit, menu, setLit, setMenu, onPick, onConfirm, onDismiss, onUnqueue, onAccept, onDiscard, onClear }: ChipProps & { slot: SlotRow; event: EventRow }) {
+function Chip({ slot, event, model, drafts, queued, keys, readOnly, pendingRows, lit, menu, setLit, setMenu, onPick, onConfirm, onDismiss, onUnqueue, onAccept, onDiscard, onClear, onRemoveSlot }: ChipProps & { slot: SlotRow; event: EventRow }) {
   const a = model.bySlot.get(slot.id);
   const q = queued.get(keys.get(slot.id) ?? '');
   const draft = drafts.get(slot.id);
@@ -607,6 +724,7 @@ function Chip({ slot, event, model, drafts, queued, keys, readOnly, pendingRows,
           {item('Trocar pessoa', () => onPick(slot.id))}
           {state === 'suggested' && item('Deixar vaga', () => (proposal && a ? onDiscard(a) : onDismiss(slot.id)))}
           {state === 'confirmed' && item('Desfazer', () => (q ? onUnqueue(slot.id) : a && onClear(a)))}
+          {!cancelled && item('Tirar esta vaga', () => onRemoveSlot(slot.id))}
         </ChipMenu>
       )}
     </li>
