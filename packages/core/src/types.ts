@@ -47,6 +47,8 @@ export interface Candidate {
   level?: number;
   /** Fora do horário de trabalho: vem depois de quem está no horário, com o aviso. */
   offHours?: boolean;
+  /** Turma fixa gravada da série: 0 titular, 1 reserva. Vem antes de todos. */
+  pinned?: number;
 }
 
 /** Nível da pessoa numa função (person_roles.level). */
@@ -88,6 +90,8 @@ export interface EventLike {
   external?: boolean;
   /** Sede da série (aprendida de quem costuma fazer); nula quando não dá para saber. */
   base?: Base | null;
+  /** Turma fixa gravada da série: por função, [titular, reserva] (series_rules.titulars). */
+  titulars?: Readonly<Record<string, readonly string[]>>;
 }
 
 export interface SlotLike {

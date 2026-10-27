@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CREW_ROWS, eventRow, ROLE_ROWS, TYPE_ROWS, WEEK_B } from '../../test/weekFixtures';
-import type { AssignmentRow, CrewRow, EventRow, JobRoleRow, ServiceTypeRow, SlotRow } from '../data/catalog';
-import { activityKind, chipState, eventAlerts, isPlanned, plannedRows, shortTitle, slotKeys, timeOffAbsences } from './board';
+import type { AssignmentRow, CrewRow, EventRow, HistoryFactRow, JobRoleRow, ServiceTypeRow, SlotRow } from '../data/catalog';
+import { activityKind, chipState, eventAlerts, isPlanned, plannedRows, shortTitle, slotKeys, timeOffAbsences, titularAsks } from './board';
 import type { WeekRows } from './model';
 
 const types = TYPE_ROWS as unknown as ServiceTypeRow[];
@@ -38,6 +38,26 @@ describe('grade da semana', () => {
     // Semana montada fica como está.
     const built = rows({ week: { id: 'w' } as never, events });
     expect(plannedRows(built)).toBe(built);
+  });
+
+  it('"virou o titular?": a mesma pessoa nas duas últimas vezes e outra mais vezes nas 8 semanas; vaga de duas pessoas não pergunta', () => {
+    const event = eventRow('a', { title: 'MBA Agro - Aula 9' }) as unknown as EventRow;
+    const slot = (id: string, role: string) => ({ id, event_id: 'a', job_role_id: role, archived_at: null }) as SlotRow;
+    const fact = (person: string, week: string, role = 'r1') =>
+      ({ event_id: `h${person}${week}${role}`, week_start: week, event_date: week, title: 'MBA Agro - Aula 3', service_type_id: 't1', service_type_name: 'T1', job_role_id: role, job_role_name: 'R', person_id: person, person_name: person, raw_name: null, hours: 2, source: 'platform' }) as HistoryFactRow;
+    const facts = [
+      ...['2026-09-07', '2026-09-14', '2026-09-21', '2026-09-28', '2026-10-05'].map((w) => fact('ana', w)),
+      fact('bia', '2026-10-12'),
+      fact('bia', '2026-10-19'),
+      fact('caio', '2026-10-12', 'r5'),
+      fact('caio', '2026-10-19', 'r5'),
+    ];
+    const r = rows({ events: [event] });
+    const slots = new Map([['a', [slot('s1', 'r1'), slot('s2', 'r5'), slot('s3', 'r5')]]]);
+    expect(titularAsks(r, slots, facts)).toEqual([{ eventId: 'a', series: 'mba agro', roleId: 'r1', personId: 'bia', current: 'ana' }]);
+    // Respondido "Sim", Bia é a titular gravada: não pergunta mais.
+    const answered = rows({ events: [event], seriesRules: [{ id: 'x', version: 1, updated_at: '', series: 'mba agro', service_type_id: null, titulars: { r1: ['bia', 'ana'] } }] });
+    expect(titularAsks(answered, slots, facts)).toEqual([]);
   });
 
   it('a chave da vaga é a mesma antes e depois da montagem (evento, função e ordem na função)', () => {

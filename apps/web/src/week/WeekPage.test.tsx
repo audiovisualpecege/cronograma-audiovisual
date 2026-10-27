@@ -145,6 +145,20 @@ describe('Semana: grade', () => {
     expect((ops(remote).filter((o) => o.kind === 'slot.remove')[1]?.payload as { id: string }).id).not.toBe(filled.slot.id);
   });
 
+  it('"virou o titular?": a mesma troca nas duas últimas vezes pergunta no cartão; "Sim" grava a turma fixa (titular e reserva)', async () => {
+    const user = userEvent.setup();
+    const fact = (person: string, week: string) => ({ event_id: `h${person}${week}`, week_start: week, event_date: week, title: 'Gravação aula Biologia', service_type_id: 't1', service_type_name: 'T1', job_role_id: 'r1', job_role_name: 'Câmera', person_id: person, person_name: person, raw_name: null, hours: 3, source: 'platform' });
+    const remote = weekRemote({ events: [AULA], slots: [slotWith('ea', 'r1')] });
+    remote.views = { ...remote.views, history_facts: [...['2026-09-14', '2026-09-21', '2026-09-28'].map((w) => fact('p3', w)), fact('p4', '2026-10-12'), fact('p4', '2026-10-19')] };
+    await page(remote);
+    const aula = await card('Gravação aula Biologia');
+    const ask = await within(aula).findByRole('group', { name: 'Pessoa Exemplo 04 virou titular de Câmera?' });
+    expect(ask).toHaveTextContent('no lugar de Pessoa Exemplo 03');
+    await user.click(within(ask).getByRole('button', { name: 'Sim' }));
+    await waitFor(() => expect(remote.rpcCalls).toContainEqual({ fn: 'set_series_titular', args: { p_series: 'gravacao biologia', p_role: 'r1', p_people: ['p4', 'p3'] } }));
+    expect(within(aula).queryByRole('group', { name: /virou titular/ })).toBeNull();
+  });
+
   it('"Confirmar sugestões (N)" grava as sugestões e aceita as propostas do serviço de fundo; o placar conta cada situação', async () => {
     const user = userEvent.setup();
     const remote = weekRemote({ events: [AULA, TARDE], slots: [slotWith('ea', 'r1'), slotWith('ea', 'r5', 'p17', 'proposed'), slotWith('eb', 'r1', 'p3')] });

@@ -2,7 +2,7 @@
 // da montagem), a chave estável de cada vaga, os dias em colunas com as folgas, a família de cada atividade (cor
 // do cartão), os avisos do evento e o placar.
 import { addDays, eventSeries, nameTokens, zonedTime, type AbsenceLike } from '@cronograma/core';
-import { seriesRuleMap, type AssignmentRow, type EventRow, type ServiceTypeRow, type SlotRow } from '../data/catalog';
+import { seriesRuleMap, type AssignmentRow, type EventRow, type HistoryFactRow, type ServiceTypeRow, type SlotRow } from '../data/catalog';
 import type { Draft } from './historyProposal';
 import { estimatedCrew, eventsByDay, isMarker, isMeetingEvent, needsTeam, slotState, weekDays, type AutoSize, type CrewOrigin, type TimeOff, type WeekRows } from './model';
 import type { ScheduleModel } from './schedule';
@@ -141,6 +141,63 @@ export function eventAlerts(e: EventRow, slotCount: number, built: boolean, type
   if (e.crew_outdated) out.push('a equipe típica do tipo mudou');
   if (e.duplicate_group) out.push('possível duplicado');
   if (built && slotCount === 0 && e.service_type_id && needsTeam(e, types)) out.push('sem vagas');
+  return out;
+}
+
+/** "Fulano virou o titular?": a mesma pessoa fez a função nas duas últimas vezes da série, e não é a titular. */
+export interface TitularAsk {
+  eventId: string;
+  series: string;
+  roleId: string;
+  personId: string;
+  /** Titular de hoje: a gravada, senão quem mais fez a série nas 8 semanas antes. */
+  current: string | null;
+}
+
+/** Semanas da janela da turma fixa (SERIES_WINDOW_WEEKS do core). */
+const FIXED_WINDOW_DAYS = 56;
+
+/**
+ * As perguntas "virou o titular?" da semana: para cada série e função de uma vaga só, quando a mesma pessoa fez as
+ * duas últimas vezes (no histórico, que inclui as semanas publicadas) e ela não é a titular de hoje. Uma pergunta
+ * por série e função, no primeiro evento dela.
+ */
+export function titularAsks(rows: WeekRows, slots: ReadonlyMap<string, readonly SlotRow[]>, facts: readonly HistoryFactRow[] | null): TitularAsk[] {
+  const byKey = new Map<string, Map<string, Set<string>>>();
+  for (const f of facts ?? []) {
+    if (!f.person_id || !f.job_role_id || !f.title || f.week_start >= rows.weekStart) continue;
+    const key = `${eventSeries(f.title)}|${f.job_role_id}`;
+    const weeks = byKey.get(key) ?? new Map<string, Set<string>>();
+    weeks.set(f.week_start, (weeks.get(f.week_start) ?? new Set()).add(f.person_id));
+    byKey.set(key, weeks);
+  }
+  const rules = seriesRuleMap(rows.seriesRules);
+  const since = addDays(rows.weekStart, -FIXED_WINDOW_DAYS);
+  const asked = new Set<string>();
+  const out: TitularAsk[] = [];
+  for (const e of rows.events) {
+    if (!needsTeam(e, rows.types)) continue;
+    const series = eventSeries(e.title);
+    const roles = new Map<string, number>();
+    for (const s of slots.get(e.id) ?? []) roles.set(s.job_role_id, (roles.get(s.job_role_id) ?? 0) + 1);
+    for (const [roleId, n] of roles) {
+      const key = `${series}|${roleId}`;
+      const weeks = byKey.get(key);
+      if (n !== 1 || !series || !weeks || asked.has(key)) continue;
+      const [w1, w2] = [...weeks.keys()].sort().reverse();
+      if (!w1 || !w2) continue;
+      const both = [...(weeks.get(w1) ?? [])].filter((p) => weeks.get(w2)?.has(p));
+      if (both.length !== 1) continue;
+      const personId = both[0] as string;
+      const counts = new Map<string, number>();
+      for (const [w, people] of weeks) if (w >= since) for (const p of people) counts.set(p, (counts.get(p) ?? 0) + 1);
+      const deduced = [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+      const current = rules.get(series)?.titulars?.[roleId]?.[0] ?? deduced;
+      if (current === personId) continue;
+      asked.add(key);
+      out.push({ eventId: e.id, series, roleId, personId, current });
+    }
+  }
   return out;
 }
 

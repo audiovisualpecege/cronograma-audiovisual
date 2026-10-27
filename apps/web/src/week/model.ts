@@ -123,11 +123,12 @@ export function needsTeam(e: EventRow, types: readonly ServiceTypeRow[]): boolea
   return e.status !== 'cancelled' && !e.ignored && !e.no_team && !typeNoTeam(types, e.service_type_id);
 }
 
-export function toEventLike(e: EventRow, types: readonly ServiceTypeRow[], bases?: ReadonlyMap<string, Base>): EventLike {
+export function toEventLike(e: EventRow, types: readonly ServiceTypeRow[], bases?: ReadonlyMap<string, Base>, rule?: SeriesRuleRow): EventLike {
   const type = types.find((t) => t.id === e.service_type_id);
   return {
     external: Boolean(type?.external),
     base: bases?.get(eventSeries(e.title)) ?? null,
+    ...(rule?.titulars ? { titulars: rule.titulars } : {}),
     // Trabalho complexo: tipo marcado como complexo, evento de porte Grande ou com estrela de atividade principal.
     complex: Boolean(e.highlighted) || Boolean(type?.complex) || Boolean(type?.sized && sizeFor(type, e.size) === 3),
     id: e.id,
@@ -204,7 +205,8 @@ export function activeSlots(rows: Pick<WeekRows, 'events' | 'slots'>): SlotRow[]
  * aprendida do histórico (seriesBases).
  */
 export function weekContext(rows: WeekRows, now: Date, bases?: ReadonlyMap<string, Base>): WeekContext {
-  const events = rows.events.filter((e) => !e.ignored).map((e) => toEventLike(e, rows.types, bases));
+  const rules = seriesRuleMap(rows.seriesRules);
+  const events = rows.events.filter((e) => !e.ignored).map((e) => toEventLike(e, rows.types, bases, rules.get(eventSeries(e.title))));
   const noHours = new Set(rows.roles.filter((r) => r.no_hours).map((r) => r.id));
   const slots: SlotLike[] = activeSlots(rows).map((s, i) => ({
     id: s.id,

@@ -297,6 +297,7 @@ const byCode = (a: { code: string }, b: { code: string }) =>
 
 /**
  * Aptos da vaga em ordem (só entra quem não tem bloqueio nem alerta, menos o "fora do horário"):
+ *   0. a turma fixa gravada da série (titular, depois reserva), quando alguém respondeu "virou o titular?";
  *   1. a turma fixa: quem fez a função neste mesmo evento nas 8 semanas antes, mais vezes primeiro, no horário ou
  *      fora dele;
  *   2. dentro do horário, o grupo de empate do histórico (>= 0,8 x o maior, ou todos quando o maior é 0), pela
@@ -315,6 +316,7 @@ export function rankCandidates(slotId: string, ctx: WeekContext, history: Histor
     const elig = checkEligibility(p.id, slotId, ctx);
     if (elig.blockers.length > 0 || elig.warnings.some((w) => w !== 'off_hours')) continue;
     const offHours = elig.warnings.includes('off_hours');
+    const pinned = event.titulars?.[slot.jobRoleId]?.indexOf(p.id) ?? -1;
     const load = loadOf(p.id, weekCtx, slotId);
     const hist = history.hist(p.id, slot.jobRoleId, event.serviceTypeId);
     const pos = p.rolePriority?.indexOf(slot.jobRoleId) ?? -1;
@@ -331,6 +333,7 @@ export function rankCandidates(slotId: string, ctx: WeekContext, history: Histor
       ...(pos >= 0 ? { priority: pos } : {}),
       ...(level !== undefined ? { level } : {}),
       ...(offHours ? { offHours } : {}),
+      ...(pinned >= 0 ? { pinned } : {}),
       score: history.recent ? history.recent(p.id, slot.jobRoleId, event.serviceTypeId, event.weekStart) : hist,
     });
   }
@@ -341,9 +344,11 @@ export function rankCandidates(slotId: string, ctx: WeekContext, history: Histor
     const l = c.level ?? ROLE_LEVELS.titular;
     return event.complex ? -l : l === ROLE_LEVELS.referencia ? 1 : 0;
   };
-  const fixed = apt.filter((c) => (c.series ?? 0) > 0);
-  const rest = apt.filter((c) => !c.series && !c.offHours);
-  const late = apt.filter((c) => !c.series && c.offHours);
+  const pinnedFirst = apt.filter((c) => c.pinned !== undefined).sort((a, b) => (a.pinned ?? 0) - (b.pinned ?? 0));
+  const free = apt.filter((c) => c.pinned === undefined);
+  const fixed = free.filter((c) => (c.series ?? 0) > 0);
+  const rest = free.filter((c) => !c.series && !c.offHours);
+  const late = free.filter((c) => !c.series && c.offHours);
   const maxScore = rest.reduce((m, c) => Math.max(m, c.score), 0);
   for (const c of apt) c.inTieGroup = (c.series ?? 0) > 0 || (!c.offHours && (maxScore === 0 || c.score >= TIE_RATIO * maxScore));
   const bySeries = (a: (typeof apt)[number], b: (typeof apt)[number]) =>
@@ -353,6 +358,7 @@ export function rankCandidates(slotId: string, ctx: WeekContext, history: Histor
   const byHist = (a: (typeof apt)[number], b: (typeof apt)[number]) =>
     b.score - a.score || lvl(a) - lvl(b) || prio(a) - prio(b) || a.loadHours - b.loadHours || a.loadCount - b.loadCount || byCode(a, b);
   const ordered = [
+    ...pinnedFirst,
     ...fixed.sort(bySeries),
     ...rest.filter((c) => c.inTieGroup).sort(byLoad),
     ...rest.filter((c) => !c.inTieGroup).sort(byHist),
@@ -365,6 +371,7 @@ export function rankCandidates(slotId: string, ctx: WeekContext, history: Histor
     if (c.priority !== undefined) out.priority = c.priority;
     if (c.level !== undefined) out.level = c.level;
     if (c.offHours) out.offHours = true;
+    if (c.pinned !== undefined) out.pinned = c.pinned;
     return out;
   });
 }
@@ -409,7 +416,7 @@ export function proposeWeek(ctx: WeekContext, history: HistoryIndex, isMeeting: 
   for (const slot of order) {
     if (isMeeting(slot.eventId)) continue;
     const best = rankCandidates(slot.id, work, history)[0];
-    if (best?.series) take(slot, best);
+    if (best?.series || best?.pinned !== undefined) take(slot, best);
   }
   for (const slot of order) {
     if (out.has(slot.id)) continue;

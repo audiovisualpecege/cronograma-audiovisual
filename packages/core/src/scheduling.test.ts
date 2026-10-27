@@ -232,6 +232,17 @@ describe('ranking e lotes da pré-escala', () => {
     });
   });
 
+  it('turma fixa gravada: titular, depois reserva, antes da turma deduzida e do histórico; na semana toda também', () => {
+    const { ctx } = rankingScenario([{ id: 'p3', hist: 0, loadHours: 0 }, { id: 'p4', hist: 9, loadHours: 0 }, { id: 'p5', hist: 0, loadHours: 0 }]);
+    const fact = (personId: string, weekStart: string) =>
+      ({ eventId: `h-${personId}-${weekStart}`, weekStart, eventDate: weekStart, title: 'MBA Agro', serviceTypeId: 't1', jobRoleId: 'r1', personId, hours: 3 });
+    const history = buildHistoryIndex([fact('p4', '2026-10-05'), fact('p4', '2026-10-12')]);
+    const pinned = { ...ctx, events: ctx.events.map((e) => (e.id === 'ev' ? { ...e, title: 'MBA Agro', titulars: { r1: ['p5', 'p3'] } } : e)) };
+    const ranked = rankCandidates('v1', pinned, history);
+    expect(ranked.map((c) => [c.personId, c.pinned])).toEqual([['p5', 0], ['p3', 1], ['p4', undefined]]);
+    expect(proposeWeek(pinned, history).get('v1')?.personId).toBe('p5');
+  });
+
   describe('turma fixa, prioridade e nível', () => {
     const fact = (personId: string, weekStart: string, title = 'Gravação aula') =>
       ({ eventId: `h-${personId}-${weekStart}-${title}`, weekStart, eventDate: weekStart, title, serviceTypeId: 't1', jobRoleId: 'r1', personId, hours: 3 });

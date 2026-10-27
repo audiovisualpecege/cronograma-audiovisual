@@ -15,7 +15,7 @@ import type {
   SlotRow,
   WeekRow,
 } from '../data/catalog';
-import { isSimulating, previewWeekRows, setPreviewSize, usePreviewExternal, usePreviewPeople, usePreviewSeries, usePreviewSizes } from '../dev/sizePreview';
+import { isSimulating, learnPreviewTitular, previewWeekRows, setPreviewSize, usePreviewExternal, usePreviewPeople, usePreviewSeries, usePreviewSizes } from '../dev/sizePreview';
 import type { LocalStore } from '../sync/localStore';
 import type { SyncEngine } from '../sync/syncEngine';
 import { useLocalQuery } from '../sync/SyncProvider';
@@ -125,6 +125,16 @@ export async function buildWeek(engine: SyncEngine, weekStart: string, sizes: Re
   const payload = sizes.size > 0 ? { week_start: weekStart, sizes: Object.fromEntries([...sizes].map(([id, s]) => [id, s.size])) } : { week_start: weekStart };
   await engine.enqueue('week.build', payload);
   await sendAndRefresh(engine, WEEK_TABLES);
+}
+
+/**
+ * Grava a turma fixa da série numa função: [titular, reserva] (migração 0023). Precisa de internet; na simulação
+ * do app local, fica neste navegador.
+ */
+export async function setSeriesTitular(engine: SyncEngine, series: string, roleId: string, people: string[]): Promise<void> {
+  if (isSimulating()) return learnPreviewTitular(series, roleId, people);
+  await engine.runOnline((remote) => remote.rpc('set_series_titular', { p_series: series, p_role: roleId, p_people: people }));
+  await engine.pull('series_rules').catch(() => 0);
 }
 
 /** Vaga a mais no evento; ensina a série (migração 0021). Sem versão de base: pôr vaga não entra em conflito. */

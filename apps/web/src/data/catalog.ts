@@ -211,6 +211,8 @@ export interface SeriesRuleRow extends Row {
   crew_type_id?: string | null;
   /** Porte da última troca de porte num evento da série. */
   size?: number | null;
+  /** Turma fixa gravada: por função, [titular, reserva] (migração 0023). */
+  titulars?: Record<string, string[]> | null;
 }
 
 /** Tipo aprendido de cada série, para o classifyTitle. */

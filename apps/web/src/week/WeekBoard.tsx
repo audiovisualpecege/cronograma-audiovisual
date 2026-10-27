@@ -19,9 +19,11 @@ import {
   shortTitle,
   slotKeys,
   timeOffAbsences,
+  titularAsks,
   type BoardCounts,
   type BoardDay,
   type ChipState,
+  type TitularAsk,
 } from './board';
 import { EventSeals } from './EventSeals';
 import { proposeByHistory, type Draft } from './historyProposal';
@@ -47,7 +49,7 @@ import { useSchedule } from './schedule';
 import { Seal } from './Seal';
 import { TIME_OFF } from './timeOffIcons';
 import { buildTitleIndex, typeSuggestions } from './typeSuggestions';
-import { acceptProposal, addSlot, buildWeek, clearSlot, discardProposal, removeSlot, sendAndRefresh, setPerson, useBuildPending } from './useWeek';
+import { acceptProposal, addSlot, buildWeek, clearSlot, discardProposal, removeSlot, sendAndRefresh, setPerson, setSeriesTitular, useBuildPending } from './useWeek';
 
 const NO_DRAFTS: ReadonlyMap<string, Draft> = new Map();
 
@@ -240,6 +242,23 @@ export function WeekBoard({ rows, now, today, historyRows, historyLoading, onOpe
     for (const a of schedule.proposed) void acceptProposal(engine, a);
   }
 
+  // "Virou o titular?": a mesma troca nas duas últimas vezes da série. A resposta grava a turma fixa.
+  const [answered, setAnswered] = useState<ReadonlySet<string>>(() => new Set());
+  const asks = useMemo(() => {
+    if (!suggesting) return new Map<string, TitularAsk[]>();
+    const out = new Map<string, TitularAsk[]>();
+    for (const a of titularAsks(board, model.slotsByEvent, historyRows)) {
+      if (answered.has(`${a.series}|${a.roleId}`)) continue;
+      out.set(a.eventId, [...(out.get(a.eventId) ?? []), a]);
+    }
+    return out;
+  }, [suggesting, board, model.slotsByEvent, historyRows, answered]);
+  function answer(a: TitularAsk, yes: boolean) {
+    setAnswered((s) => new Set([...s, `${a.series}|${a.roleId}`]));
+    const people = yes ? [a.personId, a.current] : [a.current, a.personId];
+    void setSeriesTitular(engine, a.series, a.roleId, people.filter((p): p is string => Boolean(p))).catch(() => undefined);
+  }
+
   // Tipo e porte sugeridos pelo histórico, no cartão. Sem montagem, o porte já vai sozinho (auto).
   const titleIndex = useMemo(() => buildTitleIndex(historyRows), [historyRows]);
   const typeHints = useMemo(() => typeSuggestions(rows, titleIndex), [rows, titleIndex]);
@@ -285,6 +304,8 @@ export function WeekBoard({ rows, now, today, historyRows, historyLoading, onOpe
     onRemoveSlot: dropSlot,
     onAddRole: addRole,
     auto,
+    asks,
+    onAnswer: answer,
   };
   return (
     <>
@@ -354,6 +375,9 @@ type ChipProps = {
   onAddRole: (e: EventRow, roleId: string) => void;
   /** Porte aplicado sozinho, que vai junto quando a montagem cria as vagas. */
   auto: ReadonlyMap<string, AutoSize>;
+  /** Perguntas "virou o titular?" por evento. */
+  asks: ReadonlyMap<string, TitularAsk[]>;
+  onAnswer: (a: TitularAsk, yes: boolean) => void;
 };
 
 function DayColumn({
@@ -542,6 +566,23 @@ function EventCard({
           )}
         </span>
       )}
+      {(chip.asks.get(event.id) ?? []).map((a) => {
+        const name = chip.model.personName(a.personId);
+        const role = chip.model.roleName(a.roleId);
+        return (
+          <p key={a.roleId} className="board-ask" role="group" aria-label={`${name} virou titular de ${role}?`}>
+            <span>
+              {name} fez {role} nas duas últimas vezes{a.current ? `, no lugar de ${chip.model.personName(a.current)}` : ''}. Virou o titular?
+            </span>
+            <button type="button" className="text-button" onClick={() => chip.onAnswer(a, true)}>
+              Sim
+            </button>
+            <button type="button" className="text-button" onClick={() => chip.onAnswer(a, false)}>
+              Não
+            </button>
+          </p>
+        );
+      })}
       {slots.length > 0 ? (
         <ul className="plain-list board-chips" aria-label={`Vagas de ${title}`}>
           {slots.map((s) => (

@@ -24,12 +24,13 @@ export function historyReason(
   ctx: WeekContext,
   history: HistoryIndex,
   slotId: string,
-  c: Pick<Candidate, 'personId' | 'hist' | 'series' | 'level'>,
+  c: Pick<Candidate, 'personId' | 'hist' | 'series' | 'level' | 'pinned'>,
 ): string {
   const slot = ctx.slots.find((s) => s.id === slotId);
   const event = ctx.events.find((e) => e.id === slot?.eventId);
   if (!slot || !event) return '';
   const parts: string[] = [];
+  if (c.pinned !== undefined) parts.push(c.pinned === 0 ? 'titular desta série' : 'reserva desta série');
   const lastSeries = c.series && event.title ? history.lastSeriesWeek?.(c.personId, slot.jobRoleId, event.title, event.weekStart) : null;
   const last = c.hist > 0 ? history.lastWeek?.(c.personId, slot.jobRoleId, event.serviceTypeId, event.weekStart) : null;
   if (c.series) parts.push(`fez este evento ${lastSeries ? agoText(lastSeries, event.weekStart) : 'há pouco'} (${vezes(c.series)} em 8 semanas)`);

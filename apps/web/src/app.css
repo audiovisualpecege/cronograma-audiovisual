@@ -2441,6 +2441,21 @@ button.board-off-item {
   color: var(--text-primary);
 }
 
+/* "Virou o titular?": pergunta curta no cartão, com Sim e Não. */
+.board-ask {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 /* "pela série": as vagas ou o porte vieram do que a série aprendeu. */
 .board-card-origin {
   color: var(--accent);

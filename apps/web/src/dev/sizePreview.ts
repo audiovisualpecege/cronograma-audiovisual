@@ -209,6 +209,7 @@ export interface LearnedSeries {
   crew?: { job_role_id: string; quantity: number }[] | null;
   crewType?: string | null;
   size?: number;
+  titulars?: Record<string, string[]>;
 }
 
 type Sizes = Readonly<Record<string, EventSize>>;
@@ -232,6 +233,12 @@ export function learnPreviewSeries(title: string, typeId: string) {
   learn(title, { type: typeId });
 }
 
+/** A 0023: a resposta "virou o titular?" grava a turma fixa da série (aqui, só neste navegador). */
+export function learnPreviewTitular(series: string, roleId: string, people: string[]) {
+  const l = seriesStore.read()[series];
+  seriesStore.set(series, { ...l, titulars: { ...l?.titulars, [roleId]: people } });
+}
+
 /** A 0021: pôr ou tirar vaga ensina as vagas da série (aqui, só neste navegador). */
 export function learnPreviewCrew(title: string, typeId: string, roleIds: readonly string[]) {
   const counts = new Map<string, number>();
@@ -249,6 +256,7 @@ function mergeRules(rules: readonly SeriesRuleRow[] | undefined, learned: Learne
       ...(l.type ? { service_type_id: l.type } : {}),
       ...(l.crew !== undefined ? { crew: l.crew, crew_type_id: l.crewType ?? null } : {}),
       ...(l.size !== undefined ? { size: l.size } : {}),
+      ...(l.titulars ? { titulars: { ...r.titulars, ...l.titulars } } : {}),
     });
   }
   return [...out.values()];
