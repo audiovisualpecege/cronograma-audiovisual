@@ -10,6 +10,8 @@ export { fillOrder } from '@cronograma/core';
 export interface Draft {
   personId: string;
   reason: string;
+  /** Alertas que a sugestão já leva (fora do horário): confirmar é escalar mesmo assim. */
+  warnings?: string[];
 }
 
 const vezes = (n: number) => `${n} ${n === 1 ? 'vez' : 'vezes'}`;
@@ -41,7 +43,12 @@ export function proposeByHistory(ctx: WeekContext, history: HistoryIndex, isMeet
   const out = new Map<string, Draft>();
   for (const [slotId, best] of proposeWeek(ctx, history, isMeeting)) {
     const load = `${hoursText(best.loadHours)} na semana`;
-    out.set(slotId, { personId: best.personId, reason: `${historyReason(ctx, history, slotId, best)}; ${load}` });
+    const late = best.offHours ? '; fora do horário de trabalho' : '';
+    out.set(slotId, {
+      personId: best.personId,
+      reason: `${historyReason(ctx, history, slotId, best)}; ${load}${late}`,
+      ...(best.offHours ? { warnings: ['off_hours'] } : {}),
+    });
   }
   return out;
 }

@@ -2,13 +2,15 @@
 import { buildHistoryIndex, isWeekPast, rankCandidates, type HistoryIndex, type WeekContext } from '@cronograma/core';
 import { useMemo } from 'react';
 import { toFact, type AssignmentRow, type EventRow, type HistoryFactRow, type SlotRow } from '../data/catalog';
-import { activeSlots, needsTeam, slotState, weekContext, type WeekRows } from './model';
+import { activeSlots, needsTeam, seriesBases, slotState, weekContext, type WeekRows } from './model';
 
 /** Escala da semana: contexto das regras, índice do histórico e o modelo da grade. */
 export function useSchedule(rows: WeekRows, now: Date, today: string, historyRows: readonly HistoryFactRow[] | null) {
   const index = useMemo(() => buildHistoryIndex((historyRows ?? []).map(toFact)), [historyRows]);
+  // Sede de cada série, de quem costuma fazer (outra sede não é sugerida).
+  const bases = useMemo(() => seriesBases(historyRows, rows.people), [historyRows, rows.people]);
   // O relógio só importa por dia aqui (semana passada); recalcula quando as linhas mudam.
-  const ctx = useMemo(() => weekContext(rows, now), [rows, today]); // eslint-disable-line react-hooks/exhaustive-deps
+  const ctx = useMemo(() => weekContext(rows, now, bases), [rows, today, bases]); // eslint-disable-line react-hooks/exhaustive-deps
   const model = useMemo(() => scheduleModel(rows, ctx, index), [rows, ctx, index]);
   const proposed = rows.assignments.filter((a) => slotState(a) === 'proposed' && model.slotsByEvent.get(a.event_id)?.some((s) => s.id === a.slot_id));
   return { model, ctx, index, proposed, readOnly: isWeekPast(rows.weekStart, now) };

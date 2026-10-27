@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { row } from '../../test/catalogRows';
-import type { AbsenceRow, EventRow, JobRoleRow, PersonRoleRow, PersonRow } from '../data/catalog';
-import { agoText, relativeWeekLabel, weekTimeOff, type WeekRows } from './model';
+import type { AbsenceRow, EventRow, HistoryFactRow, JobRoleRow, PersonRoleRow, PersonRow } from '../data/catalog';
+import { agoText, relativeWeekLabel, seriesBases, weekTimeOff, type WeekRows } from './model';
 
 const WEEK = '2026-10-26';
 const role = (id: string, code: string, name: string) => row(id, { code, name, sector_id: null, archived_at: null }) as unknown as JobRoleRow;
@@ -26,6 +26,27 @@ function rows(extra: Partial<WeekRows> = {}): WeekRows {
     ...extra,
   };
 }
+
+describe('sede da série', () => {
+  const fact = (personId: string, title: string, i: number) =>
+    ({ event_id: `h${personId}${i}`, week_start: WEEK, event_date: WEEK, title, service_type_id: 't1', service_type_name: 'T1', job_role_id: 'r1', job_role_name: 'Operador', person_id: personId, person_name: personId, raw_name: null, hours: 2, source: 'import' }) as HistoryFactRow;
+  const people = [person('sp', { base: 'sao_paulo' }), person('pi', { base: 'piracicaba' }), person('sem')];
+
+  it('vem de quem costuma fazer: 3 em cada 4 da mesma sede, com ao menos 3 vezes; quem não tem sede não conta', () => {
+    const facts = [
+      ...[0, 1, 2].map((i) => fact('sp', 'MBA Agro - Aula 3', i)),
+      fact('pi', 'MBA Agro - Aula 4', 0),
+      ...[0, 1, 2].map((i) => fact('sem', 'MBA Agro', i)),
+      // Meio a meio: sem sede.
+      ...[0, 1].map((i) => fact('sp', 'Curso Solos', i)),
+      ...[0, 1].map((i) => fact('pi', 'Curso Solos', i)),
+      // Poucas vezes: sem sede.
+      fact('pi', 'Webinar Café', 0),
+    ];
+    const bases = seriesBases(facts, people);
+    expect([...bases]).toEqual([['mba agro', 'sao_paulo']]);
+  });
+});
 
 describe('textos da semana', () => {
   it('agoText conta a última vez a partir da semana em escala', () => {

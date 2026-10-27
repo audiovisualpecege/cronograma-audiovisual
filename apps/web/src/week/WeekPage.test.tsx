@@ -87,6 +87,28 @@ describe('Semana: grade', () => {
     await waitFor(() => expect(ops(remote).find((o) => o.kind === 'assignment.set')).toMatchObject({ payload: { slot_id: open.slot.id, override: false } }));
   });
 
+  it('fora do horário de trabalho: ainda é sugerida, com o alerta; Confirmar escala mesmo assim', async () => {
+    const user = userEvent.setup();
+    const open = slotWith('ea', 'r1');
+    // P3 e P4 têm a Câmera; com P4 inativa, só sobra P3, que só trabalha à tarde na segunda (a aula é de manhã).
+    const people = peopleRows(4, { p3: { work_hours: { '1': ['13:00', '18:00'] } }, p4: { active: false } });
+    const remote = weekRemote({ events: [AULA], slots: [open], people, personRoles: personRoleRows(4) });
+    await page(remote);
+    const chip = await within(await card('Gravação aula Biologia')).findByRole('button', { name: 'Câmera: Pessoa Exemplo 03 (sugestão)' });
+    expect(chip).toHaveAttribute('title', expect.stringContaining('fora do horário de trabalho'));
+    expect(within(chip).getByText('alerta')).toBeInTheDocument();
+    await user.click(chip);
+    await user.click(screen.getByRole('menuitem', { name: 'Confirmar' }));
+    await waitFor(() => expect(ops(remote).find((o) => o.kind === 'assignment.set')).toMatchObject({ payload: { slot_id: open.slot.id, person_id: 'p3', override: true } }));
+  });
+
+  it('pessoa de São Paulo não é sugerida em tipo externo', async () => {
+    const types = TYPE_ROWS.map((t) => (t.id === 't1' ? { ...t, external: true } : t));
+    const people = peopleRows(4, { p3: { base: 'sao_paulo' }, p4: { base: 'piracicaba' } });
+    await page(weekRemote({ events: [AULA], slots: [slotWith('ea', 'r1')], people, personRoles: personRoleRows(4), extra: { service_types: types } }));
+    expect(await within(await card('Gravação aula Biologia')).findByRole('button', { name: 'Câmera: Pessoa Exemplo 04 (sugestão)' })).toBeInTheDocument();
+  });
+
   it('"Deixar vaga" tira a sugestão: a ficha fica vermelha, aberta', async () => {
     const user = userEvent.setup();
     await page(weekRemote({ events: [AULA], slots: [slotWith('ea', 'r1')] }));

@@ -17,6 +17,7 @@ import {
   type EventRow,
   type JobRoleRow,
   type PersonRoleRow,
+  type PersonRow,
   type SectorRow,
   type SeriesRuleRow,
   type ServiceTypeRow,
@@ -26,6 +27,8 @@ import type { WeekRows } from '../week/model';
 const ENABLED = import.meta.env.DEV && import.meta.env.MODE !== 'test';
 const STORAGE_KEY = 'cronograma:simulacao-porte';
 const SERIES_KEY = 'cronograma:simulacao-serie';
+const PEOPLE_KEY = 'cronograma:simulacao-pessoas';
+const EXTERNAL_KEY = 'cronograma:simulacao-externo';
 
 /** A 0020: palavras-chave de começo, pelo nome normalizado do tipo. */
 const OPENINGS: Record<string, string[]> = {
@@ -158,9 +161,11 @@ export function simulateCatalog(
     }
     outTypes.push({ ...t, sized: false, default_size: 1 });
   }
+  const marked = ENABLED ? externalStore.read() : {};
   const withOpenings = outTypes.map((t) => {
     const add = t.archived_at ? undefined : OPENINGS[normalizeName(t.name)];
-    return add ? { ...t, keywords: [...new Set([...(t.keywords ?? []), ...add])] } : t;
+    const external = marked[t.id] ?? (t.external ?? EXTERNAL.has(normalizeName(t.name)));
+    return { ...t, external, ...(add ? { keywords: [...new Set([...(t.keywords ?? []), ...add])] } : {}) };
   });
   return { types: withOpenings, crew: outCrew, roles };
 }
@@ -249,6 +254,48 @@ function mergeRules(rules: readonly SeriesRuleRow[] | undefined, learned: Learne
   return [...out.values()];
 }
 
+// ---------------------------------------------------------------------------------------------
+// A 0022 no app local: sede e horário das pessoas e "externo" nos tipos, guardados neste navegador enquanto o
+// banco não tem as colunas.
+
+export interface PersonExtras {
+  base: PersonRow['base'];
+  work_hours: PersonRow['work_hours'];
+}
+
+const personStore = localMap(PEOPLE_KEY, (v): v is PersonExtras => typeof v === 'object' && v !== null);
+const externalStore = localMap(EXTERNAL_KEY, (v): v is boolean => typeof v === 'boolean');
+
+/** Tipos externos da 0022, pelo nome normalizado. */
+const EXTERNAL = new Set(['evento', 'fotos', 'gravacao externa']);
+
+/** O banco ainda não tem a sede das pessoas (as linhas chegam sem a coluna). */
+export function peopleColumnsMissing(people: readonly PersonRow[]): boolean {
+  return ENABLED && people.length > 0 && people.every((p) => p.base === undefined);
+}
+
+export function setPreviewPerson(id: string, extras: PersonExtras) {
+  personStore.set(id, extras);
+}
+
+export function setPreviewExternal(typeId: string, external: boolean) {
+  externalStore.set(typeId, external);
+}
+
+/** As pessoas com a sede e o horário guardados neste navegador, enquanto o banco não tem as colunas. */
+export function previewPeople(people: readonly PersonRow[], extras: Readonly<Record<string, PersonExtras>> = personStore.read()): PersonRow[] {
+  if (!peopleColumnsMissing(people)) return [...people];
+  return people.map((p) => (extras[p.id] ? { ...p, ...extras[p.id] } : p));
+}
+
+export function usePreviewPeople(): Readonly<Record<string, PersonExtras>> {
+  return useSyncExternalStore(personStore.subscribe, () => (ENABLED ? personStore.read() : EMPTY));
+}
+
+export function usePreviewExternal(): Readonly<Record<string, boolean>> {
+  return useSyncExternalStore(externalStore.subscribe, () => (ENABLED ? externalStore.read() : EMPTY));
+}
+
 const EMPTY = {};
 
 export function usePreviewSizes(): Sizes {
@@ -310,7 +357,7 @@ export function simulateWeek(rows: WeekRows, sizes: Sizes, learned: Learned = {}
     }
   }
   const slots = hidden.size ? rows.slots.map((s) => (hidden.has(s.id) ? { ...s, archived_at: 'simulacao' } : s)) : rows.slots;
-  return { ...rows, types, crew, roles, events, slots, seriesRules, personRoles: simulatePersonRoles(rows.personRoles, roles) };
+  return { ...rows, types, crew, roles, events, slots, seriesRules, people: previewPeople(rows.people), personRoles: simulatePersonRoles(rows.personRoles, roles) };
 }
 
 /** A 0018 dá Disponibilizador, por último na lista, a quem tem Operador Aula. */

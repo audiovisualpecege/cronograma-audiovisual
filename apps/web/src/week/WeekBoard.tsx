@@ -51,6 +51,9 @@ import { acceptProposal, addSlot, buildWeek, clearSlot, discardProposal, removeS
 
 const NO_DRAFTS: ReadonlyMap<string, Draft> = new Map();
 
+/** Confirmar a sugestão que já leva alerta (fora do horário) é escalar mesmo assim. */
+const draftPick = (slotId: string, d: Draft): Pick => ({ slotId, personId: d.personId, warnings: d.warnings ?? [], override: Boolean(d.warnings?.length) });
+
 /**
  * Escolha feita numa vaga prevista: gravada na vaga de verdade assim que a montagem a criar. Com `remove`, a vaga
  * prevista sai: some da tela na hora e é tirada assim que a montagem a criar.
@@ -233,7 +236,7 @@ export function WeekBoard({ rows, now, today, historyRows, historyLoading, onOpe
   const counts = useMemo(() => boardCounts(model, drafts, built), [model, drafts, built]);
   const toConfirm = drafts.size + schedule.proposed.length;
   function confirmAll() {
-    confirm([...drafts].map(([slotId, d]) => ({ slotId, personId: d.personId })));
+    confirm([...drafts].map(([slotId, d]) => draftPick(slotId, d)));
     for (const a of schedule.proposed) void acceptProposal(engine, a);
   }
 
@@ -659,7 +662,7 @@ function Chip({ slot, event, model, drafts, queued, keys, readOnly, pendingRows,
   const personId = q?.personId ?? (slotState(a) !== 'open' ? (a?.person_id ?? null) : (draft?.personId ?? null));
   const role = model.roleName(slot.job_role_id);
   const who = personId ? model.personName(personId) : 'vaga aberta';
-  const warnings = (a?.warnings ?? []).filter((w) => w !== 'role_archived');
+  const warnings = (slotState(a) === 'open' && draft ? (draft.warnings ?? []) : (a?.warnings ?? [])).filter((w) => w !== 'role_archived');
   const cancelled = event.status === 'cancelled';
   const sending = Boolean(q) || Boolean(a && pendingRows.has(`assignments:${a.id}`));
   const reason = draft?.reason ?? (proposal ? a?.reason : null);
@@ -720,7 +723,7 @@ function Chip({ slot, event, model, drafts, queued, keys, readOnly, pendingRows,
       </button>
       {open && (
         <ChipMenu onClose={close} label={`${role}: ${who}`}>
-          {state === 'suggested' && personId && item('Confirmar', () => (proposal && a ? onAccept(a) : onConfirm({ slotId: slot.id, personId })))}
+          {state === 'suggested' && personId && item('Confirmar', () => (proposal && a ? onAccept(a) : draft && onConfirm(draftPick(slot.id, draft))))}
           {item('Trocar pessoa', () => onPick(slot.id))}
           {state === 'suggested' && item('Deixar vaga', () => (proposal && a ? onDiscard(a) : onDismiss(slot.id)))}
           {state === 'confirmed' && item('Desfazer', () => (q ? onUnqueue(slot.id) : a && onClear(a)))}

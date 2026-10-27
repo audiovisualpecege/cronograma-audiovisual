@@ -180,6 +180,58 @@ describe('ranking e lotes da pré-escala', () => {
     expect(ranked.map((c) => c.inTieGroup)).toEqual(tie);
   });
 
+  describe('horário de trabalho e sede', () => {
+    // A vaga é quarta 21/10, 14:00 a 17:00.
+    const morning = { '1': ['08:00', '13:00'], '2': ['08:00', '13:00'], '3': ['08:00', '13:00'], '4': ['08:00', '13:00'], '5': ['08:00', '13:00'] } as const;
+    const fullDay = { '3': ['08:00', '18:00'] } as const;
+
+    it('fora do horário é aviso, não bloqueio; dia sem horário conta como fora; sem horário cadastrado não pesa', () => {
+      const { ctx } = rankingScenario([
+        { id: 'p3', hist: 0, loadHours: 0, extra: { workHours: morning } },
+        { id: 'p4', hist: 0, loadHours: 0, extra: { workHours: fullDay } },
+        { id: 'p5', hist: 0, loadHours: 0, extra: { workHours: { '1': ['08:00', '18:00'] } } },
+        { id: 'p6', hist: 0, loadHours: 0 },
+      ]);
+      expect(checkEligibility('p3', 'v1', ctx).warnings).toEqual(['off_hours']);
+      expect(checkEligibility('p4', 'v1', ctx).warnings).toEqual([]);
+      expect(checkEligibility('p5', 'v1', ctx).warnings).toEqual(['off_hours']);
+      expect(checkEligibility('p6', 'v1', ctx).ok).toBe(true);
+    });
+
+    it('turma fixa manda; depois quem está no horário; quem está fora vem por último, pelo histórico, com a marca', () => {
+      const { ctx } = rankingScenario([
+        { id: 'p3', hist: 0, loadHours: 0, extra: { workHours: morning } },
+        { id: 'p4', hist: 0, loadHours: 0, extra: { workHours: morning } },
+        { id: 'p5', hist: 0, loadHours: 0, extra: { workHours: fullDay } },
+        { id: 'p6', hist: 0, loadHours: 0, extra: { workHours: morning } },
+      ]);
+      const fact = (personId: string, weekStart: string, title: string) =>
+        ({ eventId: `h-${personId}-${weekStart}`, weekStart, eventDate: weekStart, title, serviceTypeId: 't1', jobRoleId: 'r1', personId, hours: 3 });
+      const history = buildHistoryIndex([
+        fact('p6', '2026-10-12', 'MBA Agro'),
+        ...Array.from({ length: 5 }, (_, i) => fact('p4', addDays('2026-01-05', 7 * i), 'Outra coisa')),
+      ]);
+      const titled = { ...ctx, events: ctx.events.map((e) => (e.id === 'ev' ? { ...e, title: 'MBA Agro' } : e)) };
+      const ranked = rankCandidates('v1', titled, history);
+      expect(ranked.map((c) => c.personId)).toEqual(['p6', 'p5', 'p4', 'p3']);
+      expect(ranked.map((c) => Boolean(c.offHours))).toEqual([true, false, true, true]);
+    });
+
+    it('externo é só de Piracicaba; aula de outra sede não entra; sem sede não pesa', () => {
+      const { ctx } = rankingScenario([
+        { id: 'p3', hist: 0, loadHours: 0, extra: { base: 'sao_paulo' } },
+        { id: 'p4', hist: 0, loadHours: 0, extra: { base: 'piracicaba' } },
+        { id: 'p5', hist: 0, loadHours: 0 },
+      ]);
+      const withEvent = (patch: Partial<EventLike>) => ({ ...ctx, events: ctx.events.map((e) => (e.id === 'ev' ? { ...e, ...patch } : e)) });
+      const ranked = (patch: Partial<EventLike>) => rankCandidates('v1', withEvent(patch), buildHistoryIndex([])).map((c) => c.personId);
+      expect(ranked({ external: true })).toEqual(['p4', 'p5']);
+      expect(checkEligibility('p3', 'v1', withEvent({ external: true })).warnings).toEqual(['other_base']);
+      expect(ranked({ base: 'sao_paulo' })).toEqual(['p3', 'p5']);
+      expect(ranked({})).toEqual(['p3', 'p4', 'p5']);
+    });
+  });
+
   describe('turma fixa, prioridade e nível', () => {
     const fact = (personId: string, weekStart: string, title = 'Gravação aula') =>
       ({ eventId: `h-${personId}-${weekStart}-${title}`, weekStart, eventDate: weekStart, title, serviceTypeId: 't1', jobRoleId: 'r1', personId, hours: 3 });

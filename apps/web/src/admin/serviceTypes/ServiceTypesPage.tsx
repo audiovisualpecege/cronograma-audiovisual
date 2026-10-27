@@ -14,7 +14,7 @@ import { AddCircleIcon, TrashBinMinimalisticIcon } from '@solar-icons/react/line
 import { useMemo, useState, type FormEvent } from 'react';
 import { byName, crewOf, toFact, useTable, type CrewItem, type CrewRow, type JobRoleRow, type SectorRow, type ServiceTypeRow } from '../../data/catalog';
 import { firstError } from '../../data/messages';
-import { previewActive, previewCatalog } from '../../dev/sizePreview';
+import { previewActive, previewCatalog, setPreviewExternal, usePreviewExternal } from '../../dev/sizePreview';
 import { PageTitle } from '../../layout/PageTitle';
 import { useSyncEngine, useSyncState } from '../../sync/SyncProvider';
 import { AppIcon } from '../../ui/AppIcon';
@@ -162,6 +162,7 @@ function ServiceTypeForm({
   const [noTeam, setNoTeam] = useState(type?.no_team ?? false);
   const [icon, setIcon] = useState(type?.icon ?? '');
   const [complex, setComplex] = useState(type?.complex ?? false);
+  const [external, setExternal] = useState(type?.external ?? false);
   const [sized, setSized] = useState(type?.sized ?? false);
   const [sectorIds, setSectorIds] = useState<string[]>(type?.sector_ids ?? []);
   const [defaultSize, setDefaultSize] = useState(String(isEventSize(type?.default_size) ? type.default_size : DEFAULT_SIZE));
@@ -211,6 +212,7 @@ function ServiceTypeForm({
       no_team: v.noTeam,
       icon: icon || null,
       complex,
+      external: !v.noTeam && external,
       sized,
       default_size: Number(defaultSize),
       // Setores só valem para tipo sem equipe (reunião); com equipe, quem vê é quem está escalado.
@@ -258,6 +260,18 @@ function ServiceTypeForm({
             label="Trabalho complexo (a escala sugerida chama primeiro quem é Referência na função)"
             checked={complex}
             onChange={setComplex}
+          />
+        )}
+
+        {!noTeam && (
+          <Checkbox
+            label={`Externo (cobertura fora do estúdio: só a equipe de Piracicaba é sugerida)${simulated ? '. No app local, vale já, só neste navegador' : ''}`}
+            checked={external}
+            onChange={(on) => {
+              setExternal(on);
+              // Sem a 0022 no banco, a marca fica no navegador, valendo na sugestão da semana.
+              if (simulated && type) setPreviewExternal(type.id, on);
+            }}
           />
         )}
 
@@ -360,6 +374,7 @@ export function ServiceTypesPage() {
   const serverRoles = [...(useTable<JobRoleRow>('job_roles') ?? [])].sort(byName);
   const sectors = [...(useTable<SectorRow>('sectors') ?? [])].sort(byName);
   // App local sem a 0017 e a 0018 no banco: mostra os tipos como ficariam (dev/sizePreview), só para ver.
+  usePreviewExternal(); // a marca de externo guardada no navegador refaz a lista
   const preview = serverTypes && serverCrew ? previewCatalog(serverTypes, serverCrew, serverRoles, sectors) : undefined;
   const simulated = Boolean(serverTypes && previewActive(serverTypes));
   const types = preview?.types;
@@ -413,6 +428,7 @@ export function ServiceTypesPage() {
                   </span>
                   <span className="list-row-sub">
                     {t.complex ? 'trabalho complexo · ' : ''}
+                    {t.external && !t.no_team ? 'externo, só Piracicaba · ' : ''}
                     {t.no_team
                       ? `não exige equipe${t.sector_ids?.length ? ` · veem: ${t.sector_ids.map((id) => sectorName.get(id) ?? 'Setor').join(', ')}` : ''}`
                       : items.length

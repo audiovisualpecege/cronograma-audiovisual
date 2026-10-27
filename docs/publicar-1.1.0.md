@@ -76,12 +76,18 @@ primeiro passo que não der o resultado esperado.
     série, e a troca de porte grava o porte da série; `create_event_slots` cria as vagas aprendidas (mesmo tipo),
     senão a equipe do porte (o do evento, senão o da série, senão o padrão); `week.build` aceita `sizes` (o porte
     sugerido pelo app para os eventos sem porte). Não mexe em dados.
+  - `supabase/migrations/0022_base_work_hours.sql`: sede e horário de trabalho. Colunas `people.base`
+    (Piracicaba ou São Paulo) e `people.work_hours`, `service_types.external`; `check_eligibility` ganha os alertas
+    "fora do horário de trabalho" e "outra sede" (pessoa de São Paulo em tipo externo); `op_person_upsert` e
+    `op_service_type_upsert` viram `_base` e `_sectors`, e as novas gravam sede, horário e externo. **Mexe em
+    dados da produção**: EVENTO, FOTOS e GRAVACAO EXTERNA ficam externos (cópia em `public._backup_0022`).
+    Depois de aplicar, cadastre a sede e o horário de cada pessoa em Dados > Pessoas.
 - **Dados iniciais da 0016** (fora do repositório, porque trata da equipe pelo e-mail):
   `..\dados-iniciais\aplicar-prioridades.mjs`. Ele grava a ordem das funções de cada pessoa a partir da
   planilha `..\Analise da escala.xlsx`, aba "Prioridade por pessoa": vale a coluna "Sua ordem" quando
   preenchida, senão a sugerida pelo histórico do último ano. Também acrescenta Cinegrafista e Operador Evento
   a Pedro, Fernanda, Tiphany e Juliana.
-- **Desfazer**: `supabase/rollback/0021_down.sql`, `0020_down.sql`, `0019_down.sql`, `0018_down.sql`, `0017_down.sql`, `0016_down.sql`, `0015_down.sql`, `0014_down.sql`, `0013_down.sql` e
+- **Desfazer**: `supabase/rollback/0022_down.sql`, `0021_down.sql`, `0020_down.sql`, `0019_down.sql`, `0018_down.sql`, `0017_down.sql`, `0016_down.sql`, `0015_down.sql`, `0014_down.sql`, `0013_down.sql` e
   `0012_down.sql` (fora da pasta de migrações, para o `db push` não rodá-los).
 - **Serviço de fundo (NAS)**: **muda**. Ganhou o fornecedor de IA local (`apps/worker/src/ai/local.ts`), lotes
   de 25 vagas (eram 60), resposta da IA aproveitada item por item e o motivo exato da falha guardado no pedido. Depois
@@ -115,7 +121,7 @@ primeiro passo que não der o resultado esperado.
    ```
    Deve listar **só** `0012_request_classify.sql`, `0013_type_icon_and_highlight.sql`, `0014_local_ai.sql`,
    `0015_meetings_by_sector.sql`, `0016_role_priority_level.sql`, `0017_event_size.sql`,
-   `0018_disponibilizador.sql`, `0019_meeting_sectors.sql`, `0020_type_rules.sql` e `0021_series_crew.sql`.
+   `0018_disponibilizador.sql`, `0019_meeting_sectors.sql`, `0020_type_rules.sql`, `0021_series_crew.sql` e `0022_base_work_hours.sql`.
    Se listar também as antigas (0001 a 0011), o histórico de migrações do banco não registrou que elas já
    foram aplicadas. **Não rode o push.** Confira com `npx supabase migration list`. Depois de confirmar que o
    esquema existe (as tabelas `people`, `events`, `weeks` estão lá), marque as antigas como aplicadas com
@@ -195,7 +201,8 @@ estimada" da prévia (as vagas, que o banco cria, saem certas).
 2. **Serviço de fundo**: no NAS, volte a imagem anterior. Antes, troque o fornecedor para Gemini na tela, porque
    o worker antigo não conhece o local. Ou deixe como está: o worker novo funciona com o banco antigo.
 3. **Banco**, nesta ordem. Rode cada arquivo inteiro no SQL Editor do painel; cada um roda numa transação só:
-   0. `supabase/rollback/0021_down.sql`: as vagas voltam a nascer só pela equipe do tipo (as já criadas ficam).
+   0. `supabase/rollback/0022_down.sql`: tira sede, horário e "externo" e os alertas novos. Depois
+      `supabase/rollback/0021_down.sql`: as vagas voltam a nascer só pela equipe do tipo (as já criadas ficam).
       Depois `supabase/rollback/0020_down.sql`: tira as regras de começo e o que as séries aprenderam, e volta os
       eventos e o histórico que mudaram de tipo ao que eram.
    1. `supabase/rollback/0019_down.sql`: as reuniões de setor voltam a pedir equipe e a equipe deixa de ler os

@@ -18,7 +18,13 @@ export interface PersonRow extends Row {
   role_ids?: string[];
   /** Nível em cada função (1 Apoio, 2 Titular, 3 Referência), enquanto o cadastro está na fila. */
   role_levels?: Record<string, number>;
+  /** Sede (migração 0022); vazia, a sede não pesa na escala. */
+  base?: 'piracicaba' | 'sao_paulo' | null;
+  /** Horário de trabalho por dia ISO ('1' segunda a '7' domingo); vazio, o horário não pesa. */
+  work_hours?: Record<string, [string, string]> | null;
 }
+
+export const BASE_LABEL: Record<'piracicaba' | 'sao_paulo', string> = { piracicaba: 'Piracicaba', sao_paulo: 'São Paulo' };
 
 export interface PersonRoleRow extends Row {
   person_id: string;
@@ -68,6 +74,8 @@ export interface ServiceTypeRow extends Row {
   default_size?: number;
   /** Setores que veem os eventos do tipo na agenda (reuniões, sem escala). */
   sector_ids?: string[];
+  /** Externo (cobertura fora do estúdio): só a equipe de Piracicaba faz (migração 0022). */
+  external?: boolean;
   archived_at: string | null;
   crew?: CrewItem[];
 }

@@ -15,7 +15,7 @@ import type {
   SlotRow,
   WeekRow,
 } from '../data/catalog';
-import { isSimulating, previewWeekRows, setPreviewSize, usePreviewSeries, usePreviewSizes } from '../dev/sizePreview';
+import { isSimulating, previewWeekRows, setPreviewSize, usePreviewExternal, usePreviewPeople, usePreviewSeries, usePreviewSizes } from '../dev/sizePreview';
 import type { LocalStore } from '../sync/localStore';
 import type { SyncEngine } from '../sync/syncEngine';
 import { useLocalQuery } from '../sync/SyncProvider';
@@ -53,7 +53,10 @@ export function useWeekRows(weekStart: string): WeekRows | undefined {
   // No app local, sem as migrações 0017 a 0020 no banco, a semana aparece como ficaria com elas (dev/sizePreview).
   const sizes = usePreviewSizes();
   const learned = usePreviewSeries();
-  return useMemo(() => rows && previewWeekRows(rows, sizes, learned), [rows, sizes, learned]);
+  // Sede, horário e "externo" guardados no navegador entram pela simulação; mudar um deles refaz a semana.
+  const people = usePreviewPeople();
+  const external = usePreviewExternal();
+  return useMemo(() => rows && previewWeekRows(rows, sizes, learned), [rows, sizes, learned, people, external]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
 /** Relógio da tela, atualizado a cada minuto (selo "hoje", aviso do serviço de fundo). */

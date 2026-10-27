@@ -7,6 +7,7 @@ import {
   localDate,
   overlaps,
   toLocalIso,
+  zonedTime,
 } from './time.ts';
 import { nameTokens } from './names.ts';
 import { ROLE_LEVELS } from './types.ts';
@@ -22,6 +23,7 @@ import type {
   SlotLike,
   Warning,
   WeekContext,
+  WorkHours,
 } from './types.ts';
 
 /** Segunda-feira da semana de um instante ou de uma data 'YYYY-MM-DD', em Brasília. */
@@ -106,6 +108,30 @@ export function personLoad(personId: string, ctx: WeekContext): { hours: number;
   return loadOf(personId, ctx);
 }
 
+/**
+ * O evento sai do horário de trabalho: em algum dia dele a pessoa não trabalha, ou o trecho do dia começa antes da
+ * entrada ou acaba depois da saída. Dia inteiro sem período não conta. Espelha public.outside_work_hours (0022).
+ */
+export function outsideWorkHours(hours: WorkHours, e: EventLike): boolean {
+  const iv = eventInterval(e);
+  if (!iv) return false;
+  for (const d of daysOf({ startsAt: iv.start, endsAt: iv.end })) {
+    const w = hours[String(isoWeekday(d))];
+    if (!w) return true;
+    const from = Math.max(iv.start.getTime(), zonedTime(d).getTime());
+    const to = Math.min(iv.end.getTime(), zonedTime(addDays(d, 1)).getTime());
+    if (from < zonedTime(d, w[0]).getTime() || to > zonedTime(d, w[1]).getTime()) return true;
+  }
+  return false;
+}
+
+/** A pessoa é de outra sede: evento externo é só de Piracicaba; o resto segue a sede da série. Sem sede, não pesa. */
+export function otherBase(person: PersonLike, e: EventLike): boolean {
+  if (!person.base) return false;
+  if (e.external) return person.base !== 'piracicaba';
+  return Boolean(e.base && e.base !== person.base);
+}
+
 function find<T extends { id: string }>(items: T[], id: string, what: string): T {
   const it = items.find((i) => i.id === id);
   if (!it) throw new Error(`${what} não encontrado: ${id}`);
@@ -153,6 +179,9 @@ export function checkEligibility(personId: string, slotId: string, ctx: WeekCont
   if (load.hours + extra > person.weeklyLimitHours) warnings.push('over_limit');
 
   if (!person.roleIds.includes(slot.jobRoleId)) warnings.push('role_not_enabled');
+  // Função que não ocupa horário (subir vídeo) se faz a qualquer hora.
+  if (!slot.noHours && person.workHours && outsideWorkHours(person.workHours, event)) warnings.push('off_hours');
+  if (otherBase(person, event)) warnings.push('other_base');
 
   return { ok: blockers.length === 0 && warnings.length === 0, blockers, warnings };
 }
@@ -267,11 +296,13 @@ const byCode = (a: { code: string }, b: { code: string }) =>
   a.code.localeCompare(b.code, 'en', { numeric: true });
 
 /**
- * Aptos da vaga em ordem (só entra quem não tem bloqueio nem alerta):
- *   1. a turma fixa: quem fez a função neste mesmo evento nas 8 semanas antes, mais vezes primeiro;
- *   2. o grupo de empate do histórico (>= 0,8 x o maior, ou todos quando o maior é 0), pela prioridade da
- *      função na lista da pessoa, depois menor carga em horas e em atividades;
- *   3. os demais pelo histórico.
+ * Aptos da vaga em ordem (só entra quem não tem bloqueio nem alerta, menos o "fora do horário"):
+ *   1. a turma fixa: quem fez a função neste mesmo evento nas 8 semanas antes, mais vezes primeiro, no horário ou
+ *      fora dele;
+ *   2. dentro do horário, o grupo de empate do histórico (>= 0,8 x o maior, ou todos quando o maior é 0), pela
+ *      prioridade da função na lista da pessoa, depois menor carga em horas e em atividades;
+ *   3. dentro do horário, os demais pelo histórico;
+ *   4. fora do horário, pelo histórico (pedido do Raoni em 27/10/2026: pode ser sugerido, com o aviso).
  * O histórico é o recente pesando mais quando o índice tem as datas; senão, a contagem de sempre. Sem datas
  * nem prioridade definida, a ordem é a mesma de antes (só grupo de empate e carga).
  */
@@ -281,7 +312,9 @@ export function rankCandidates(slotId: string, ctx: WeekContext, history: Histor
   const weekCtx = { ...ctx, weekStart: event.weekStart };
   const apt: (Candidate & { score: number })[] = [];
   for (const p of ctx.people) {
-    if (!checkEligibility(p.id, slotId, ctx).ok) continue;
+    const elig = checkEligibility(p.id, slotId, ctx);
+    if (elig.blockers.length > 0 || elig.warnings.some((w) => w !== 'off_hours')) continue;
+    const offHours = elig.warnings.includes('off_hours');
     const load = loadOf(p.id, weekCtx, slotId);
     const hist = history.hist(p.id, slot.jobRoleId, event.serviceTypeId);
     const pos = p.rolePriority?.indexOf(slot.jobRoleId) ?? -1;
@@ -297,6 +330,7 @@ export function rankCandidates(slotId: string, ctx: WeekContext, history: Histor
       ...(series > 0 ? { series } : {}),
       ...(pos >= 0 ? { priority: pos } : {}),
       ...(level !== undefined ? { level } : {}),
+      ...(offHours ? { offHours } : {}),
       score: history.recent ? history.recent(p.id, slot.jobRoleId, event.serviceTypeId, event.weekStart) : hist,
     });
   }
@@ -308,22 +342,29 @@ export function rankCandidates(slotId: string, ctx: WeekContext, history: Histor
     return event.complex ? -l : l === ROLE_LEVELS.referencia ? 1 : 0;
   };
   const fixed = apt.filter((c) => (c.series ?? 0) > 0);
-  const rest = apt.filter((c) => !c.series);
+  const rest = apt.filter((c) => !c.series && !c.offHours);
+  const late = apt.filter((c) => !c.series && c.offHours);
   const maxScore = rest.reduce((m, c) => Math.max(m, c.score), 0);
-  for (const c of apt) c.inTieGroup = (c.series ?? 0) > 0 || maxScore === 0 || c.score >= TIE_RATIO * maxScore;
+  for (const c of apt) c.inTieGroup = (c.series ?? 0) > 0 || (!c.offHours && (maxScore === 0 || c.score >= TIE_RATIO * maxScore));
   const bySeries = (a: (typeof apt)[number], b: (typeof apt)[number]) =>
     (b.series ?? 0) - (a.series ?? 0) || lvl(a) - lvl(b) || prio(a) - prio(b) || a.loadHours - b.loadHours || b.score - a.score || byCode(a, b);
   const byLoad = (a: (typeof apt)[number], b: (typeof apt)[number]) =>
     lvl(a) - lvl(b) || prio(a) - prio(b) || a.loadHours - b.loadHours || a.loadCount - b.loadCount || b.score - a.score || byCode(a, b);
   const byHist = (a: (typeof apt)[number], b: (typeof apt)[number]) =>
     b.score - a.score || lvl(a) - lvl(b) || prio(a) - prio(b) || a.loadHours - b.loadHours || a.loadCount - b.loadCount || byCode(a, b);
-  const ordered = [...fixed.sort(bySeries), ...rest.filter((c) => c.inTieGroup).sort(byLoad), ...rest.filter((c) => !c.inTieGroup).sort(byHist)];
+  const ordered = [
+    ...fixed.sort(bySeries),
+    ...rest.filter((c) => c.inTieGroup).sort(byLoad),
+    ...rest.filter((c) => !c.inTieGroup).sort(byHist),
+    ...late.sort(byHist),
+  ];
   // O score (histórico ponderado) é só para ordenar; quem chama recebe os campos de Candidate.
   return ordered.map((c) => {
     const out: Candidate = { personId: c.personId, code: c.code, hist: c.hist, loadHours: c.loadHours, loadCount: c.loadCount, inTieGroup: c.inTieGroup };
     if (c.series) out.series = c.series;
     if (c.priority !== undefined) out.priority = c.priority;
     if (c.level !== undefined) out.level = c.level;
+    if (c.offHours) out.offHours = true;
     return out;
   });
 }

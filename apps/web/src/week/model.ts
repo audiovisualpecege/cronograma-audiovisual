@@ -12,6 +12,7 @@ import {
   suggestSize,
   type AbsenceLike,
   type AssignmentLike,
+  type Base,
   type EventLike,
   type EventSize,
   type PersonLike,
@@ -33,6 +34,7 @@ import {
   type CrewItem,
   type CrewRow,
   type EventRow,
+  type HistoryFactRow,
   type JobRoleRow,
   type PersonRoleRow,
   type PersonRow,
@@ -121,9 +123,11 @@ export function needsTeam(e: EventRow, types: readonly ServiceTypeRow[]): boolea
   return e.status !== 'cancelled' && !e.ignored && !e.no_team && !typeNoTeam(types, e.service_type_id);
 }
 
-export function toEventLike(e: EventRow, types: readonly ServiceTypeRow[]): EventLike {
+export function toEventLike(e: EventRow, types: readonly ServiceTypeRow[], bases?: ReadonlyMap<string, Base>): EventLike {
   const type = types.find((t) => t.id === e.service_type_id);
   return {
+    external: Boolean(type?.external),
+    base: bases?.get(eventSeries(e.title)) ?? null,
     // Trabalho complexo: tipo marcado como complexo, evento de porte Grande ou com estrela de atividade principal.
     complex: Boolean(e.highlighted) || Boolean(type?.complex) || Boolean(type?.sized && sizeFor(type, e.size) === 3),
     id: e.id,
@@ -151,7 +155,36 @@ export function toPersonLike(p: PersonRow, personRoles: readonly PersonRoleRow[]
     // A ordem só vale como prioridade quando alguém ordenou; senão é a ordem de cadastro, sem significado.
     ...(hasRoleOrder(p, personRoles) ? { rolePriority: rolesOf(p, personRoles) } : {}),
     roleLevels: levelsOf(p, personRoles),
+    base: p.base ?? null,
+    workHours: p.work_hours ?? null,
   };
+}
+
+/** Quantas vezes, no mínimo, a série precisa ter sido feita por gente com sede para a sede dela valer. */
+export const SERIES_BASE_MIN = 3;
+
+/**
+ * Sede de cada série, aprendida de quem costuma fazer: a sede de quem fez a série no histórico, quando pelo menos
+ * 3 vezes foram feitas por gente com sede e 3 em cada 4 delas são da mesma sede. Sem isso, a série fica sem sede.
+ */
+export function seriesBases(facts: readonly HistoryFactRow[] | null, people: readonly PersonRow[]): Map<string, Base> {
+  const baseOf = new Map(people.filter((p) => p.base).map((p) => [p.id, p.base as Base]));
+  const counts = new Map<string, Map<Base, number>>();
+  for (const f of facts ?? []) {
+    const base = f.person_id ? baseOf.get(f.person_id) : undefined;
+    const series = base && f.title ? eventSeries(f.title) : '';
+    if (!base || !series) continue;
+    const c = counts.get(series) ?? new Map<Base, number>();
+    c.set(base, (c.get(base) ?? 0) + 1);
+    counts.set(series, c);
+  }
+  const out = new Map<string, Base>();
+  for (const [series, c] of counts) {
+    const total = [...c.values()].reduce((a, b) => a + b, 0);
+    const [top, n] = [...c].sort((a, b) => b[1] - a[1])[0] ?? [];
+    if (top && n !== undefined && total >= SERIES_BASE_MIN && n >= 0.75 * total) out.set(series, top);
+  }
+  return out;
 }
 
 export function toAbsenceLike(a: AbsenceRow): AbsenceLike {
@@ -166,9 +199,12 @@ export function activeSlots(rows: Pick<WeekRows, 'events' | 'slots'>): SlotRow[]
     .sort((a, b) => (start.get(a.event_id) as string).localeCompare(start.get(b.event_id) as string) || a.id.localeCompare(b.id));
 }
 
-/** Contexto das regras do core (aptidão, carga, ranking) com o que está na cópia local. */
-export function weekContext(rows: WeekRows, now: Date): WeekContext {
-  const events = rows.events.filter((e) => !e.ignored).map((e) => toEventLike(e, rows.types));
+/**
+ * Contexto das regras do core (aptidão, carga, ranking) com o que está na cópia local; `bases` é a sede de cada série,
+ * aprendida do histórico (seriesBases).
+ */
+export function weekContext(rows: WeekRows, now: Date, bases?: ReadonlyMap<string, Base>): WeekContext {
+  const events = rows.events.filter((e) => !e.ignored).map((e) => toEventLike(e, rows.types, bases));
   const noHours = new Set(rows.roles.filter((r) => r.no_hours).map((r) => r.id));
   const slots: SlotLike[] = activeSlots(rows).map((s, i) => ({
     id: s.id,
@@ -436,6 +472,8 @@ export const WARNING_LABEL: Record<string, string> = {
   over_limit: 'passa do limite semanal',
   role_not_enabled: 'função não habilitada',
   role_archived: 'função arquivada',
+  off_hours: 'fora do horário de trabalho',
+  other_base: 'outra sede',
 };
 
 export const BLOCKER_LABEL: Record<string, string> = {
