@@ -38,6 +38,18 @@ PATCH para um conserto, MINOR para algo novo, MAJOR quando o jeito de usar muda.
   - Publicar avisa quantas sugestões ainda não foram confirmadas.
   Saíram a tela Propor escala (o endereço antigo abre a Semana), o Assistente, os quadros de pessoas disponíveis
   por função e de folga e férias, e o botão de teste da IA local.
+- **A escala aprende com quem monta**, para sobrar só a revisão das exceções:
+  - o tipo sai do começo do título antes do histórico ("Reunião Mediadores POLI USP PRO" é reunião, não aula; o
+    histórico antigo foi corrigido). Trocar o tipo de um evento ensina a série: as próximas semanas já vêm certas;
+  - "+ vaga" no cartão e "Tirar esta vaga" no menu da ficha, em qualquer evento. A mudança vira o padrão da série
+    (mesmo título), com a marca "pela série"; o porte das últimas vezes da série já vale na semana sem montagem;
+  - cadastro da pessoa com a sede (Piracicaba ou São Paulo) e o horário de trabalho. Externo é só de Piracicaba;
+    aulas e gravações seguem a sede de quem costuma fazer a série. Fora do horário a pessoa ainda pode ser
+    sugerida, por último e com o alerta;
+  - quando a mesma pessoa faz a função nas duas últimas vezes da série, o cartão pergunta "virou o titular?"; a
+    resposta grava titular e reserva, que vêm primeiro na sugestão;
+  - "Só o que precisa de olho" apaga os cartões que a sugestão resolve e mostra o motivo nos outros (vaga sem
+    sugestão, alerta, tipo incerto, série nova, titular a confirmar), com "Próximo" para ir de um em um.
 - **Reuniões sem escala, por setor**: reunião não se escala mais. Cada reunião fica ligada ao setor dela (Reunião
   de Edição à Edição, de Produção à Produção, Técnica Aulas à Técnica, Mediadores à Mediação, Planejamento ao
   Planejamento; a Reunião Interna a todos), e quem é do setor vê a reunião em Minha semana, com o selo "reunião do setor", e no filtro por

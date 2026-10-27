@@ -7,7 +7,7 @@ primeiro passo que não der o resultado esperado.
 
 - **Código**: branch `ajuste/painel-e-semana`, pull request #2 (`audiovisualpecege/cronograma-audiovisual`).
   Ainda **sem merge**: o app publicado no GitHub Pages continua na 1.0.1.
-- **Banco**: oito migrações novas, **ainda não aplicadas** na produção:
+- **Banco**: doze migrações novas, **ainda não aplicadas** na produção:
   - `supabase/migrations/0012_request_classify.sql`: o app passa a poder pedir o job `classify` (identificar os
     tipos pelo histórico e pelo Gemini), e "Montar semana" numa semana já montada cria as vagas dos eventos
     que o serviço de fundo tipou depois da montagem. Não mexe em dados.
@@ -180,11 +180,14 @@ primeiro passo que não der o resultado esperado.
      fundo os outros. Se aparecer "ainda não foi liberada no servidor", a 0012 não entrou.
    - Porte: clicar num EVENTO abre os detalhes com Simples, Médio e Grande; trocar para Grande muda as vagas.
    - Estrela: marcar um evento nos detalhes, recarregar a página, a estrela continua no cartão.
+   - Escala que aprende: "Reunião Mediadores ..." aparece como reunião; "+ vaga" num evento e, na semana
+     seguinte, o mesmo evento já vem com a vaga e "pela série"; numa pessoa com sede São Paulo, um EVENTO não a
+     sugere; "Só o que precisa de olho" apaga os cartões resolvidos.
    - Tipos de serviço: abrir um tipo, escolher um ícone no banco de ícones, salvar, recarregar, o ícone fica.
    - Se for usar o MiniCPM5: Configurações > Geral, fornecedor "Modelo local", endereço e modelo, "Testar
      conexão" deve dizer "Conexão aceita". A IA só identifica tipos ("Identificar os tipos"): a sugestão de
      pessoas na grade é a do histórico, que acertou mais que a IA nos testes.
-7. Depois de alguns dias sem problema: `drop table public._backup_0013; drop table public._backup_0015; drop table public._backup_0017; drop table public._backup_0018; drop table public._backup_0019;` e apague esta seção de pendência
+7. Depois de alguns dias sem problema: `drop table public._backup_0013; drop table public._backup_0015; drop table public._backup_0017; drop table public._backup_0018; drop table public._backup_0019; drop table public._backup_0020; drop table public._backup_0022;` e apague esta seção de pendência
    do `CLAUDE.md`.
 
 ## Desfazer
@@ -223,8 +226,8 @@ estimada" da prévia (as vagas, que o banco cria, saem certas).
       novas. Estrelas e ícones escolhidos depois da 1.1.0 se perdem.
    8. `supabase/rollback/0012_down.sql`: volta `request_job` e `build_week_internal`.
    9. Registre no histórico de migrações:
-      `npx supabase migration repair --status reverted 0019 0018 0017 0016 0015 0014 0013 0012`.
+      `npx supabase migration repair --status reverted 0023 0022 0021 0020 0019 0018 0017 0016 0015 0014 0013 0012`.
    10. Confira com `select name, no_team, keywords from public.service_types order by name;`. Depois de
-      conferir, apague as cópias: `drop table public._backup_0013; drop table public._backup_0015; drop table public._backup_0017; drop table public._backup_0018; drop table public._backup_0019;`.
+      conferir, apague as cópias: `drop table public._backup_0013; drop table public._backup_0015; drop table public._backup_0017; drop table public._backup_0018; drop table public._backup_0019; drop table public._backup_0020; drop table public._backup_0022;`.
 4. Os tipos que a identificação gravou nos eventos (por palavra-chave, histórico ou IA) **não** são desfeitos:
    são tipos certos, e o administrador pode trocar qualquer um na tela.
