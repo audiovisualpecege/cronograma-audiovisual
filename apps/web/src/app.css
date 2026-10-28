@@ -428,13 +428,56 @@ body {
     display: flex;
     flex-direction: column;
     flex: none;
-    width: 248px;
+    z-index: 30;
+    width: 68px;
     height: 100vh;
     height: 100dvh;
     padding: var(--space-5) var(--space-3);
+    overflow: hidden;
     background: var(--surface-card);
     border-right: 1px solid var(--border-subtle);
     box-sizing: border-box;
+    transition:
+      width var(--dur-fast) var(--ease-cine),
+      margin-right var(--dur-fast) var(--ease-cine),
+      box-shadow var(--dur-fast) var(--ease-cine);
+  }
+
+  /* Menu recolhido: só os ícones. Com o mouse ou o teclado (Tab) nele, abre por cima da tela (a margem negativa
+     segura o conteúdo no lugar) e os nomes aparecem; depois do clique, recolhe quando o mouse sai. */
+  .side-nav:hover,
+  .side-nav:has(:focus-visible) {
+    width: 248px;
+    margin-right: -180px;
+    box-shadow: 12px 0 32px rgb(0 0 0 / 45%);
+  }
+
+  .side-nav .nav-link,
+  .side-nav-brand,
+  .side-nav-user,
+  .side-nav-footer .app-version {
+    white-space: nowrap;
+  }
+
+  .side-nav .nav-link > span,
+  .side-nav-brand .screen-title,
+  .side-nav-user,
+  .side-nav-footer .app-version {
+    opacity: 0;
+    transition: opacity var(--dur-fast) var(--ease-cine);
+  }
+
+  .side-nav:hover :is(.nav-link > span, .side-nav-brand .screen-title, .side-nav-user, .app-version),
+  .side-nav:has(:focus-visible) :is(.nav-link > span, .side-nav-brand .screen-title, .side-nav-user, .app-version) {
+    opacity: 1;
+  }
+
+  .side-nav:not(:hover, :has(:focus-visible)) .nav-sublist {
+    display: none;
+  }
+
+  .side-nav-list {
+    overflow-x: hidden;
   }
 
   .bottom-nav,

@@ -5,6 +5,9 @@ PATCH para um conserto, MINOR para algo novo, MAJOR quando o jeito de usar muda.
 
 ## 1.1.0 (21/10/2026)
 
+- No computador, o menu da esquerda fica recolhido, só com os ícones, e deixa mais espaço para a tela. Passar o
+  mouse (ou entrar com o Tab) abre o menu por cima, com os nomes; ao tirar o mouse, ele recolhe de novo.
+
 - Painel mais visual: no topo, cartões da semana atual (em destaque, com moldura no gradiente da Chiaro) e das 2
   seguintes, com ícone colorido e situação (sem montagem, em montagem ou publicada) e o que falta em cada uma. Logo
   abaixo, os **Avisos da agenda**: as últimas mudanças vindas das agendas nessas 3 semanas, cada uma com ícone e
