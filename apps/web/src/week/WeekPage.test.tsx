@@ -143,6 +143,10 @@ describe('Semana: grade', () => {
     await user.click(await screen.findByRole('button', { name: 'Tirar esta vaga' }));
     await waitFor(() => expect(ops(remote).filter((o) => o.kind === 'slot.remove')).toHaveLength(2));
     expect((ops(remote).filter((o) => o.kind === 'slot.remove')[1]?.payload as { id: string }).id).not.toBe(filled.slot.id);
+
+    // O "−" na própria ficha tira a vaga aberta sem abrir nada.
+    await user.click(within(aula).getAllByRole('button', { name: 'Tirar a vaga de Mediação (vaga aberta)' })[0] as HTMLElement);
+    await waitFor(() => expect(ops(remote).filter((o) => o.kind === 'slot.remove')).toHaveLength(3));
   });
 
   it('"virou o titular?": a mesma troca nas duas últimas vezes pergunta no cartão; "Sim" grava a turma fixa (titular e reserva)', async () => {

@@ -811,6 +811,12 @@ function Chip({ slot, event, model, drafts, queued, keys, readOnly, pendingRows,
           </span>
         )}
       </button>
+      {/* "−" à vista na vaga aberta (e no foco ou mouse nas outras): trabalho que pede menos gente perde a vaga em vez de ficar em falta. */}
+      {!readOnly && !cancelled && (
+        <button type="button" className="board-chip-drop" title="Tirar esta vaga" aria-label={`Tirar a vaga de ${role} (${who})`} onClick={() => onRemoveSlot(slot.id)}>
+          −
+        </button>
+      )}
       {open && (
         <ChipMenu onClose={close} label={`${role}: ${who}`}>
           {state === 'suggested' && personId && item('Confirmar', () => (proposal && a ? onAccept(a) : draft && onConfirm(draftPick(slot.id, draft))))}

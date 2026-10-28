@@ -2461,6 +2461,33 @@ button.board-off-item {
   box-shadow: 0 0 0 2px var(--accent);
 }
 
+/* "−" que tira a vaga: sempre à vista na vaga aberta; nas outras, só com o mouse ou o foco na ficha. */
+.board-chip-drop {
+  display: none;
+  align-self: stretch;
+  padding: 0 8px;
+  border: 0;
+  border-left: 1px solid var(--border-subtle);
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: var(--weight-bold);
+  cursor: pointer;
+}
+
+.board-chip.is-open .board-chip-drop,
+.board-chip:hover .board-chip-drop,
+.board-chip:focus-within .board-chip-drop {
+  display: block;
+}
+
+.board-chip-drop:hover,
+.board-chip-drop:focus-visible {
+  outline: none;
+  color: var(--danger);
+}
+
 /* "+ vaga": ficha tracejada e discreta no fim das vagas. */
 .board-chip--add {
   border-style: dashed;
