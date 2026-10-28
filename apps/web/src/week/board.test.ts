@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CREW_ROWS, eventRow, ROLE_ROWS, TYPE_ROWS, WEEK_B } from '../../test/weekFixtures';
 import type { AssignmentRow, CrewRow, EventRow, HistoryFactRow, JobRoleRow, ServiceTypeRow, SlotRow } from '../data/catalog';
-import { activityKind, chipState, eventAlerts, isPlanned, plannedRows, reviewReasons, shortTitle, slotKeys, timelineLayout, timeOffAbsences, titularAsks } from './board';
+import { activityKind, boardDays, chipState, eventAlerts, isPlanned, plannedRows, reviewReasons, shortTitle, slotKeys, timelineLayout, timeOffAbsences, titularAsks } from './board';
 import type { WeekRows } from './model';
 
 const types = TYPE_ROWS as unknown as ServiceTypeRow[];
@@ -23,6 +23,15 @@ function rows(extra: Partial<WeekRows> = {}): WeekRows {
     ...extra,
   };
 }
+
+describe('dias da grade', () => {
+  it('os cancelados vão para o fim do dia, depois dos ativos', () => {
+    const ev = (id: string, from: string, extra: Record<string, unknown> = {}) =>
+      eventRow(id, { starts_at: `2026-10-26T${from}:00-03:00`, ends_at: `2026-10-26T${from.replace(/^\d+/, (h) => String(Number(h) + 1).padStart(2, '0'))}:00-03:00`, ...extra }) as unknown as EventRow;
+    const day = boardDays(rows({ events: [ev('a', '08:00', { status: 'cancelled' }), ev('b', '09:00'), ev('c', '10:00')] }), [])[0];
+    expect(day?.cards.map((e) => e.id)).toEqual(['b', 'c', 'a']);
+  });
+});
 
 describe('linha do tempo do dia', () => {
   const at = (id: string, from: string, to: string, extra: Record<string, unknown> = {}) =>

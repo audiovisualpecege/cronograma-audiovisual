@@ -104,9 +104,11 @@ export function boardDays(rows: WeekRows, timeOff: readonly TimeOff[]): BoardDay
   const byDay = eventsByDay(rows.weekStart, rows.events.filter((e) => !e.ignored));
   return weekDays(rows.weekStart).map((d) => {
     const all = byDay.get(d.date) ?? [];
+    const cards = all.filter((e) => !isMarker(e, rows.types));
     return {
       ...d,
-      cards: all.filter((e) => !isMarker(e, rows.types)),
+      // Os cancelados vão para o fim do dia, para não se misturar com os ativos.
+      cards: [...cards.filter((e) => e.status !== 'cancelled'), ...cards.filter((e) => e.status === 'cancelled')],
       lines: all.filter((e) => isMarker(e, rows.types)),
       off: timeOff.filter((t) => t.from <= d.date && d.date <= t.to),
     };

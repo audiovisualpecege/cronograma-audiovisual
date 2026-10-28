@@ -622,10 +622,10 @@ const HOUR_PX = 96;
  */
 function DayTimeline({ now, ...props }: Parameters<typeof DayColumn>[0] & { now: Date }) {
   const { day, today, rows, built, readOnly, dropped, onToggleOff, onOpenEvent, typeHints, sizeHints, chip } = props;
-  // Marcações (não escalar, folga) ficam numa faixa à direita, sem apertar os cartões das atividades.
+  // Marcações (não escalar, folga) e cancelados ficam numa faixa à direita, sem apertar os cartões ativos.
   const layout = useMemo(() => timelineLayout(day.date, [...day.cards, ...day.lines]), [day]);
-  const cardItems = useMemo(() => timelineLayout(day.date, day.cards).items, [day]);
-  const markItems = useMemo(() => timelineLayout(day.date, day.lines).items, [day]);
+  const cardItems = useMemo(() => timelineLayout(day.date, day.cards.filter((e) => e.status !== 'cancelled')).items, [day]);
+  const markItems = useMemo(() => timelineLayout(day.date, [...day.lines, ...day.cards.filter((e) => e.status === 'cancelled')]).items, [day]);
   const markers = useMemo(() => new Set(day.lines.map((e) => e.id)), [day.lines]);
   const hours = [];
   for (let m = layout.from; m < layout.to; m += 60) hours.push(m);
@@ -677,7 +677,7 @@ function DayTimeline({ now, ...props }: Parameters<typeof DayColumn>[0] & { now:
         ].map(
           (col) =>
             col.items.length > 0 && (
-              <div key={col.key} className={col.className} aria-label={col.key === 'marks' ? 'Marcações do dia' : undefined}>
+              <div key={col.key} className={col.className} aria-label={col.key === 'marks' ? 'Marcações e cancelados do dia' : undefined}>
                 {col.items.map((it) => (
                   <div
                     key={it.event.id}
