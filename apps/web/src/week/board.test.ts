@@ -48,6 +48,15 @@ describe('linha do tempo do dia', () => {
     expect([out.from, out.to]).toEqual([420, 1140]);
   });
 
+  it('o cancelado fica na coluna da direita do grupo que ele cruza, sem coluna própria no resto do dia', () => {
+    const out = timelineLayout(WEEK_B, [at('x', '09:00', '11:00', { status: 'cancelled' }), at('a', '09:30', '10:30'), at('b', '10:00', '12:00'), at('c', '14:00', '15:00')]);
+    const by = new Map(out.items.map((it) => [it.event.id, it]));
+    expect(by.get('a')).toMatchObject({ lane: 0, lanes: 3 });
+    expect(by.get('b')).toMatchObject({ lane: 1, lanes: 3 });
+    expect(by.get('x')).toMatchObject({ lane: 2, lanes: 3 });
+    expect(by.get('c')).toMatchObject({ lane: 0, lanes: 1 });
+  });
+
   it('dia inteiro vai para a faixa de cima; atividade curta ocupa meia hora; as horas alargam até a atividade', () => {
     const out = timelineLayout(WEEK_B, [at('x', '00:00', '00:00', { all_day: true, ends_at: '2026-10-27T00:00:00-03:00' }), at('y', '06:30', '06:30'), at('z', '20:00', '21:15')]);
     expect(out.allDay.map((e) => e.id)).toEqual(['x']);

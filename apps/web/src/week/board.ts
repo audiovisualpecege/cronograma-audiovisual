@@ -153,20 +153,26 @@ export function timelineLayout(date: string, events: readonly EventRow[]): Timel
   }
   timed.sort((a, b) => a.start - b.start || b.end - a.end);
   // Grupos que se cruzam: cada atividade na primeira coluna livre; o grupo todo divide a largura pelas colunas.
+  // Os cancelados ficam nas colunas da direita do grupo, depois das ativas.
   let group: TimelineItem[] = [];
-  let laneEnds: number[] = [];
   let groupEnd = -1;
+  const place = (items: TimelineItem[], laneEnds: number[], first: number) => {
+    for (const it of items) {
+      let lane = laneEnds.findIndex((end, i) => i >= first && end <= it.start);
+      if (lane < 0) lane = laneEnds.push(it.end) - 1;
+      else laneEnds[lane] = it.end;
+      it.lane = lane;
+    }
+  };
   const close = () => {
+    const laneEnds: number[] = [];
+    place(group.filter((it) => it.event.status !== 'cancelled'), laneEnds, 0);
+    place(group.filter((it) => it.event.status === 'cancelled'), laneEnds, laneEnds.length);
     for (const it of group) it.lanes = laneEnds.length;
     group = [];
-    laneEnds = [];
   };
   for (const it of timed) {
     if (it.start >= groupEnd) close();
-    let lane = laneEnds.findIndex((end) => end <= it.start);
-    if (lane < 0) lane = laneEnds.push(it.end) - 1;
-    else laneEnds[lane] = it.end;
-    it.lane = lane;
     group.push(it);
     groupEnd = Math.max(groupEnd, it.end);
   }

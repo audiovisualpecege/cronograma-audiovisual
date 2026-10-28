@@ -2369,7 +2369,7 @@ body {
   right: 156px;
 }
 
-/* Faixa à direita com as marcações (não escalar, folga; hachuradas) e os cancelados, sem apertar os cartões. */
+/* Faixa das marcações (não escalar, folga), à direita: hachurada, sem apertar os cartões. */
 .board-timeline-marks {
   position: absolute;
   top: 0;
