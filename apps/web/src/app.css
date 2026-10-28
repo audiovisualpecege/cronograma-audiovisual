@@ -2461,19 +2461,33 @@ button.board-off-item {
   box-shadow: 0 0 0 2px var(--accent);
 }
 
-/* "−" que tira a vaga: sempre à vista na vaga aberta; nas outras, só com o mouse ou o foco na ficha. */
+/* Lixeira que tira a vaga: sempre à vista na vaga aberta; nas outras, só com o mouse ou o foco na ficha.
+   O ícone (Solar, lixeira linear) vem por máscara de CSS: uma regra só, sem um SVG por ficha, que deixava a grade lenta. */
 .board-chip-drop {
   display: none;
-  align-self: stretch;
-  padding: 0 8px;
+  flex: none;
+  align-self: center;
+  width: 24px;
+  height: 24px;
+  margin-right: 4px;
+  padding: 0;
   border: 0;
-  border-left: 1px solid var(--border-subtle);
+  border-radius: 50%;
   background: none;
   color: var(--text-muted);
-  font: inherit;
-  font-size: 14px;
-  font-weight: var(--weight-bold);
   cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.board-chip-drop::before {
+  content: '';
+  display: block;
+  width: 15px;
+  height: 15px;
+  margin: auto;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23000' stroke-width='1.8' stroke-linecap='round'%3E%3Cpath d='M9.17 4a3 3 0 0 1 5.66 0M20.5 6h-17M18.83 8.5l-.46 6.9c-.18 2.65-.27 3.98-1.13 4.79-.86.81-2.2.81-4.86.81h-.77c-2.66 0-4 0-4.86-.81-.86-.81-.95-2.14-1.13-4.79l-.46-6.9M9.5 11l.5 5M14.5 11l-.5 5'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23000' stroke-width='1.8' stroke-linecap='round'%3E%3Cpath d='M9.17 4a3 3 0 0 1 5.66 0M20.5 6h-17M18.83 8.5l-.46 6.9c-.18 2.65-.27 3.98-1.13 4.79-.86.81-2.2.81-4.86.81h-.77c-2.66 0-4 0-4.86-.81-.86-.81-.95-2.14-1.13-4.79l-.46-6.9M9.5 11l.5 5M14.5 11l-.5 5'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
 .board-chip.is-open .board-chip-drop,
@@ -2485,6 +2499,7 @@ button.board-off-item {
 .board-chip-drop:hover,
 .board-chip-drop:focus-visible {
   outline: none;
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
   color: var(--danger);
 }
 

@@ -41,7 +41,7 @@ PATCH para um conserto, MINOR para algo novo, MAJOR quando o jeito de usar muda.
 - **A escala aprende com quem monta**, para sobrar só a revisão das exceções:
   - o tipo sai do começo do título antes do histórico ("Reunião Mediadores POLI USP PRO" é reunião, não aula; o
     histórico antigo foi corrigido). Trocar o tipo de um evento ensina a série: as próximas semanas já vêm certas;
-  - "+ vaga" no cartão e "−" na ficha para tirar a vaga (à vista na vaga aberta; nas outras, com o mouse em cima ou
+  - "+ vaga" no cartão e lixeira na ficha para tirar a vaga (à vista na vaga aberta; nas outras, com o mouse em cima ou
     pelo menu "Tirar esta vaga"), em qualquer evento. A mudança vira o padrão da série
     (mesmo título), com a marca "pela série"; o porte das últimas vezes da série já vale na semana sem montagem;
   - cadastro da pessoa com a sede (Piracicaba ou São Paulo) e o horário de trabalho. Externo é só de Piracicaba;
