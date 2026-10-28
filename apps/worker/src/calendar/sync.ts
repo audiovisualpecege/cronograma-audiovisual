@@ -159,7 +159,21 @@ export class CalendarSync {
       else if (change.kind === 'cancelled') outcome.events_cancelled++;
       else outcome.events_changed++;
     }
-    await this.store.updateSource(src.id, { status: 'connected', last_synced_at: now.toISOString(), last_error: null });
+    // Cor do Google: a do evento (colorId) muda sem mudar o evento, então é gravada à parte, só onde mudou.
+    const colors = new Map<string | null, string[]>();
+    for (const r of remote) {
+      if (r.status === 'cancelled') continue;
+      const color = r.colorId ?? null;
+      const row = byId.get(r.id);
+      if (row ? (row.color_id ?? null) === color : color === null) continue;
+      colors.set(color, [...(colors.get(color) ?? []), r.id]);
+    }
+    if (colors.size > 0) await this.store.setEventColors(src.id, colors);
+    const color = await google.calendarColor(calId);
+    await this.store.updateSource(src.id, {
+      status: 'connected', last_synced_at: now.toISOString(), last_error: null,
+      ...(color && color !== src.color ? { color } : {}),
+    });
     await this.store.markSourceDisconnected(src.id, false);
     return { outcome, aiCalls: classified.aiCalls, aiQuotaHits: classified.aiQuotaHits };
   }

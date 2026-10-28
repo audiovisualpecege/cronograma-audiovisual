@@ -7,7 +7,7 @@ primeiro passo que não der o resultado esperado.
 
 - **Código**: branch `ajuste/painel-e-semana`, pull request #2 (`audiovisualpecege/cronograma-audiovisual`).
   Ainda **sem merge**: o app publicado no GitHub Pages continua na 1.0.1.
-- **Banco**: doze migrações novas, **ainda não aplicadas** na produção:
+- **Banco**: treze migrações novas, **ainda não aplicadas** na produção:
   - `supabase/migrations/0012_request_classify.sql`: o app passa a poder pedir o job `classify` (identificar os
     tipos pelo histórico e pelo Gemini), e "Montar semana" numa semana já montada cria as vagas dos eventos
     que o serviço de fundo tipou depois da montagem. Não mexe em dados.
@@ -85,18 +85,22 @@ primeiro passo que não der o resultado esperado.
   - `supabase/migrations/0023_series_titulars.sql`: turma fixa gravada. Coluna `series_rules.titulars`
     (por função, titular e reserva) e a função `set_series_titular`, que o app chama quando alguém responde
     "virou o titular?". Não mexe em dados.
+  - `supabase/migrations/0024_google_colors.sql`: cores do Google Agenda nos cartões. Colunas
+    `events.color_id` (a cor do evento, de 1 a 11) e `calendar_sources.color` (a cor da agenda), gravadas pelo
+    serviço de fundo novo a cada releitura. Não mexe em dados; as cores aparecem depois da primeira releitura.
 - **Dados iniciais da 0016** (fora do repositório, porque trata da equipe pelo e-mail):
   `..\dados-iniciais\aplicar-prioridades.mjs`. Ele grava a ordem das funções de cada pessoa a partir da
   planilha `..\Analise da escala.xlsx`, aba "Prioridade por pessoa": vale a coluna "Sua ordem" quando
   preenchida, senão a sugerida pelo histórico do último ano. Também acrescenta Cinegrafista e Operador Evento
   a Pedro, Fernanda, Tiphany e Juliana.
-- **Desfazer**: `supabase/rollback/0023_down.sql`, `0022_down.sql`, `0021_down.sql`, `0020_down.sql`, `0019_down.sql`, `0018_down.sql`, `0017_down.sql`, `0016_down.sql`, `0015_down.sql`, `0014_down.sql`, `0013_down.sql` e
+- **Desfazer**: `supabase/rollback/0024_down.sql`, `0023_down.sql`, `0022_down.sql`, `0021_down.sql`, `0020_down.sql`, `0019_down.sql`, `0018_down.sql`, `0017_down.sql`, `0016_down.sql`, `0015_down.sql`, `0014_down.sql`, `0013_down.sql` e
   `0012_down.sql` (fora da pasta de migrações, para o `db push` não rodá-los).
 - **Serviço de fundo (NAS)**: **muda**. Ganhou o fornecedor de IA local (`apps/worker/src/ai/local.ts`), lotes
   de 25 vagas (eram 60), resposta da IA aproveitada item por item e o motivo exato da falha guardado no pedido. Depois
   do merge, o NAS precisa de `docker compose pull && docker compose up -d` na pasta
-  `docker/cronograma-audiovisual`. O worker novo funciona com o banco antigo e o antigo com o banco novo; só a
-  IA local precisa dos dois atualizados.
+  `docker/cronograma-audiovisual`. Ele também grava as cores do Google (precisa da **0024 aplicada antes**: o
+  worker novo lê `events.color_id` e, sem a coluna, a releitura das agendas falha). O worker antigo funciona com o
+  banco novo.
 - O que muda para quem usa está no topo do `CHANGELOG.md`.
 
 ## Antes de começar
@@ -124,7 +128,7 @@ primeiro passo que não der o resultado esperado.
    ```
    Deve listar **só** `0012_request_classify.sql`, `0013_type_icon_and_highlight.sql`, `0014_local_ai.sql`,
    `0015_meetings_by_sector.sql`, `0016_role_priority_level.sql`, `0017_event_size.sql`,
-   `0018_disponibilizador.sql`, `0019_meeting_sectors.sql`, `0020_type_rules.sql`, `0021_series_crew.sql`, `0022_base_work_hours.sql` e `0023_series_titulars.sql`.
+   `0018_disponibilizador.sql`, `0019_meeting_sectors.sql`, `0020_type_rules.sql`, `0021_series_crew.sql`, `0022_base_work_hours.sql`, `0023_series_titulars.sql` e `0024_google_colors.sql`.
    Se listar também as antigas (0001 a 0011), o histórico de migrações do banco não registrou que elas já
    foram aplicadas. **Não rode o push.** Confira com `npx supabase migration list`. Depois de confirmar que o
    esquema existe (as tabelas `people`, `events`, `weeks` estão lá), marque as antigas como aplicadas com
@@ -205,9 +209,10 @@ estimada" da prévia (as vagas, que o banco cria, saem certas).
    ```
    Isso vai num branch e num PR, como qualquer ajuste. O merge publica de novo.
 2. **Serviço de fundo**: no NAS, volte a imagem anterior. Antes, troque o fornecedor para Gemini na tela, porque
-   o worker antigo não conhece o local. Ou deixe como está: o worker novo funciona com o banco antigo.
+   o worker antigo não conhece o local. Se for desfazer a 0024, volte o worker **antes**: o novo precisa dela.
 3. **Banco**, nesta ordem. Rode cada arquivo inteiro no SQL Editor do painel; cada um roda numa transação só:
-   0. `supabase/rollback/0023_down.sql`: tira a turma fixa gravada. Depois `supabase/rollback/0022_down.sql`: tira sede, horário e "externo" e os alertas novos. Depois
+   0. `supabase/rollback/0024_down.sql`: tira as cores do Google (os cartões voltam à cor da família). Depois
+      `supabase/rollback/0023_down.sql`: tira a turma fixa gravada. Depois `supabase/rollback/0022_down.sql`: tira sede, horário e "externo" e os alertas novos. Depois
       `supabase/rollback/0021_down.sql`: as vagas voltam a nascer só pela equipe do tipo (as já criadas ficam).
       Depois `supabase/rollback/0020_down.sql`: tira as regras de começo e o que as séries aprenderam, e volta os
       eventos e o histórico que mudaram de tipo ao que eram.
@@ -226,7 +231,7 @@ estimada" da prévia (as vagas, que o banco cria, saem certas).
       novas. Estrelas e ícones escolhidos depois da 1.1.0 se perdem.
    8. `supabase/rollback/0012_down.sql`: volta `request_job` e `build_week_internal`.
    9. Registre no histórico de migrações:
-      `npx supabase migration repair --status reverted 0023 0022 0021 0020 0019 0018 0017 0016 0015 0014 0013 0012`.
+      `npx supabase migration repair --status reverted 0024 0023 0022 0021 0020 0019 0018 0017 0016 0015 0014 0013 0012`.
    10. Confira com `select name, no_team, keywords from public.service_types order by name;`. Depois de
       conferir, apague as cópias: `drop table public._backup_0013; drop table public._backup_0015; drop table public._backup_0017; drop table public._backup_0018; drop table public._backup_0019; drop table public._backup_0020; drop table public._backup_0022;`.
 4. Os tipos que a identificação gravou nos eventos (por palavra-chave, histórico ou IA) **não** são desfeitos:

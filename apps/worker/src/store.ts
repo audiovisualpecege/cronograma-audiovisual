@@ -49,6 +49,8 @@ export interface SourceRow {
   status: 'pending' | 'connected' | 'error';
   last_synced_at: string | null;
   last_error: string | null;
+  /** Cor da agenda no Google (#rrggbb), migração 0024. */
+  color?: string | null;
 }
 
 export interface StoredEventRow {
@@ -64,6 +66,8 @@ export interface StoredEventRow {
   fingerprint: string | null;
   status: 'active' | 'changed' | 'cancelled';
   change_original: EventSnapshot | null;
+  /** Cor do evento no Google (colorId), migração 0024. */
+  color_id?: string | null;
 }
 
 export interface EventType {
@@ -200,7 +204,9 @@ export interface CalendarStore extends NoticeStore {
   sources(): Promise<SourceRow[]>;
   storedEvents(sourceId: string, from: Date, to: Date): Promise<StoredEventRow[]>;
   storedByGoogleIds(sourceId: string, googleIds: string[]): Promise<StoredEventRow[]>;
-  updateSource(id: string, patch: Partial<Pick<SourceRow, 'status' | 'last_synced_at' | 'last_error'>>): Promise<void>;
+  updateSource(id: string, patch: Partial<Pick<SourceRow, 'status' | 'last_synced_at' | 'last_error' | 'color'>>): Promise<void>;
+  /** Cor do Google (colorId, ou nula) dos eventos da origem, agrupados pela cor nova. */
+  setEventColors(sourceId: string, colors: ReadonlyMap<string | null, string[]>): Promise<void>;
   applyCalendarChange(sourceId: string, googleEventId: string, change: CalendarChange, type: EventType | null): Promise<void>;
   markSourceDisconnected(sourceId: string, disconnected: boolean): Promise<void>;
   setFingerprint(eventId: string, fingerprint: string): Promise<void>;
@@ -371,7 +377,7 @@ export class SupabaseStore implements Store {
     return this.all<StoredEventRow>(
       (a, b) =>
         this.db.from('events')
-          .select('id, google_event_id, week_start, title, location, description, starts_at, ends_at, all_day, fingerprint, status, change_original')
+          .select('id, google_event_id, week_start, title, location, description, starts_at, ends_at, all_day, fingerprint, status, change_original, color_id')
           .eq('calendar_source_id', sourceId).not('google_event_id', 'is', null)
           .gte('starts_at', from.toISOString()).lt('starts_at', to.toISOString())
           .order('id').range(a, b),
@@ -384,7 +390,7 @@ export class SupabaseStore implements Store {
     for (let i = 0; i < googleIds.length; i += 100) {
       out.push(...(check(
         await this.db.from('events')
-          .select('id, google_event_id, week_start, title, location, description, starts_at, ends_at, all_day, fingerprint, status, change_original')
+          .select('id, google_event_id, week_start, title, location, description, starts_at, ends_at, all_day, fingerprint, status, change_original, color_id')
           .eq('calendar_source_id', sourceId).in('google_event_id', googleIds.slice(i, i + 100)),
         'storedByGoogleIds',
       ) as StoredEventRow[]));
@@ -392,8 +398,19 @@ export class SupabaseStore implements Store {
     return out;
   }
 
-  async updateSource(id: string, patch: Partial<Pick<SourceRow, 'status' | 'last_synced_at' | 'last_error'>>) {
+  async updateSource(id: string, patch: Partial<Pick<SourceRow, 'status' | 'last_synced_at' | 'last_error' | 'color'>>) {
     check(await this.db.from('calendar_sources').update(patch).eq('id', id), 'updateSource');
+  }
+
+  async setEventColors(sourceId: string, colors: ReadonlyMap<string | null, string[]>) {
+    for (const [color, ids] of colors) {
+      for (let i = 0; i < ids.length; i += 100) {
+        check(
+          await this.db.from('events').update({ color_id: color }).eq('calendar_source_id', sourceId).in('google_event_id', ids.slice(i, i + 100)),
+          'setEventColors',
+        );
+      }
+    }
   }
 
   async applyCalendarChange(sourceId: string, googleEventId: string, change: CalendarChange, type: EventType | null) {

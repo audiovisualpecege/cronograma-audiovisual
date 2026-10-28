@@ -40,6 +40,8 @@ export interface CalendarApi {
   listEvents(calendarId: string, window: CalendarWindow): Promise<RemoteEvent[]>;
   /** Evento pelo id; nulo em 404 ou 410 (apagado). */
   getEvent(calendarId: string, eventId: string): Promise<RemoteEvent | null>;
+  /** Cor da agenda (#rrggbb) na lista de agendas da conta; nula quando a agenda não está na lista. */
+  calendarColor(calendarId: string): Promise<string | null>;
 }
 
 const b64url = (s: string | Buffer) => Buffer.from(s).toString('base64url');
@@ -135,6 +137,17 @@ export class GoogleCalendar implements CalendarApi {
       );
     } catch (e) {
       if (e instanceof GoogleError && (e.status === 404 || e.status === 410)) return null;
+      throw e;
+    }
+  }
+
+  async calendarColor(calendarId: string): Promise<string | null> {
+    try {
+      const entry = await this.get<{ backgroundColor?: string }>(`/users/me/calendarList/${encodeURIComponent(calendarId)}`);
+      return entry.backgroundColor ?? null;
+    } catch (e) {
+      // A cor é enfeite: agenda fora da lista da conta (ou qualquer falha) não atrapalha a releitura.
+      if (e instanceof GoogleError) return null;
       throw e;
     }
   }

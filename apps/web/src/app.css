@@ -2331,6 +2331,10 @@ body {
   background: var(--surface-page);
 }
 
+.board-timeline-item.is-marker > .board-line.has-google-color {
+  background: color-mix(in srgb, var(--kind-color) 14%, var(--surface-page));
+}
+
 .board-day {
   display: flex;
   flex: 1 0 280px;
@@ -2417,6 +2421,16 @@ button.board-off-item {
 }
 
 /* Cartões */
+/* Com a cor do Google Agenda (do evento ou da agenda), o cartão inteiro leva um toque dela, como na agenda. */
+.board-card.has-google-color {
+  background: color-mix(in srgb, var(--kind-color) 16%, var(--surface-raised));
+}
+
+.board-line.has-google-color {
+  border-left: 3px solid var(--kind-color);
+  background: color-mix(in srgb, var(--kind-color) 10%, transparent);
+}
+
 .board-kind--aula { --kind-color: var(--chiaro-lavanda); }
 .board-kind--producao { --kind-color: var(--chiaro-pessego); }
 .board-kind--reuniao { --kind-color: var(--neutral-400); }

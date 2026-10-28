@@ -38,6 +38,7 @@ beforeEach(() => {
   google.calls = [];
   google.lists.clear();
   google.events.clear();
+  google.colors.clear();
   server.use(...google.handlers());
   store = new FakeStore();
   store.sourceRows = [{ ...S1 }];
@@ -88,6 +89,23 @@ describe('CalendarSync', () => {
     expect(q?.get('timeMin')).toBe(syncWindow(clock.now()).timeMin.toISOString());
     expect(q?.get('timeMin')).toBe('2026-10-12T03:00:00.000Z');
     expect(q?.get('timeMax')).toBe('2026-12-21T03:00:00.000Z');
+  });
+
+  it('grava a cor do Google só onde mudou (a do evento e a da agenda), sem contar como mudança do evento', async () => {
+    store.stored = [stored({ google_event_id: 'g-e1', color_id: '7' })];
+    google.colors.set(S1.google_calendar_id, '#33b679');
+    google.list(S1.google_calendar_id, 'google/page-1.json', 'google/page-2.json');
+    await sync.run();
+    // g-e1 perdeu a cor no Google; g-b2 veio com Banana (5); os outros novos sem cor não geram gravação.
+    expect(store.colors.sort((a, b) => a.googleId.localeCompare(b.googleId))).toEqual([
+      { sourceId: S1.id, googleId: 'g-b2', color: '5' },
+      { sourceId: S1.id, googleId: 'g-e1', color: null },
+    ]);
+    expect(store.sourceRows[0]?.color).toBe('#33b679');
+    // Agenda fora da lista da conta: a cor fica como estava.
+    google.colors.clear();
+    await sync.run();
+    expect(store.sourceRows[0]?.color).toBe('#33b679');
   });
 
   it('UT-127 evento ausente da janela chama events.get: 404 vira cancelled, outra semana vira moved_week', async () => {

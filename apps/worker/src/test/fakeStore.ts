@@ -29,6 +29,7 @@ export class FakeStore {
   stored: (StoredEventRow & { calendar_source_id: string })[] = [];
   applied: { sourceId: string; googleId: string; change: CalendarChange; type: EventType | null }[] = [];
   disconnected: { sourceId: string; flag: boolean }[] = [];
+  colors: { sourceId: string; googleId: string; color: string | null }[] = [];
 
   types: ServiceTypeRow[] = [];
   titles: { title: string; serviceTypeId: string }[] = [];
@@ -127,6 +128,9 @@ export class FakeStore {
     this.disconnected.push({ sourceId, flag });
   }
   async setFingerprint() {}
+  async setEventColors(sourceId: string, colors: ReadonlyMap<string | null, string[]>) {
+    for (const [color, ids] of colors) for (const googleId of ids) this.colors.push({ sourceId, googleId, color });
+  }
 
   // Classificação e IA
   async serviceTypes() {

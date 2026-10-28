@@ -1,7 +1,8 @@
 import { DangerTriangleIcon } from '@solar-icons/react/bold-duotone';
 import { buildSeriesSizes, localDate, personLoad, SIZE_LABEL, weekStartOf, zonedTime, type EventSize, type SizeSuggestion, type WeekContext } from '@cronograma/core';
 import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { sizeFor, toFact, type AssignmentRow, type EventRow, type HistoryFactRow, type ServiceTypeRow, type SlotRow } from '../data/catalog';
+import { googleColor, useLocalGoogleColors } from './googleColors';
+import { sizeFor, toFact, type AssignmentRow, type CalendarSourceRow, type EventRow, type HistoryFactRow, type ServiceTypeRow, type SlotRow } from '../data/catalog';
 import { useSyncEngine, useSyncState } from '../sync/SyncProvider';
 import { AppIcon } from '../ui/AppIcon';
 import { Button } from '../ui/chiaro';
@@ -56,6 +57,7 @@ import { buildTitleIndex, typeSuggestions } from './typeSuggestions';
 import { acceptProposal, addSlot, buildWeek, clearSlot, discardProposal, removeSlot, sendAndRefresh, setPerson, setSeriesTitular, useBuildPending } from './useWeek';
 
 const NO_DRAFTS: ReadonlyMap<string, Draft> = new Map();
+const NO_SOURCES: readonly CalendarSourceRow[] = [];
 
 /** Confirmar a sugestão que já leva alerta (fora do horário) é escalar mesmo assim. */
 const draftPick = (slotId: string, d: Draft): Pick => ({ slotId, personId: d.personId, warnings: d.warnings ?? [], override: Boolean(d.warnings?.length) });
@@ -97,6 +99,8 @@ export interface BoardState {
 
 interface BoardProps {
   rows: WeekRows;
+  /** Agendas de origem: a cor de cada uma pinta os cartões sem cor própria no Google. */
+  sources?: readonly CalendarSourceRow[];
   now: Date;
   today: string;
   historyRows: readonly HistoryFactRow[] | null;
@@ -112,8 +116,16 @@ interface BoardProps {
  * as vagas abertas já vêm com a sugestão do histórico; nada grava sem confirmar. Semana ainda sem montagem mostra
  * as vagas previstas e monta sozinha na primeira confirmação.
  */
-export function WeekBoard({ rows, now, today, historyRows, historyLoading, onOpenEvent, renderBar }: BoardProps) {
+export function WeekBoard({ rows, sources = NO_SOURCES, now, today, historyRows, historyLoading, onOpenEvent, renderBar }: BoardProps) {
   const engine = useSyncEngine();
+  const localColors = useLocalGoogleColors();
+  const colorOf = useMemo(() => {
+    const cache = new Map<string, string | null>();
+    return (e: EventRow) => {
+      if (!cache.has(e.id)) cache.set(e.id, googleColor(e, sources, localColors));
+      return cache.get(e.id) ?? null;
+    };
+  }, [sources, localColors]);
   const { pendingRows } = useSyncState();
   const building = useBuildPending(rows.weekStart);
   // Semana sem montagem: as vagas que a montagem criaria, com o porte da série aplicado sozinho.
@@ -389,6 +401,7 @@ export function WeekBoard({ rows, now, today, historyRows, historyLoading, onOpe
     onAnswer: answer,
     reviews,
     onlyReview,
+    colorOf,
   };
   return (
     <>
@@ -474,6 +487,8 @@ type ChipProps = {
   /** Por que cada cartão precisa de olho; sem entrada, não precisa. */
   reviews: ReadonlyMap<string, string[]>;
   onlyReview: boolean;
+  /** Cor do Google Agenda do cartão; nula fica a cor da família. */
+  colorOf: (e: EventRow) => string | null;
 };
 
 function DayColumn({
@@ -529,7 +544,7 @@ function DayColumn({
             />
           ))}
           {day.lines.map((e) => (
-            <MarkerLine key={e.id} event={e} types={rows.types} onOpen={onOpenEvent} />
+            <MarkerLine key={e.id} event={e} types={rows.types} color={chip.colorOf(e)} onOpen={onOpenEvent} />
           ))}
         </div>
       )}
@@ -613,7 +628,7 @@ function DayTimeline({ now, ...props }: Parameters<typeof DayColumn>[0] & { now:
   const nowMin = day.date === today ? Math.round((now.getTime() - midnight) / 60_000) : null;
   const card = (e: EventRow) =>
     markers.has(e.id) ? (
-      <MarkerLine event={e} types={rows.types} onOpen={onOpenEvent} />
+      <MarkerLine event={e} types={rows.types} color={chip.colorOf(e)} onOpen={onOpenEvent} />
     ) : (
       <EventCard
         event={e}
@@ -735,9 +750,12 @@ function EventCard({
   const cancelled = event.status === 'cancelled';
   const canAdd = !readOnly && !cancelled && Boolean(event.service_type_id) && needsTeam(event, rows.types);
   const review = chip.reviews.get(event.id);
+  const color = chip.colorOf(event);
   return (
     <article
-      className={`board-card board-kind--${kind}${event.highlighted ? ' is-highlighted' : ''}${cancelled ? ' board-card--cancelled' : ''}${chip.onlyReview && !review ? ' is-dim' : ''}`}
+      className={`board-card board-kind--${kind}${color ? ' has-google-color' : ''}${event.highlighted ? ' is-highlighted' : ''}${cancelled ? ' board-card--cancelled' : ''}${chip.onlyReview && !review ? ' is-dim' : ''}`}
+      style={color ? ({ '--kind-color': color } as CSSProperties) : undefined}
+      data-color={color ?? undefined}
       aria-label={title}
       data-review={review ? '' : undefined}
       onClick={(ev) => {
@@ -918,10 +936,16 @@ function hasSeals(e: EventRow, today: string): boolean {
 }
 
 /** Reunião, folga, lembrete: uma linha fina e cinza, só para contexto. */
-function MarkerLine({ event, types, onOpen }: { event: EventRow; types: readonly ServiceTypeRow[]; onOpen: (eventId: string) => void }) {
+function MarkerLine({ event, types, color, onOpen }: { event: EventRow; types: readonly ServiceTypeRow[]; color: string | null; onOpen: (eventId: string) => void }) {
   const type = types.find((t) => t.id === event.service_type_id);
   return (
-    <button type="button" className="board-line" onClick={() => onOpen(event.id)} aria-label={`${shortTitle(event.title)}, ${eventSpan(event)}`}>
+    <button
+      type="button"
+      className={`board-line${color ? ' has-google-color' : ''}`}
+      style={color ? ({ '--kind-color': color } as CSSProperties) : undefined}
+      onClick={() => onOpen(event.id)}
+      aria-label={`${shortTitle(event.title)}, ${eventSpan(event)}`}
+    >
       <AppIcon icon={typeIcon(type).icon} size={14} />
       <span className="board-line-time">{event.all_day ? 'dia todo' : eventSpan(event).split(' às ')[0]}</span>
       <span className="board-line-title">{shortTitle(event.title)}</span>

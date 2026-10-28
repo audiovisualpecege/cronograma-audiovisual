@@ -65,6 +65,8 @@ export class GoogleFake {
   events = new Map<string, Reply>();
   /** Respostas de calendars.get; ausente = calendar.json. */
   calendars = new Map<string, Reply>();
+  /** Cor de cada agenda na lista de agendas da conta; ausente = 404 (fora da lista). */
+  colors = new Map<string, string>();
   tokenRequests = 0;
 
   static error = googleError;
@@ -90,6 +92,11 @@ export class GoogleFake {
         this.calls.push({ method: request.method, url });
         // A plataforma nunca escreve na agenda (ADR-003): qualquer outro método é falha do teste.
         if (request.method !== 'GET') return HttpResponse.json({ error: { message: 'só leitura' } }, { status: 405 });
+        const listed = /\/users\/me\/calendarList\/(.+)$/.exec(url.pathname);
+        if (listed) {
+          const color = this.colors.get(decodeURIComponent(listed[1] ?? ''));
+          return reply(color ? { body: { id: listed[1], backgroundColor: color } } : googleError(404));
+        }
         const parts = url.pathname.replace('/calendar/v3/calendars/', '').split('/').map(decodeURIComponent);
         const [cal = '', what, eventId] = parts;
         if (what === 'events' && eventId) return reply(this.events.get(`${cal}/${eventId}`) ?? googleError(404));

@@ -105,6 +105,8 @@ export interface CalendarSourceRow extends Row {
   last_synced_at: string | null;
   last_error: string | null;
   archived_at: string | null;
+  /** Cor da agenda no Google (#rrggbb), lida pelo serviço de fundo (migração 0024). */
+  color?: string | null;
 }
 
 export interface SettingsRow extends Row {
@@ -179,6 +181,9 @@ export interface EventRow extends Row {
   highlighted?: boolean;
   /** Porte escolhido (1 Simples, 2 Médio, 3 Grande); vazio vale o porte padrão do tipo. */
   size?: number | null;
+  google_event_id?: string | null;
+  /** Cor do evento no Google Agenda (colorId de 1 a 11); vazia segue a cor da agenda (migração 0024). */
+  color_id?: string | null;
 }
 
 export interface SlotRow extends Row {

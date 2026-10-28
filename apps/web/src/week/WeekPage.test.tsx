@@ -318,6 +318,15 @@ describe('Semana: grade', () => {
   });
 });
 
+describe('Semana: cores do Google Agenda', () => {
+  it('o cartão leva a cor do evento no Google; sem ela, a da agenda de origem', async () => {
+    const colored = eventRow('ec', { title: 'Evento externo', service_type_id: 't2', color_id: '11' });
+    await page(weekRemote({ events: [AULA, colored], slots: [slotWith('ea', 'r1')], extra: { calendar_sources: [{ ...(SOURCES[0] as object), color: '#33b679' } as never] } }));
+    expect(await card('Evento externo')).toHaveAttribute('data-color', '#d50000');
+    expect(await card('Gravação aula Biologia')).toHaveAttribute('data-color', '#33b679');
+  });
+});
+
 describe('Semana: linha do tempo', () => {
   it('mostra um dia por vez, com os cartões na altura do horário; os dias trocam e a escolha fica lembrada', async () => {
     const user = userEvent.setup();
