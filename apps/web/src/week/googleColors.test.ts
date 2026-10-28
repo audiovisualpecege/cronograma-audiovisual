@@ -20,6 +20,13 @@ describe('cor do Google Agenda no cartão', () => {
     expect(typeColor(undefined)).toBeNull();
   });
 
+  it('Faculdade fica verde-limão, mesmo com o tipo de aula MBA; a cor própria do Google ainda vence', () => {
+    expect(googleColor(event({ title: 'Faculdade Pecege - ADS EAD', service_type_id: 't1' }), { types })).toBe('#bbc166');
+    expect(googleColor(event({ title: '*Faculdade Pecege - Gestão de Projetos EAD' }), { types })).toBe('#bbc166');
+    expect(googleColor(event({ title: 'Aula na Faculdade', service_type_id: 't1' }), { types })).toBe('#76ad84');
+    expect(googleColor(event({ title: 'Faculdade Pecege', color_id: '5' }), { types })).toBe('#dabb63');
+  });
+
   it('a cor própria do evento no Google vence a do tipo; no app local, o arquivo lido do Google completa o banco', () => {
     expect(googleColor(event({ service_type_id: 't1', color_id: '11' }), { types })).toBe('#c05b3f');
     const local = { events: { 'g-1': '5' }, sources: {} };

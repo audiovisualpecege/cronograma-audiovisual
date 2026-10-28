@@ -40,6 +40,9 @@ const TYPE_COLOR: Readonly<Record<string, string>> = {
   'NAO ESCALAR': '6',
 };
 
+/** Exceções pelo começo do título, que vencem o tipo: as aulas da Faculdade ficam verde-limão, como na agenda. */
+const TITLE_COLOR: readonly [RegExp, string][] = [[/^\W*faculdade\b/i, '#bbc166']];
+
 /** Cores lidas do Google por um script local, enquanto o banco não guarda (só no app local). */
 export interface LocalGoogleColors {
   /** colorId de cada evento, pelo id do evento no Google. */
@@ -61,11 +64,12 @@ export function typeColor(type: Pick<ServiceTypeRow, 'name'> | undefined): strin
   return id ? (GOOGLE_EVENT_COLORS[id]?.hex ?? LILAS) : LILAS;
 }
 
-/** A cor do cartão: a própria do evento no Google, senão a do tipo, senão a lilás da agenda. */
+/** A cor do cartão: a própria do evento no Google, senão a do título (Faculdade), senão a do tipo, senão lilás. */
 export function googleColor(e: EventRow, { types, local = null }: ColorContext): string {
   const id = e.color_id ?? (e.google_event_id ? local?.events[e.google_event_id] : undefined);
   const own = id ? GOOGLE_EVENT_COLORS[id]?.hex : undefined;
-  return own ?? typeColor(types.find((t) => t.id === e.service_type_id)) ?? LILAS;
+  const byTitle = TITLE_COLOR.find(([re]) => re.test(e.title))?.[1];
+  return own ?? byTitle ?? typeColor(types.find((t) => t.id === e.service_type_id)) ?? LILAS;
 }
 
 const LOCAL_FILE = 'dev/cores-google.json';
