@@ -44,9 +44,10 @@ PATCH para um conserto, MINOR para algo novo, MAJOR quando o jeito de usar muda.
     lado a lado. Os dias da semana ficam no topo, com quantas atividades cada um tem, e a linha vermelha marca a
     hora de agora. O cartão é o mesmo da grade; o que não couber aparece ao passar o mouse. O placar e o "Próximo"
     da revisão trocam de dia sozinhos;
-  - **os cartões têm as cores do Google Agenda**: a cor do próprio evento, senão a da agenda de onde ele veio,
-    como na agenda. Evento sem cor nenhuma fica com a cor da família. Mudar a cor no Google não conta como
-    mudança do evento.
+  - **os cartões têm as cores da agenda da equipe**, nos mesmos tons do Google Agenda: verde para aulas,
+    disponibilizar e transmitir, amarelo para eventos, gravações e podcasts, uva para fotos, azul para cursos e
+    webinars, laranja para "não escalar" e lilás para reuniões e o resto. Se alguém der uma cor própria ao
+    evento no Google, ela vence. Mudar a cor no Google não conta como mudança do evento.
   Saíram a tela Propor escala (o endereço antigo abre a Semana), o Assistente, os quadros de pessoas disponíveis
   por função e de folga e férias, e o botão de teste da IA local.
 - **A escala aprende com quem monta**, para sobrar só a revisão das exceções:

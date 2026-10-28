@@ -169,11 +169,7 @@ export class CalendarSync {
       colors.set(color, [...(colors.get(color) ?? []), r.id]);
     }
     if (colors.size > 0) await this.store.setEventColors(src.id, colors);
-    const color = await google.calendarColor(calId);
-    await this.store.updateSource(src.id, {
-      status: 'connected', last_synced_at: now.toISOString(), last_error: null,
-      ...(color && color !== src.color ? { color } : {}),
-    });
+    await this.store.updateSource(src.id, { status: 'connected', last_synced_at: now.toISOString(), last_error: null });
     await this.store.markSourceDisconnected(src.id, false);
     return { outcome, aiCalls: classified.aiCalls, aiQuotaHits: classified.aiQuotaHits };
   }

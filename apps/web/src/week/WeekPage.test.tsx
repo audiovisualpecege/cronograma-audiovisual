@@ -319,11 +319,11 @@ describe('Semana: grade', () => {
 });
 
 describe('Semana: cores do Google Agenda', () => {
-  it('o cartão leva a cor do evento no Google; sem ela, a da agenda de origem', async () => {
+  it('o cartão leva a cor própria do evento no Google; sem ela, a do tipo (fora da lista, o lilás da agenda)', async () => {
     const colored = eventRow('ec', { title: 'Evento externo', service_type_id: 't2', color_id: '11' });
-    await page(weekRemote({ events: [AULA, colored], slots: [slotWith('ea', 'r1')], extra: { calendar_sources: [{ ...(SOURCES[0] as object), color: '#33b679' } as never] } }));
-    expect(await card('Evento externo')).toHaveAttribute('data-color', '#d50000');
-    expect(await card('Gravação aula Biologia')).toHaveAttribute('data-color', '#33b679');
+    await page(weekRemote({ events: [AULA, colored], slots: [slotWith('ea', 'r1')] }));
+    expect(await card('Evento externo')).toHaveAttribute('data-color', '#c05b3f');
+    expect(await card('Gravação aula Biologia')).toHaveAttribute('data-color', '#9b7cad');
   });
 });
 

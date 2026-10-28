@@ -153,7 +153,6 @@ function WeekBody({ rows, sources, now, today }: BodyProps) {
       ) : (
         <WeekBoard
           rows={rows}
-          sources={sources}
           now={now}
           today={today}
           historyRows={history.rows}

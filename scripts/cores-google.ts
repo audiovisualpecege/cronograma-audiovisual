@@ -1,4 +1,4 @@
-// Lê do Google as cores dos eventos e das agendas e grava em apps/web/public/dev/cores-google.json, para o app
+// Lê do Google as cores próprias dos eventos e grava em apps/web/public/dev/cores-google.json, para o app
 // local (npm run dev) pintar os cartões antes da migração 0024 e do serviço de fundo novo. Só lê: no Google (como o
 // serviço de fundo) e, no banco, a lista de agendas. Não grava nada no banco.
 //
@@ -32,9 +32,7 @@ for (const s of sources ?? []) {
     out.events[e.id] = e.colorId;
     colored++;
   }
-  const color = await google.calendarColor(s.google_calendar_id);
-  if (color) out.sources[s.id] = color;
-  console.log(`${s.label}: ${items.length} eventos, ${colored} com cor própria; cor da agenda ${color ?? 'não lida (fica a cor da família)'}`);
+  console.log(`${s.label}: ${items.length} eventos, ${colored} com cor própria (os outros ficam com a cor do tipo)`);
 }
 
 const file = join(dirname(fileURLToPath(import.meta.url)), '..', 'apps', 'web', 'public', 'dev', 'cores-google.json');

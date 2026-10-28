@@ -2,7 +2,7 @@ import { DangerTriangleIcon } from '@solar-icons/react/bold-duotone';
 import { buildSeriesSizes, localDate, personLoad, SIZE_LABEL, weekStartOf, zonedTime, type EventSize, type SizeSuggestion, type WeekContext } from '@cronograma/core';
 import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { googleColor, useLocalGoogleColors } from './googleColors';
-import { sizeFor, toFact, type AssignmentRow, type CalendarSourceRow, type EventRow, type HistoryFactRow, type ServiceTypeRow, type SlotRow } from '../data/catalog';
+import { sizeFor, toFact, type AssignmentRow, type EventRow, type HistoryFactRow, type ServiceTypeRow, type SlotRow } from '../data/catalog';
 import { useSyncEngine, useSyncState } from '../sync/SyncProvider';
 import { AppIcon } from '../ui/AppIcon';
 import { Button } from '../ui/chiaro';
@@ -57,7 +57,6 @@ import { buildTitleIndex, typeSuggestions } from './typeSuggestions';
 import { acceptProposal, addSlot, buildWeek, clearSlot, discardProposal, removeSlot, sendAndRefresh, setPerson, setSeriesTitular, useBuildPending } from './useWeek';
 
 const NO_DRAFTS: ReadonlyMap<string, Draft> = new Map();
-const NO_SOURCES: readonly CalendarSourceRow[] = [];
 
 /** Confirmar a sugestão que já leva alerta (fora do horário) é escalar mesmo assim. */
 const draftPick = (slotId: string, d: Draft): Pick => ({ slotId, personId: d.personId, warnings: d.warnings ?? [], override: Boolean(d.warnings?.length) });
@@ -99,8 +98,6 @@ export interface BoardState {
 
 interface BoardProps {
   rows: WeekRows;
-  /** Agendas de origem: a cor de cada uma pinta os cartões sem cor própria no Google. */
-  sources?: readonly CalendarSourceRow[];
   now: Date;
   today: string;
   historyRows: readonly HistoryFactRow[] | null;
@@ -116,16 +113,17 @@ interface BoardProps {
  * as vagas abertas já vêm com a sugestão do histórico; nada grava sem confirmar. Semana ainda sem montagem mostra
  * as vagas previstas e monta sozinha na primeira confirmação.
  */
-export function WeekBoard({ rows, sources = NO_SOURCES, now, today, historyRows, historyLoading, onOpenEvent, renderBar }: BoardProps) {
+export function WeekBoard({ rows, now, today, historyRows, historyLoading, onOpenEvent, renderBar }: BoardProps) {
   const engine = useSyncEngine();
   const localColors = useLocalGoogleColors();
   const colorOf = useMemo(() => {
-    const cache = new Map<string, string | null>();
+    const cache = new Map<string, string>();
     return (e: EventRow) => {
-      if (!cache.has(e.id)) cache.set(e.id, googleColor(e, sources, localColors));
-      return cache.get(e.id) ?? null;
+      const key = `${e.id}|${e.service_type_id ?? ''}|${e.color_id ?? ''}`;
+      if (!cache.has(key)) cache.set(key, googleColor(e, { types: rows.types, local: localColors }));
+      return cache.get(key) ?? null;
     };
-  }, [sources, localColors]);
+  }, [rows.types, localColors]);
   const { pendingRows } = useSyncState();
   const building = useBuildPending(rows.weekStart);
   // Semana sem montagem: as vagas que a montagem criaria, com o porte da série aplicado sozinho.

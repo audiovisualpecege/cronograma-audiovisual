@@ -49,8 +49,6 @@ export interface SourceRow {
   status: 'pending' | 'connected' | 'error';
   last_synced_at: string | null;
   last_error: string | null;
-  /** Cor da agenda no Google (#rrggbb), migração 0024. */
-  color?: string | null;
 }
 
 export interface StoredEventRow {
@@ -204,7 +202,7 @@ export interface CalendarStore extends NoticeStore {
   sources(): Promise<SourceRow[]>;
   storedEvents(sourceId: string, from: Date, to: Date): Promise<StoredEventRow[]>;
   storedByGoogleIds(sourceId: string, googleIds: string[]): Promise<StoredEventRow[]>;
-  updateSource(id: string, patch: Partial<Pick<SourceRow, 'status' | 'last_synced_at' | 'last_error' | 'color'>>): Promise<void>;
+  updateSource(id: string, patch: Partial<Pick<SourceRow, 'status' | 'last_synced_at' | 'last_error'>>): Promise<void>;
   /** Cor do Google (colorId, ou nula) dos eventos da origem, agrupados pela cor nova. */
   setEventColors(sourceId: string, colors: ReadonlyMap<string | null, string[]>): Promise<void>;
   applyCalendarChange(sourceId: string, googleEventId: string, change: CalendarChange, type: EventType | null): Promise<void>;
@@ -398,7 +396,7 @@ export class SupabaseStore implements Store {
     return out;
   }
 
-  async updateSource(id: string, patch: Partial<Pick<SourceRow, 'status' | 'last_synced_at' | 'last_error' | 'color'>>) {
+  async updateSource(id: string, patch: Partial<Pick<SourceRow, 'status' | 'last_synced_at' | 'last_error'>>) {
     check(await this.db.from('calendar_sources').update(patch).eq('id', id), 'updateSource');
   }
 

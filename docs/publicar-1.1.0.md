@@ -85,9 +85,9 @@ primeiro passo que não der o resultado esperado.
   - `supabase/migrations/0023_series_titulars.sql`: turma fixa gravada. Coluna `series_rules.titulars`
     (por função, titular e reserva) e a função `set_series_titular`, que o app chama quando alguém responde
     "virou o titular?". Não mexe em dados.
-  - `supabase/migrations/0024_google_colors.sql`: cores do Google Agenda nos cartões. Colunas
-    `events.color_id` (a cor do evento, de 1 a 11) e `calendar_sources.color` (a cor da agenda), gravadas pelo
-    serviço de fundo novo a cada releitura. Não mexe em dados; as cores aparecem depois da primeira releitura.
+  - `supabase/migrations/0024_google_colors.sql`: cor própria do evento no Google Agenda. Coluna
+    `events.color_id` (de 1 a 11), gravada pelo serviço de fundo novo a cada releitura; vence a cor do tipo no
+    cartão. Não mexe em dados. (Em 28/10/2026 nenhum evento das agendas tinha cor própria.)
 - **Dados iniciais da 0016** (fora do repositório, porque trata da equipe pelo e-mail):
   `..\dados-iniciais\aplicar-prioridades.mjs`. Ele grava a ordem das funções de cada pessoa a partir da
   planilha `..\Analise da escala.xlsx`, aba "Prioridade por pessoa": vale a coluna "Sua ordem" quando
@@ -211,7 +211,7 @@ estimada" da prévia (as vagas, que o banco cria, saem certas).
 2. **Serviço de fundo**: no NAS, volte a imagem anterior. Antes, troque o fornecedor para Gemini na tela, porque
    o worker antigo não conhece o local. Se for desfazer a 0024, volte o worker **antes**: o novo precisa dela.
 3. **Banco**, nesta ordem. Rode cada arquivo inteiro no SQL Editor do painel; cada um roda numa transação só:
-   0. `supabase/rollback/0024_down.sql`: tira as cores do Google (os cartões voltam à cor da família). Depois
+   0. `supabase/rollback/0024_down.sql`: tira a cor própria dos eventos (os cartões ficam com a cor do tipo). Depois
       `supabase/rollback/0023_down.sql`: tira a turma fixa gravada. Depois `supabase/rollback/0022_down.sql`: tira sede, horário e "externo" e os alertas novos. Depois
       `supabase/rollback/0021_down.sql`: as vagas voltam a nascer só pela equipe do tipo (as já criadas ficam).
       Depois `supabase/rollback/0020_down.sql`: tira as regras de começo e o que as séries aprenderam, e volta os
