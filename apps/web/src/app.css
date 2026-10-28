@@ -453,9 +453,28 @@ body {
   }
 
   .side-nav .nav-link,
-  .side-nav-brand,
   .side-nav-user,
   .side-nav-footer .app-version {
+    white-space: nowrap;
+  }
+
+  /* O ícone nunca encolhe: o nome, sem quebra de linha, espremia o ícone até sumir com o menu recolhido. */
+  .side-nav .nav-link > svg,
+  .side-nav-brand img {
+    flex: none;
+  }
+
+  .side-nav .nav-link > span {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  /* "CRONOGRAMA" em cima e "AUDIOVISUAL" embaixo, para caber sem alargar o menu. */
+  .side-nav-brand .screen-title {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.1;
     white-space: nowrap;
   }
 
