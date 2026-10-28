@@ -113,6 +113,67 @@ export function boardDays(rows: WeekRows, timeOff: readonly TimeOff[]): BoardDay
   });
 }
 
+/** Uma atividade na linha do tempo do dia: minutos desde a meia-noite e a coluna, quando divide o horário. */
+export interface TimelineItem {
+  event: EventRow;
+  start: number;
+  end: number;
+  lane: number;
+  lanes: number;
+}
+
+export interface TimelineDay {
+  /** Dia inteiro (ou que cobre o dia todo): numa faixa acima das horas. */
+  allDay: EventRow[];
+  items: TimelineItem[];
+  /** Horas mostradas, em minutos: das 7h às 19h, alargado até a primeira e a última atividade. */
+  from: number;
+  to: number;
+}
+
+/** Atividade curta ocupa ao menos meia hora na tela, para caber o título. */
+export const TIMELINE_MIN = 30;
+const DAY_MIN = 24 * 60;
+
+/**
+ * A linha do tempo de um dia, como no Google Agenda: cada atividade na altura do horário, e as que acontecem ao
+ * mesmo tempo lado a lado, dividindo a largura do grupo que se cruza.
+ */
+export function timelineLayout(date: string, events: readonly EventRow[]): TimelineDay {
+  const midnight = zonedTime(date, '00:00').getTime();
+  const allDay: EventRow[] = [];
+  const timed: TimelineItem[] = [];
+  for (const event of events) {
+    const start = Math.max(0, Math.round((Date.parse(event.starts_at) - midnight) / 60_000));
+    const end = Math.min(DAY_MIN, Math.round((Date.parse(event.ends_at) - midnight) / 60_000));
+    if (event.all_day || (start === 0 && end === DAY_MIN)) allDay.push(event);
+    else timed.push({ event, start, end: Math.min(DAY_MIN, Math.max(end, start + TIMELINE_MIN)), lane: 0, lanes: 1 });
+  }
+  timed.sort((a, b) => a.start - b.start || b.end - a.end);
+  // Grupos que se cruzam: cada atividade na primeira coluna livre; o grupo todo divide a largura pelas colunas.
+  let group: TimelineItem[] = [];
+  let laneEnds: number[] = [];
+  let groupEnd = -1;
+  const close = () => {
+    for (const it of group) it.lanes = laneEnds.length;
+    group = [];
+    laneEnds = [];
+  };
+  for (const it of timed) {
+    if (it.start >= groupEnd) close();
+    let lane = laneEnds.findIndex((end) => end <= it.start);
+    if (lane < 0) lane = laneEnds.push(it.end) - 1;
+    else laneEnds[lane] = it.end;
+    it.lane = lane;
+    group.push(it);
+    groupEnd = Math.max(groupEnd, it.end);
+  }
+  close();
+  const from = Math.min(7 * 60, ...timed.map((it) => Math.floor(it.start / 60) * 60));
+  const to = Math.max(19 * 60, ...timed.map((it) => Math.ceil(it.end / 60) * 60));
+  return { allDay, items: timed, from, to };
+}
+
 /**
  * Folgas e férias vindas da agenda (não cadastradas) que valem: contam como ausência na sugestão e na escolha,
  * sem gravar nada. A desmarcada na faixa do dia não conta; as cadastradas sempre contam (já estão no contexto).

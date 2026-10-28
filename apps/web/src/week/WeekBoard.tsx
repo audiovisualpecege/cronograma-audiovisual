@@ -1,6 +1,6 @@
 import { DangerTriangleIcon } from '@solar-icons/react/bold-duotone';
-import { buildSeriesSizes, localDate, personLoad, SIZE_LABEL, weekStartOf, type EventSize, type SizeSuggestion, type WeekContext } from '@cronograma/core';
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { buildSeriesSizes, localDate, personLoad, SIZE_LABEL, weekStartOf, zonedTime, type EventSize, type SizeSuggestion, type WeekContext } from '@cronograma/core';
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { sizeFor, toFact, type AssignmentRow, type EventRow, type HistoryFactRow, type ServiceTypeRow, type SlotRow } from '../data/catalog';
 import { useSyncEngine, useSyncState } from '../sync/SyncProvider';
 import { AppIcon } from '../ui/AppIcon';
@@ -20,6 +20,7 @@ import {
   reviewReasons,
   shortTitle,
   slotKeys,
+  timelineLayout,
   timeOffAbsences,
   titularAsks,
   type BoardCounts,
@@ -298,7 +299,30 @@ export function WeekBoard({ rows, now, today, historyRows, historyLoading, onOpe
   const pickEvent = pickSlot ? board.events.find((e) => e.id === pickSlot.event_id) : undefined;
   const pickAssignment = picking ? model.bySlot.get(picking) : undefined;
 
+  // Grade (a semana em colunas) ou linha do tempo (um dia por vez, com as horas de cima para baixo).
+  const [view, setView] = useState<BoardView>(readView);
+  const chooseView = (v: BoardView) => {
+    setView(v);
+    saveView(v);
+  };
+  const [dayAt, setDayAt] = useState(() => firstDay(days, today));
+  const [dayWeek, setDayWeek] = useState(rows.weekStart);
+  if (dayWeek !== rows.weekStart) {
+    setDayWeek(rows.weekStart);
+    setDayAt(firstDay(days, today));
+  }
+
   const boardId = useId();
+  // O placar procura nos outros dias quando a linha do tempo não mostra o que ele pede.
+  const pendingGo = useRef<BoardTarget | null>(null);
+  function dayHas(day: BoardDay, what: BoardTarget): boolean {
+    return day.cards.some((e) => {
+      const slots = model.slotsByEvent.get(e.id) ?? [];
+      if (what === 'review') return reviews.has(e.id);
+      if (what === 'alert') return eventAlerts(e, slots.length, built, board.types).length > 0;
+      return slots.some((s) => chipState(model.bySlot.get(s.id), drafts.get(s.id)) === what);
+    });
+  }
   // "Próximo": o cartão para revisar depois do que está em foco (volta ao primeiro no fim).
   function scrollTo(what: BoardTarget) {
     const root = document.getElementById(boardId);
@@ -306,14 +330,30 @@ export function WeekBoard({ rows, now, today, historyRows, historyLoading, onOpe
     if (what === 'review') {
       const all = [...(root?.querySelectorAll<HTMLElement>('[data-review]') ?? [])];
       const at = all.findIndex((c) => c.contains(document.activeElement));
-      el = all[(at + 1) % Math.max(all.length, 1)];
+      el = view === 'timeline' && at === all.length - 1 && pendingGo.current !== what ? undefined : all[(at + 1) % Math.max(all.length, 1)];
     } else {
       el = root?.querySelector<HTMLElement>(what === 'alert' ? '[data-alert]' : `[data-chip="${what}"]`);
     }
+    if (!el && view === 'timeline' && pendingGo.current !== what) {
+      const next = [1, 2, 3, 4, 5, 6, 7].map((i) => (dayAt + i) % days.length).find((i) => days[i] && dayHas(days[i], what));
+      if (next !== undefined) {
+        pendingGo.current = what;
+        if (next === dayAt) scrollTo(what);
+        else setDayAt(next);
+      }
+      return;
+    }
+    pendingGo.current = null;
     if (!el) return;
     el.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
     (el.querySelector<HTMLElement>('button') ?? el).focus({ preventScroll: true });
   }
+  useEffect(() => {
+    const what = pendingGo.current;
+    if (what) scrollTo(what);
+    // Só quando o dia mostrado muda por causa do placar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dayAt]);
 
   const state: BoardState = {
     counts,
@@ -359,23 +399,33 @@ export function WeekBoard({ rows, now, today, historyRows, historyLoading, onOpe
         </p>
       )}
       <TypeIconSprite types={cardTypes} />
-      <div id={boardId} className={`board${lit ? ' is-lighting' : ''}`}>
-        {days.map((day) => (
-          <DayColumn
-            key={day.date}
-            day={day}
-            today={today}
-            rows={board}
-            built={built}
-            readOnly={readOnly}
-            dropped={dropped}
-            onToggleOff={(t) => setDropped((s) => (s.has(t.key) ? new Set([...s].filter((k) => k !== t.key)) : new Set([...s, t.key])))}
-            onOpenEvent={onOpenEvent}
-            typeHints={typeHints}
-            sizeHints={sizeHints}
-            chip={chipProps}
-          />
-        ))}
+      <div className="board-views">
+        <span className="board-view-switch" role="group" aria-label="Visualização">
+          {(['grid', 'timeline'] as const).map((v) => (
+            <button key={v} type="button" className={view === v ? 'is-on' : undefined} aria-pressed={view === v} onClick={() => chooseView(v)}>
+              {v === 'grid' ? 'Grade' : 'Linha do tempo'}
+            </button>
+          ))}
+        </span>
+        {view === 'timeline' && <DayNav days={days} at={dayAt} today={today} onGo={setDayAt} />}
+      </div>
+      <div id={boardId} className={`board${view === 'timeline' ? ' board--timeline' : ''}${lit ? ' is-lighting' : ''}`}>
+        {(view === 'timeline' ? days.slice(dayAt, dayAt + 1) : days).map((day) => {
+          const props = {
+            day,
+            today,
+            rows: board,
+            built,
+            readOnly,
+            dropped,
+            onToggleOff: (t: TimeOff) => setDropped((s) => (s.has(t.key) ? new Set([...s].filter((k) => k !== t.key)) : new Set([...s, t.key]))),
+            onOpenEvent,
+            typeHints,
+            sizeHints,
+            chip: chipProps,
+          };
+          return view === 'timeline' ? <DayTimeline key={day.date} {...props} now={now} /> : <DayColumn key={day.date} {...props} />;
+        })}
       </div>
       {pickSlot && pickEvent && (
         <PersonPicker
@@ -483,6 +533,142 @@ function DayColumn({
           ))}
         </div>
       )}
+    </section>
+  );
+}
+
+export type BoardView = 'grid' | 'timeline';
+const VIEW_KEY = 'semana.visao';
+
+/** A visualização escolhida por último, neste navegador (sem acesso ao armazenamento, a grade). */
+function readView(): BoardView {
+  try {
+    return localStorage.getItem(VIEW_KEY) === 'timeline' ? 'timeline' : 'grid';
+  } catch {
+    return 'grid';
+  }
+}
+
+function saveView(v: BoardView) {
+  try {
+    localStorage.setItem(VIEW_KEY, v);
+  } catch {
+    // Sem armazenamento, a escolha vale só até recarregar.
+  }
+}
+
+/** O dia que a linha do tempo abre: hoje, se for desta semana; senão o primeiro dia com atividade. */
+function firstDay(days: readonly BoardDay[], today: string): number {
+  const at = days.findIndex((d) => d.date === today);
+  if (at >= 0) return at;
+  return Math.max(0, days.findIndex((d) => d.cards.length + d.lines.length > 0));
+}
+
+/** Setas e os sete dias da semana, com quantas atividades cada um tem. */
+function DayNav({ days, at, today, onGo }: { days: readonly BoardDay[]; at: number; today: string; onGo: (i: number) => void }) {
+  return (
+    <nav className="board-daynav" aria-label="Dia da linha do tempo">
+      <button type="button" className="board-daynav-step" disabled={at === 0} aria-label="Dia anterior" onClick={() => onGo(at - 1)}>
+        ‹
+      </button>
+      {days.map((d, i) => {
+        const n = d.cards.length + d.lines.length;
+        return (
+          <button
+            key={d.date}
+            type="button"
+            className={`board-daynav-day${i === at ? ' is-on' : ''}${d.date === today ? ' is-today' : ''}`}
+            aria-current={i === at ? 'date' : undefined}
+            aria-label={`${d.label}, ${n === 1 ? '1 atividade' : `${n} atividades`}`}
+            onClick={() => onGo(i)}
+          >
+            {d.short}
+            <span className="board-daynav-count">{n}</span>
+          </button>
+        );
+      })}
+      <button type="button" className="board-daynav-step" disabled={at === days.length - 1} aria-label="Próximo dia" onClick={() => onGo(at + 1)}>
+        ›
+      </button>
+    </nav>
+  );
+}
+
+/** Altura de uma hora na linha do tempo, em pixels. */
+const HOUR_PX = 96;
+
+/**
+ * Um dia como no Google Agenda: as horas de cima para baixo, cada atividade na altura do horário e as que se cruzam
+ * lado a lado. O cartão é o mesmo da grade; o que não couber na altura aparece ao passar o mouse ou entrar com o
+ * teclado. Dia inteiro e as folgas ficam no topo.
+ */
+function DayTimeline({ now, ...props }: Parameters<typeof DayColumn>[0] & { now: Date }) {
+  const { day, today, rows, built, readOnly, dropped, onToggleOff, onOpenEvent, typeHints, sizeHints, chip } = props;
+  const layout = useMemo(() => timelineLayout(day.date, [...day.cards, ...day.lines]), [day]);
+  const markers = useMemo(() => new Set(day.lines.map((e) => e.id)), [day.lines]);
+  const hours = [];
+  for (let m = layout.from; m < layout.to; m += 60) hours.push(m);
+  const y = (min: number) => ((min - layout.from) / 60) * HOUR_PX;
+  const midnight = zonedTime(day.date, '00:00').getTime();
+  const nowMin = day.date === today ? Math.round((now.getTime() - midnight) / 60_000) : null;
+  const card = (e: EventRow) =>
+    markers.has(e.id) ? (
+      <MarkerLine event={e} types={rows.types} onOpen={onOpenEvent} />
+    ) : (
+      <EventCard
+        event={e}
+        rows={rows}
+        built={built}
+        today={today}
+        readOnly={readOnly}
+        slots={chip.model.slotsByEvent.get(e.id) ?? []}
+        onOpen={onOpenEvent}
+        typeHint={typeHints.get(e.id)}
+        sizeHint={sizeHints.get(e.id)}
+        chip={chip}
+      />
+    );
+  return (
+    <section className={`board-timeline${day.date === today ? ' is-today' : ''}`} aria-label={day.label}>
+      <header className="board-day-head">
+        <h3 className="board-day-title">{day.label}</h3>
+        {day.date === today && <Seal kind="hoje">hoje</Seal>}
+      </header>
+      {day.off.length > 0 && <OffStrip items={day.off} dropped={dropped} readOnly={readOnly} onToggle={onToggleOff} />}
+      {layout.allDay.length > 0 && (
+        <div className="board-timeline-allday" aria-label="Dia inteiro">
+          {layout.allDay.map((e) => (
+            <div key={e.id}>{card(e)}</div>
+          ))}
+        </div>
+      )}
+      {layout.items.length === 0 && layout.allDay.length === 0 && <p className="board-day-empty">sem atividades</p>}
+      <div className="board-timeline-grid" style={{ height: y(layout.to) }}>
+        {hours.map((m) => (
+          <span key={m} className="board-timeline-hour" style={{ top: y(m) }}>
+            {`${String(m / 60).padStart(2, '0')}h`}
+          </span>
+        ))}
+        {nowMin !== null && nowMin >= layout.from && nowMin <= layout.to && <span className="board-timeline-now" style={{ top: y(nowMin) }} aria-hidden="true" />}
+        <div className="board-timeline-track">
+          {layout.items.map((it) => (
+            <div
+              key={it.event.id}
+              className={`board-timeline-item${markers.has(it.event.id) ? ' is-marker' : ''}`}
+              style={
+                {
+                  top: y(it.start),
+                  left: `calc(${(it.lane / it.lanes) * 100}% + 2px)`,
+                  width: `calc(${100 / it.lanes}% - 4px)`,
+                  '--h': `${Math.max(((it.end - it.start) / 60) * HOUR_PX - 4, 22)}px`,
+                } as CSSProperties
+              }
+            >
+              {card(it.event)}
+            </div>
+          ))}
+        </div>
+      </div>
     </section>
   );
 }

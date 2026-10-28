@@ -35,7 +35,12 @@ PATCH para um conserto, MINOR para algo novo, MAJOR quando o jeito de usar muda.
     a equipe e a descrição da agenda;
   - a lista de pessoas tem busca pelo nome e diz por que cada uma serve, com a última vez que fez: "fez este
     evento na semana passada (3 vezes em 8 semanas)", "fez esta função neste tipo há 5 semanas (12 vezes)";
-  - Publicar avisa quantas sugestões ainda não foram confirmadas.
+  - Publicar avisa quantas sugestões ainda não foram confirmadas;
+  - **Linha do tempo**, ao lado da grade ("Grade / Linha do tempo", lembrada no navegador): um dia por vez, como
+    no Google Agenda, com as horas de cima para baixo, cada cartão na altura do horário e os que acontecem juntos
+    lado a lado. Os dias da semana ficam no topo, com quantas atividades cada um tem, e a linha vermelha marca a
+    hora de agora. O cartão é o mesmo da grade; o que não couber aparece ao passar o mouse. O placar e o "Próximo"
+    da revisão trocam de dia sozinhos.
   Saíram a tela Propor escala (o endereço antigo abre a Semana), o Assistente, os quadros de pessoas disponíveis
   por função e de folga e férias, e o botão de teste da IA local.
 - **A escala aprende com quem monta**, para sobrar só a revisão das exceções:

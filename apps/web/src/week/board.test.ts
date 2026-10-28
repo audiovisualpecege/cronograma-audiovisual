@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CREW_ROWS, eventRow, ROLE_ROWS, TYPE_ROWS, WEEK_B } from '../../test/weekFixtures';
 import type { AssignmentRow, CrewRow, EventRow, HistoryFactRow, JobRoleRow, ServiceTypeRow, SlotRow } from '../data/catalog';
-import { activityKind, chipState, eventAlerts, isPlanned, plannedRows, reviewReasons, shortTitle, slotKeys, timeOffAbsences, titularAsks } from './board';
+import { activityKind, chipState, eventAlerts, isPlanned, plannedRows, reviewReasons, shortTitle, slotKeys, timelineLayout, timeOffAbsences, titularAsks } from './board';
 import type { WeekRows } from './model';
 
 const types = TYPE_ROWS as unknown as ServiceTypeRow[];
@@ -23,6 +23,29 @@ function rows(extra: Partial<WeekRows> = {}): WeekRows {
     ...extra,
   };
 }
+
+describe('linha do tempo do dia', () => {
+  const at = (id: string, from: string, to: string, extra: Record<string, unknown> = {}) =>
+    eventRow(id, { starts_at: `2026-10-26T${from}:00-03:00`, ends_at: `2026-10-26T${to}:00-03:00`, ...extra }) as unknown as EventRow;
+
+  it('cada atividade na altura do horário; as que se cruzam dividem a largura, e a coluna livre é reaproveitada', () => {
+    const out = timelineLayout(WEEK_B, [at('a', '09:00', '12:00'), at('b', '10:00', '11:00'), at('c', '11:00', '13:00'), at('d', '15:00', '16:00')]);
+    const by = new Map(out.items.map((it) => [it.event.id, it]));
+    expect(by.get('a')).toMatchObject({ start: 540, end: 720, lane: 0, lanes: 2 });
+    expect(by.get('b')).toMatchObject({ lane: 1, lanes: 2 });
+    // "c" começa quando "b" acaba: fica na coluna de "b", no mesmo grupo de "a".
+    expect(by.get('c')).toMatchObject({ lane: 1, lanes: 2 });
+    expect(by.get('d')).toMatchObject({ lane: 0, lanes: 1 });
+    expect([out.from, out.to]).toEqual([420, 1140]);
+  });
+
+  it('dia inteiro vai para a faixa de cima; atividade curta ocupa meia hora; as horas alargam até a atividade', () => {
+    const out = timelineLayout(WEEK_B, [at('x', '00:00', '00:00', { all_day: true, ends_at: '2026-10-27T00:00:00-03:00' }), at('y', '06:30', '06:30'), at('z', '20:00', '21:15')]);
+    expect(out.allDay.map((e) => e.id)).toEqual(['x']);
+    expect(out.items.find((it) => it.event.id === 'y')).toMatchObject({ start: 390, end: 420 });
+    expect([out.from, out.to]).toEqual([360, 1320]);
+  });
+});
 
 describe('grade da semana', () => {
   it('semana sem montagem: vagas previstas pela equipe do tipo, abertas, só nos eventos que pedem equipe', () => {

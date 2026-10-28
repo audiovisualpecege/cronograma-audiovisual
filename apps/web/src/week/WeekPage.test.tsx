@@ -318,6 +318,35 @@ describe('Semana: grade', () => {
   });
 });
 
+describe('Semana: linha do tempo', () => {
+  it('mostra um dia por vez, com os cartões na altura do horário; os dias trocam e a escolha fica lembrada', async () => {
+    const user = userEvent.setup();
+    const terca = eventRow('ec', { title: 'Evento externo', service_type_id: 't2', starts_at: '2026-10-27T09:00:00-03:00', ends_at: '2026-10-27T12:00:00-03:00' });
+    try {
+      await page(weekRemote({ events: [AULA, TARDE, terca], slots: [slotWith('ea', 'r1'), slotWith('eb', 'r1'), slotWith('ec', 'r1')] }));
+      await card('Gravação aula Biologia');
+      await user.click(screen.getByRole('button', { name: 'Linha do tempo' }));
+      // Abre no primeiro dia com atividade (a semana não é a de hoje): a segunda, sem a terça.
+      const day = await screen.findByRole('region', { name: 'segunda, 26/10' });
+      const items = [...day.querySelectorAll<HTMLElement>('.board-timeline-item')];
+      expect(items.map((el) => within(el).getByRole('article').getAttribute('aria-label'))).toEqual(['Gravação aula Biologia', 'Gravação aula Química']);
+      // 9h a 12h numa grade que começa às 7h: duas horas abaixo do topo, três de altura.
+      expect(items[0]?.style.top).toBe('192px');
+      expect(items[0]?.style.getPropertyValue('--h')).toBe('284px');
+      expect(screen.queryByRole('article', { name: 'Evento externo' })).toBeNull();
+      // As fichas da vaga funcionam como na grade.
+      expect(within(items[0] as HTMLElement).getByRole('button', { name: /^Câmera:/ })).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Próximo dia' }));
+      expect(await card('Evento externo')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^terça, 27\/10/ })).toHaveAttribute('aria-current', 'date');
+      expect(localStorage.getItem('semana.visao')).toBe('timeline');
+    } finally {
+      localStorage.removeItem('semana.visao');
+    }
+  });
+});
+
 describe('Semana sem montagem', () => {
   it('as vagas previstas pela equipe do tipo já aparecem com sugestão; confirmar monta a semana sozinho', async () => {
     const user = userEvent.setup();
