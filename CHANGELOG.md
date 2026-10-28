@@ -46,7 +46,8 @@ PATCH para um conserto, MINOR para algo novo, MAJOR quando o jeito de usar muda.
     no Google Agenda, com as horas de cima para baixo, cada cartão na altura do horário e os que acontecem juntos
     lado a lado. Os dias da semana ficam no topo, com quantas atividades cada um tem, e a linha vermelha marca a
     hora de agora. O cartão é o mesmo da grade; o que não couber aparece ao passar o mouse. O placar e o "Próximo"
-    da revisão trocam de dia sozinhos;
+    da revisão trocam de dia sozinhos. O que é de dia inteiro (ou quase, como 0h às 23h59) vira uma barra fina
+    no topo, com a cor e quantas vagas faltam; o clique abre o painel;
   - o evento cancelado na agenda fica apagado, cinza e tracejado, para não se confundir com os ativos (volta ao
     normal ao passar o mouse), e vai para o fim do dia na grade e para a direita dos que acontecem no mesmo horário na linha do tempo;
   - **os cartões têm as cores da agenda da equipe**, nos mesmos tons do Google Agenda: verde para aulas,

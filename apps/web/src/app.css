@@ -2309,10 +2309,63 @@ body {
 }
 
 .board-timeline-allday {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
   margin-left: 52px;
+}
+
+/* Dia inteiro: barra fina com a cor do tipo, como no Google Agenda. */
+.board-allday {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 26px;
+  padding: 3px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--kind-color, var(--neutral-600)) 70%, var(--surface-page));
+  color: var(--surface-page);
+  font: inherit;
+  font-size: 13px;
+  font-weight: var(--weight-medium);
+  text-align: left;
+  cursor: pointer;
+}
+
+.board-allday:hover,
+.board-allday:focus-visible {
+  outline: none;
+  background: var(--kind-color, var(--neutral-500));
+}
+
+.board-allday-title {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.board-allday-slots {
+  flex: none;
+  margin-left: auto;
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.board-allday.has-open .board-allday-slots {
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--danger);
+  color: #fff;
+  opacity: 1;
+}
+
+.board-allday.is-cancelled {
+  opacity: 0.4;
+  filter: grayscale(1);
+  text-decoration: line-through;
 }
 
 .board-timeline-grid {

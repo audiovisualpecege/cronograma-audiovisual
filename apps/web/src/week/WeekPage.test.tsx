@@ -350,7 +350,8 @@ describe('Semana: linha do tempo', () => {
     const user = userEvent.setup();
     const terca = eventRow('ec', { title: 'Evento externo', service_type_id: 't2', starts_at: '2026-10-27T09:00:00-03:00', ends_at: '2026-10-27T12:00:00-03:00' });
     try {
-      await page(weekRemote({ events: [AULA, TARDE, terca], slots: [slotWith('ea', 'r1'), slotWith('eb', 'r1'), slotWith('ec', 'r1')] }));
+      const allDay = eventRow('ed', { title: 'Gravação dia todo', starts_at: '2026-10-27T00:00:00-03:00', ends_at: '2026-10-28T00:00:00-03:00', all_day: true });
+      await page(weekRemote({ events: [AULA, TARDE, terca, allDay], slots: [slotWith('ea', 'r1'), slotWith('eb', 'r1'), slotWith('ec', 'r1'), slotWith('ed', 'r4')] }));
       await card('Gravação aula Biologia');
       await user.click(screen.getByRole('button', { name: 'Linha do tempo' }));
       // Abre no primeiro dia com atividade (a semana não é a de hoje): a segunda, sem a terça.
@@ -366,6 +367,9 @@ describe('Semana: linha do tempo', () => {
 
       await user.click(screen.getByRole('button', { name: 'Próximo dia' }));
       expect(await card('Evento externo')).toBeInTheDocument();
+      // Dia inteiro: barra fina no topo, com as vagas; o clique abre o painel.
+      await user.click(screen.getByRole('button', { name: /^Gravação dia todo, dia inteiro, 1 vaga/ }));
+      expect(await screen.findByRole('complementary', { name: 'Detalhes de Gravação dia todo' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /^terça, 27\/10/ })).toHaveAttribute('aria-current', 'date');
       expect(localStorage.getItem('semana.visao')).toBe('timeline');
     } finally {

@@ -60,6 +60,8 @@ describe('linha do tempo do dia', () => {
   it('dia inteiro vai para a faixa de cima; atividade curta ocupa meia hora; as horas alargam até a atividade', () => {
     const out = timelineLayout(WEEK_B, [at('x', '00:00', '00:00', { all_day: true, ends_at: '2026-10-27T00:00:00-03:00' }), at('y', '06:30', '06:30'), at('z', '20:00', '21:15')]);
     expect(out.allDay.map((e) => e.id)).toEqual(['x']);
+    // 0h às 23h59 na agenda também é dia inteiro: não estica as horas do dia.
+    expect(timelineLayout(WEEK_B, [at('q', '00:00', '23:59')]).allDay.map((e) => e.id)).toEqual(['q']);
     expect(out.items.find((it) => it.event.id === 'y')).toMatchObject({ start: 390, end: 420 });
     expect([out.from, out.to]).toEqual([360, 1320]);
   });

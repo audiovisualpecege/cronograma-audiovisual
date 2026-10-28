@@ -125,7 +125,7 @@ export interface TimelineItem {
 }
 
 export interface TimelineDay {
-  /** Dia inteiro (ou que cobre o dia todo): numa faixa acima das horas. */
+  /** Dia inteiro (ou que cobre o dia quase todo): barras finas acima das horas. */
   allDay: EventRow[];
   items: TimelineItem[];
   /** Horas mostradas, em minutos: das 7h às 19h, alargado até a primeira e a última atividade. */
@@ -148,7 +148,8 @@ export function timelineLayout(date: string, events: readonly EventRow[]): Timel
   for (const event of events) {
     const start = Math.max(0, Math.round((Date.parse(event.starts_at) - midnight) / 60_000));
     const end = Math.min(DAY_MIN, Math.round((Date.parse(event.ends_at) - midnight) / 60_000));
-    if (event.all_day || (start === 0 && end === DAY_MIN)) allDay.push(event);
+    // Dia inteiro, ou quase (0h às 23h59 na agenda): barra no topo, sem esticar as horas do dia.
+    if (event.all_day || end - start >= DAY_MIN - 60) allDay.push(event);
     else timed.push({ event, start, end: Math.min(DAY_MIN, Math.max(end, start + TIMELINE_MIN)), lane: 0, lanes: 1 });
   }
   timed.sort((a, b) => a.start - b.start || b.end - a.end);

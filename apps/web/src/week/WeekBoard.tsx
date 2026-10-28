@@ -660,7 +660,7 @@ function DayTimeline({ now, ...props }: Parameters<typeof DayColumn>[0] & { now:
       {layout.allDay.length > 0 && (
         <div className="board-timeline-allday" aria-label="Dia inteiro">
           {layout.allDay.map((e) => (
-            <div key={e.id}>{card(e)}</div>
+            <AllDayBar key={e.id} event={e} slots={chip.model.slotsByEvent.get(e.id) ?? []} chip={chip} onOpen={onOpenEvent} />
           ))}
         </div>
       )}
@@ -700,6 +700,31 @@ function DayTimeline({ now, ...props }: Parameters<typeof DayColumn>[0] & { now:
         )}
       </div>
     </section>
+  );
+}
+
+/**
+ * Dia inteiro na linha do tempo, como no Google Agenda: uma barra fina com a cor e o título, e quantas vagas faltam.
+ * Clicar abre o painel da direita, onde as vagas se escolhem e se mudam.
+ */
+function AllDayBar({ event, slots, chip, onOpen }: { event: EventRow; slots: readonly SlotRow[]; chip: ChipProps; onOpen: (eventId: string) => void }) {
+  const color = chip.colorOf(event);
+  const open = slots.filter((s) => chipState(chip.model.bySlot.get(s.id), chip.drafts.get(s.id)) === 'open').length;
+  const title = shortTitle(event.title);
+  const vagas = slots.length === 0 ? '' : open > 0 ? `${open} ${open === 1 ? 'vaga aberta' : 'vagas abertas'}` : `${slots.length} ${slots.length === 1 ? 'vaga' : 'vagas'}`;
+  return (
+    <button
+      type="button"
+      className={`board-allday${event.status === 'cancelled' ? ' is-cancelled' : ''}${open > 0 ? ' has-open' : ''}`}
+      style={color ? ({ '--kind-color': color } as CSSProperties) : undefined}
+      data-color={color ?? undefined}
+      aria-label={`${title}, dia inteiro${vagas ? `, ${vagas}` : ''}`}
+      title={`${title}${vagas ? ` · ${vagas}` : ''}`}
+      onClick={() => onOpen(event.id)}
+    >
+      <span className="board-allday-title">{title}</span>
+      {vagas && <span className="board-allday-slots">{vagas}</span>}
+    </button>
   );
 }
 
