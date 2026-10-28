@@ -2545,6 +2545,21 @@ button.board-off-item {
   text-decoration: line-through;
 }
 
+/* Cancelado na agenda: apagado e sem cor, para não se confundir com os ativos. Volta ao passar o mouse. */
+.board-card.board-card--cancelled {
+  opacity: 0.4;
+  filter: grayscale(1);
+  border-style: dashed;
+  background: var(--surface-raised);
+  transition: opacity var(--dur-fast) var(--ease-cine), filter var(--dur-fast) var(--ease-cine);
+}
+
+.board-card.board-card--cancelled:hover,
+.board-card.board-card--cancelled:focus-within {
+  opacity: 0.85;
+  filter: none;
+}
+
 .board-card-head {
   display: flex;
   align-items: center;

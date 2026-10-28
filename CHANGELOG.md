@@ -47,6 +47,8 @@ PATCH para um conserto, MINOR para algo novo, MAJOR quando o jeito de usar muda.
     lado a lado. Os dias da semana ficam no topo, com quantas atividades cada um tem, e a linha vermelha marca a
     hora de agora. O cartão é o mesmo da grade; o que não couber aparece ao passar o mouse. O placar e o "Próximo"
     da revisão trocam de dia sozinhos;
+  - o evento cancelado na agenda fica apagado, cinza e tracejado, para não se confundir com os ativos (volta ao
+    normal ao passar o mouse);
   - **os cartões têm as cores da agenda da equipe**, nos mesmos tons do Google Agenda: verde para aulas,
     disponibilizar e transmitir, verde-limão para a Faculdade, amarelo para eventos, gravações e podcasts, uva para fotos, azul para cursos e
     webinars, laranja para "não escalar" e lilás para reuniões e o resto. Se alguém der uma cor própria ao
