@@ -106,7 +106,7 @@ begin
       where a.event_id = o.id and a.person_id = p_person and a.slot_id <> p_slot
         and not public.slot_no_hours(a.slot_id)
     );
-  if load + case when free then 0 else public.event_hours(e) end > p.weekly_limit_hours then
+  if load + (case when free then 0 else public.event_hours(e) end) > p.weekly_limit_hours then
     warnings := array_append(warnings, 'over_limit');
   end if;
 

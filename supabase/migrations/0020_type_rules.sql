@@ -53,14 +53,15 @@ create function public.prefix_type(p_title text) returns uuid
 language sql stable security definer set search_path = ''
 as $$
   with w as (select public.name_tokens(p_title) as words),
-  m as (
-    select t.id, cardinality(public.name_tokens(k)) as len
-    from public.service_types t
-    cross join lateral unnest(t.keywords) as k
-    cross join w
+  kw as (
+    select t.id, public.name_tokens(k) as toks
+    from public.service_types t cross join lateral unnest(t.keywords) as k
     where t.archived_at is null and btrim(k) like '^%'
-      and cardinality(public.name_tokens(k)) > 0
-      and w.words[1:cardinality(public.name_tokens(k))] = public.name_tokens(k)
+  ),
+  m as (
+    select kw.id, cardinality(kw.toks) as len
+    from kw cross join w
+    where cardinality(kw.toks) > 0 and w.words[1:cardinality(kw.toks)] = kw.toks
   ),
   top as (select max(len) as len from m)
   select case when count(distinct m.id) = 1 then (array_agg(m.id))[1] end
@@ -293,11 +294,34 @@ begin
 end;
 $$;
 
--- Histórico importado: o tipo da regra de começo, quando há e é outro.
-with moved as (
-  select h.id, h.service_type_id as old_type, public.prefix_type(h.title) as new_type
-  from public.history_entries h
-  where h.archived_at is null and btrim(h.title) !~ '^\*'
+-- Histórico importado: o tipo da regra de começo, quando há e é outro. Mesma regra da prefix_type, de uma vez
+-- para todos os títulos (os 44 mil registros repetem poucos milhares de títulos; um por um levava minutos).
+with kw as (
+  select t.id, public.name_tokens(k) as toks
+  from public.service_types t cross join lateral unnest(t.keywords) as k
+  where t.archived_at is null and btrim(k) like '^%'
+),
+words as (
+  select d.title, public.name_tokens(d.title) as words
+  from (
+    select distinct h.title from public.history_entries h
+    where h.archived_at is null and btrim(h.title) !~ '^\*'
+  ) d
+),
+m as (
+  select w.title, kw.id, cardinality(kw.toks) as len
+  from words w join kw on cardinality(kw.toks) > 0 and w.words[1:cardinality(kw.toks)] = kw.toks
+),
+best as (select title, max(len) as len from m group by title),
+titles as (
+  select m.title, case when count(distinct m.id) = 1 then (array_agg(m.id))[1] end as new_type
+  from m join best b on b.title = m.title and b.len = m.len
+  group by m.title
+),
+moved as (
+  select h.id, h.service_type_id as old_type, t.new_type
+  from public.history_entries h join titles t on t.title = h.title
+  where h.archived_at is null
 ),
 changed as (
   select * from moved where new_type is not null and new_type is distinct from old_type
