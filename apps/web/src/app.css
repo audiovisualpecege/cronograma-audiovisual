@@ -2346,6 +2346,27 @@ body {
   inset: 0 0 0 52px;
 }
 
+.board-timeline-track.has-marks {
+  right: 156px;
+}
+
+/* Faixa das marcações (não escalar, folga), à direita: hachurada, sem apertar os cartões. */
+.board-timeline-marks {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 148px;
+}
+
+.board-timeline-marks .board-line {
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--kind-color, var(--neutral-600)) 14%, var(--surface-page)) 0 6px,
+    var(--surface-page) 6px 12px
+  ) !important;
+}
+
 .board-timeline-item {
   position: absolute;
   height: var(--h);

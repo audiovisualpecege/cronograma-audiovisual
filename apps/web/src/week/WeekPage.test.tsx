@@ -316,6 +316,24 @@ describe('Semana: grade', () => {
     await user.click(within(panel).getByRole('button', { name: 'Fechar os detalhes' }));
     expect(screen.queryByRole('complementary')).toBeNull();
   });
+
+  it('o painel mostra as vagas como fichas: tirar, pôr mais uma e escolher a pessoa, como no cartão', async () => {
+    const user = userEvent.setup();
+    const filled = slotWith('ea', 'r1', 'p17');
+    const remote = weekRemote({ events: [AULA], slots: [filled] });
+    await page(remote);
+    await user.click(within(await card('Gravação aula Biologia')).getByRole('button', { name: 'Gravação aula Biologia' }));
+    const panel = await screen.findByRole('complementary', { name: 'Detalhes de Gravação aula Biologia' });
+    const crew = within(panel).getByRole('list', { name: 'Vagas de Gravação aula Biologia no painel' });
+    expect(within(crew).getByRole('button', { name: /^Câmera:/ })).toBeInTheDocument();
+
+    await user.click(within(crew).getByRole('button', { name: 'Pôr mais uma vaga em Gravação aula Biologia' }));
+    await user.click(within(screen.getByRole('menu', { name: 'Função da vaga a mais em Gravação aula Biologia' })).getByRole('menuitem', { name: 'Mediação' }));
+    await waitFor(() => expect(ops(remote).find((o) => o.kind === 'slot.add')).toMatchObject({ payload: { event_id: 'ea', job_role_id: 'r4' } }));
+
+    await user.click(within(crew).getByRole('button', { name: /^Tirar a vaga de Câmera/ }));
+    await waitFor(() => expect(ops(remote).find((o) => o.kind === 'slot.remove')).toMatchObject({ payload: { id: filled.slot.id } }));
+  });
 });
 
 describe('Semana: cores do Google Agenda', () => {

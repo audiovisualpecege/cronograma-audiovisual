@@ -103,6 +103,9 @@ interface BoardProps {
   historyRows: readonly HistoryFactRow[] | null;
   historyLoading: boolean;
   onOpenEvent: (eventId: string) => void;
+  /** Evento aberto no painel da direita; o painel recebe as vagas dele, editáveis como na grade. */
+  viewing?: string | null;
+  renderPanel?: (event: EventRow, crew: ReactNode) => ReactNode;
   /** A barra do topo (placar e "Confirmar sugestões") fica na página; a grade passa o que ela mostra. */
   renderBar: (state: BoardState, scrollTo: (what: BoardTarget) => void) => ReactNode;
 }
@@ -113,7 +116,7 @@ interface BoardProps {
  * as vagas abertas já vêm com a sugestão do histórico; nada grava sem confirmar. Semana ainda sem montagem mostra
  * as vagas previstas e monta sozinha na primeira confirmação.
  */
-export function WeekBoard({ rows, now, today, historyRows, historyLoading, onOpenEvent, renderBar }: BoardProps) {
+export function WeekBoard({ rows, now, today, historyRows, historyLoading, onOpenEvent, viewing = null, renderPanel, renderBar }: BoardProps) {
   const engine = useSyncEngine();
   const localColors = useLocalGoogleColors();
   const colorOf = useMemo(() => {
@@ -308,6 +311,7 @@ export function WeekBoard({ rows, now, today, historyRows, historyLoading, onOpe
   const pickSlot = picking ? board.slots.find((s) => s.id === picking) : undefined;
   const pickEvent = pickSlot ? board.events.find((e) => e.id === pickSlot.event_id) : undefined;
   const pickAssignment = picking ? model.bySlot.get(picking) : undefined;
+  const viewedEvent = viewing ? board.events.find((e) => e.id === viewing) : undefined;
 
   // Grade (a semana em colunas) ou linha do tempo (um dia por vez, com as horas de cima para baixo).
   const [view, setView] = useState<BoardView>(readView);
@@ -438,6 +442,7 @@ export function WeekBoard({ rows, now, today, historyRows, historyLoading, onOpe
           return view === 'timeline' ? <DayTimeline key={day.date} {...props} now={now} /> : <DayColumn key={day.date} {...props} />;
         })}
       </div>
+      {viewedEvent && renderPanel?.(viewedEvent, <PanelCrew event={viewedEvent} rows={board} readOnly={readOnly} slots={model.slotsByEvent.get(viewedEvent.id) ?? []} chip={chipProps} />)}
       {pickSlot && pickEvent && (
         <PersonPicker
           ctx={ctx}
@@ -617,7 +622,10 @@ const HOUR_PX = 96;
  */
 function DayTimeline({ now, ...props }: Parameters<typeof DayColumn>[0] & { now: Date }) {
   const { day, today, rows, built, readOnly, dropped, onToggleOff, onOpenEvent, typeHints, sizeHints, chip } = props;
+  // Marcações (não escalar, folga) ficam numa faixa à direita, sem apertar os cartões das atividades.
   const layout = useMemo(() => timelineLayout(day.date, [...day.cards, ...day.lines]), [day]);
+  const cardItems = useMemo(() => timelineLayout(day.date, day.cards).items, [day]);
+  const markItems = useMemo(() => timelineLayout(day.date, day.lines).items, [day]);
   const markers = useMemo(() => new Set(day.lines.map((e) => e.id)), [day.lines]);
   const hours = [];
   for (let m = layout.from; m < layout.to; m += 60) hours.push(m);
@@ -663,24 +671,32 @@ function DayTimeline({ now, ...props }: Parameters<typeof DayColumn>[0] & { now:
           </span>
         ))}
         {nowMin !== null && nowMin >= layout.from && nowMin <= layout.to && <span className="board-timeline-now" style={{ top: y(nowMin) }} aria-hidden="true" />}
-        <div className="board-timeline-track">
-          {layout.items.map((it) => (
-            <div
-              key={it.event.id}
-              className={`board-timeline-item${markers.has(it.event.id) ? ' is-marker' : ''}`}
-              style={
-                {
-                  top: y(it.start),
-                  left: `calc(${(it.lane / it.lanes) * 100}% + 2px)`,
-                  width: `calc(${100 / it.lanes}% - 4px)`,
-                  '--h': `${Math.max(((it.end - it.start) / 60) * HOUR_PX - 4, 22)}px`,
-                } as CSSProperties
-              }
-            >
-              {card(it.event)}
-            </div>
-          ))}
-        </div>
+        {[
+          { key: 'cards', items: cardItems, className: `board-timeline-track${markItems.length > 0 ? ' has-marks' : ''}` },
+          { key: 'marks', items: markItems, className: 'board-timeline-marks' },
+        ].map(
+          (col) =>
+            col.items.length > 0 && (
+              <div key={col.key} className={col.className} aria-label={col.key === 'marks' ? 'Marcações do dia' : undefined}>
+                {col.items.map((it) => (
+                  <div
+                    key={it.event.id}
+                    className={`board-timeline-item${markers.has(it.event.id) ? ' is-marker' : ''}`}
+                    style={
+                      {
+                        top: y(it.start),
+                        left: `calc(${(it.lane / it.lanes) * 100}% + 2px)`,
+                        width: `calc(${100 / it.lanes}% - 4px)`,
+                        '--h': `${Math.max(((it.end - it.start) / 60) * HOUR_PX - 4, 22)}px`,
+                      } as CSSProperties
+                    }
+                  >
+                    {card(it.event)}
+                  </div>
+                ))}
+              </div>
+            ),
+        )}
       </div>
     </section>
   );
@@ -861,6 +877,26 @@ function EventCard({
         )
       )}
     </article>
+  );
+}
+
+/**
+ * As vagas do evento no painel da direita, com as mesmas fichas da grade: escolher ou trocar a pessoa, confirmar,
+ * tirar a vaga (lixeira) e pôr mais uma ("+ vaga"). A ficha no painel e a do cartão são a mesma vaga.
+ */
+function PanelCrew({ event, rows, readOnly, slots, chip }: { event: EventRow; rows: WeekRows; readOnly: boolean; slots: readonly SlotRow[]; chip: ChipProps }) {
+  const title = shortTitle(event.title);
+  const canAdd = !readOnly && event.status !== 'cancelled' && Boolean(event.service_type_id) && needsTeam(event, rows.types);
+  if (slots.length === 0 && !canAdd) {
+    return <span>{!event.service_type_id ? 'Escolha o tipo para ver as vagas.' : needsTeam(event, rows.types) ? 'Sem vagas.' : 'Este tipo não pede equipe.'}</span>;
+  }
+  return (
+    <ul className="plain-list board-chips event-panel-crew" aria-label={`Vagas de ${title} no painel`}>
+      {slots.map((s) => (
+        <Chip key={s.id} slot={s} event={event} {...chip} />
+      ))}
+      {canAdd && <AddSlot event={event} rows={rows} slots={slots} onAdd={chip.onAddRole} />}
+    </ul>
   );
 }
 

@@ -34,8 +34,11 @@ PATCH para um conserto, MINOR para algo novo, MAJOR quando o jeito de usar muda.
     tipo. Avisos aparecem como um triângulo no cartão (sem tipo, mudou na agenda, equipe típica mudou) ou na
     ficha (alerta);
   - passar o mouse numa ficha acende a mesma pessoa na semana toda e mostra as horas dela;
-  - clicar no cartão abre os detalhes à direita, sem sair da grade: tipo, porte, a estrela de atividade principal,
-    a equipe e a descrição da agenda;
+  - clicar no cartão abre os detalhes à direita, sem sair da grade: nome, quando, onde, tipo, porte, a estrela de
+    atividade principal, as vagas (com as mesmas fichas da grade: escolher a pessoa, lixeira e "+ vaga") e a
+    descrição da agenda. O "x" no alto fecha o painel (ou o Esc);
+  - na linha do tempo, as marcações ("não marcar nada", folgas) ficam numa faixa hachurada à direita do dia, sem
+    apertar os cartões;
   - a lista de pessoas tem busca pelo nome e diz por que cada uma serve, com a última vez que fez: "fez este
     evento na semana passada (3 vezes em 8 semanas)", "fez esta função neste tipo há 5 semanas (12 vezes)";
   - Publicar avisa quantas sugestões ainda não foram confirmadas;

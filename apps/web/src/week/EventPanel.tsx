@@ -1,6 +1,6 @@
 import { CloseIcon } from '@solar-icons/react/linear';
 import { localDate, type EventSize } from '@cronograma/core';
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import type { CalendarSourceRow, EventRow } from '../data/catalog';
 import { navigate } from '../router';
 import { useSyncEngine } from '../sync/SyncProvider';
@@ -35,16 +35,19 @@ interface Props {
   today: string;
   readOnly: boolean;
   onClose: () => void;
+  /** As vagas editáveis (as fichas da grade); sem elas, a equipe aparece só em texto. */
+  crew?: ReactNode;
 }
 
 /**
- * Detalhes do evento num painel à direita, sem sair da grade: quando, onde, tipo e porte (que mudam as vagas), a
- * equipe e a descrição da agenda. O resto (vaga a mais, observação, cancelar) fica na página do evento.
+ * Detalhes do evento num painel à direita, sem sair da grade: quando, onde, tipo e porte (que mudam as vagas), as
+ * vagas (editáveis como na grade) e a descrição da agenda. O resto (observação, cancelar) fica na página do evento.
  */
-export function EventPanel({ event, rows, sources, today, readOnly, onClose }: Props) {
+export function EventPanel({ event, rows, sources, today, readOnly, onClose, crew }: Props) {
   const engine = useSyncEngine();
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    // Com a lista de pessoas aberta por cima, o Esc fecha só ela.
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && !document.querySelector('[role="dialog"]') && onClose();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
@@ -66,7 +69,7 @@ export function EventPanel({ event, rows, sources, today, readOnly, onClose }: P
       <header className="event-panel-head">
         <HighlightToggle event={event} readOnly={readOnly} />
         <h2 className="event-panel-title">{shortTitle(title)}</h2>
-        <IconButton icon={CloseIcon} label="Fechar os detalhes" onClick={onClose} size={36} />
+        <IconButton icon={CloseIcon} label="Fechar os detalhes" variant="outline" onClick={onClose} size={40} style={{ flex: 'none' }} />
       </header>
       <span className="list-row-tags">
         <EventSeals event={event} today={today} />
@@ -110,9 +113,9 @@ export function EventPanel({ event, rows, sources, today, readOnly, onClose }: P
             </dd>
           </>
         )}
-        <dt>Equipe</dt>
+        <dt>Vagas</dt>
         <dd>
-          {slots.length > 0 ? (
+          {crew ?? (slots.length > 0 ? (
             <ul className="plain-list quick-view-crew">
               {slots.map((s) => {
                 const a = bySlot.get(s.id);
@@ -129,7 +132,7 @@ export function EventPanel({ event, rows, sources, today, readOnly, onClose }: P
             `Prevista: ${estimated.map((c) => `${c.quantity} ${role(c.job_role_id)}`).join(', ')}`
           ) : (
             'Não exige equipe'
-          )}
+          ))}
         </dd>
         {event.notes && (
           <>

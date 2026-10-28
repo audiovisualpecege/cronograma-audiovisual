@@ -117,7 +117,6 @@ function WeekBody({ rows, sources, now, today }: BodyProps) {
   const historyLoading = history.rows === null && history.status === 'loading';
   const identify = useIdentifyTypes(rows, false);
   const missingType = untyped(rows).length;
-  const viewed = viewing ? rows.events.find((e) => e.id === viewing) : undefined;
 
   const note = past
     ? 'Semana passada fica só para consulta.'
@@ -158,6 +157,10 @@ function WeekBody({ rows, sources, now, today }: BodyProps) {
           historyRows={history.rows}
           historyLoading={historyLoading}
           onOpenEvent={setViewing}
+          viewing={viewing}
+          renderPanel={(event, crew) => (
+            <EventPanel event={event} rows={rows} sources={sources} today={today} readOnly={past} crew={crew} onClose={() => setViewing(null)} />
+          )}
           renderBar={(board, scrollTo) => (
             <>
               <div className="week-toolbar board-bar">
@@ -216,7 +219,6 @@ function WeekBody({ rows, sources, now, today }: BodyProps) {
           )}
         />
       )}
-      {viewed && <EventPanel event={viewed} rows={rows} sources={sources} today={today} readOnly={past} onClose={() => setViewing(null)} />}
       {creating && <InternalEventForm defaultDate={rows.weekStart} types={rows.types} onClose={() => setCreating(false)} />}
       {notice && (
         <div className="toast-stack">
