@@ -48,8 +48,18 @@ export function EventPanel({ event, rows, sources, today, readOnly, onClose, cre
   useEffect(() => {
     // Com a lista de pessoas aberta por cima, o Esc fecha só ela.
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && !document.querySelector('[role="dialog"]') && onClose();
+    // Clique fora fecha; na lista de pessoas ou num menu aberto por cima, não.
+    const onDown = (e: MouseEvent) => {
+      const target = e.target as Element | null;
+      if (!target?.isConnected || document.querySelector('[role="dialog"]') || target.closest('.event-panel, [role="menu"]')) return;
+      onClose();
+    };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    document.addEventListener('mousedown', onDown);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.removeEventListener('mousedown', onDown);
+    };
   }, [onClose]);
   const day = localDate(new Date(event.starts_at));
   const dayLabel = weekDays(rows.weekStart).find((d) => d.date === day)?.label ?? day.split('-').reverse().join('/');

@@ -315,6 +315,11 @@ describe('Semana: grade', () => {
     await waitFor(() => expect(ops(remote).find((o) => o.kind === 'event.update_extras')).toMatchObject({ payload: { id: 'ea', service_type_id: 't2' } }));
     await user.click(within(panel).getByRole('button', { name: 'Fechar os detalhes' }));
     expect(screen.queryByRole('complementary')).toBeNull();
+    // Clique fora do painel também fecha.
+    await user.click(within(await card('Gravação aula Biologia')).getByRole('button', { name: 'Gravação aula Biologia' }));
+    expect(await screen.findByRole('complementary')).toBeInTheDocument();
+    await user.click(screen.getByRole('navigation', { name: 'Trocar de semana' }));
+    expect(screen.queryByRole('complementary')).toBeNull();
   });
 
   it('o painel mostra as vagas como fichas: tirar, pôr mais uma e escolher a pessoa, como no cartão', async () => {
