@@ -815,7 +815,7 @@ function EventCard({
       {!readOnly && !cancelled && (typeHint || (sizeHint && sized)) && (
         <span className="board-card-hints">
           {typeHint && !event.service_type_id && (
-            <button type="button" className="text-button" onClick={() => void changeType(engine, event, typeHint.id)} aria-label={`Usar ${typeHint.name} em ${title}`}>
+            <button type="button" className="text-button" onClick={() => void changeType(engine, event, typeHint.id, rows.types)} aria-label={`Usar ${typeHint.name} em ${title}`}>
               Usar {typeHint.name}
             </button>
           )}

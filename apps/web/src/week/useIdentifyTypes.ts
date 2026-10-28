@@ -51,7 +51,7 @@ export function useIdentifyTypes(rows: WeekRows, enabled: boolean) {
       const events = new Map(rows.events.map((e) => [e.id, e]));
       for (const [id, typeId] of found) {
         const e = events.get(id);
-        if (e) await changeType(engine, e, typeId);
+        if (e) await changeType(engine, e, typeId, rows.types);
       }
       setByKeyword(found.size);
       if (found.size > 0) await sendAndRefresh(engine, ['events', 'slots', 'assignments']);

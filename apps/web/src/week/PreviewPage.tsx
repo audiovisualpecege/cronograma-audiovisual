@@ -25,10 +25,15 @@ export function SourceAlerts({ sources }: { sources: readonly CalendarSourceRow[
  * Troca o tipo de serviço do evento pela fila; o tipo escolhido à mão vale com certeza alta e ensina a série
  * (no servidor, migração 0020; na simulação do app local, só neste navegador).
  */
-export function changeType(engine: SyncEngine, e: EventRow, typeId: string | null) {
+export function changeType(engine: SyncEngine, e: EventRow, typeId: string | null, types: readonly ServiceTypeRow[] = []) {
   if (typeId && isSimulating()) learnPreviewSeries(e.title, typeId);
-  const changes = { service_type_id: typeId, type_certainty: typeId ? 'alta' : 'baixa', type_source: 'admin' };
-  return engine.enqueue('event.update_extras', { id: e.id, service_type_id: typeId }, { baseVersion: e.version, target: { table: 'events', id: e.id, changes } });
+  // O evento novo copia o "não exige equipe" do tipo da agenda (serviço de fundo). Se a marca veio do tipo antigo,
+  // ela segue o tipo novo: um evento lido como NAO ESCALAR e corrigido para GRAVACAO volta a ter vagas.
+  const before = types.find((t) => t.id === e.service_type_id);
+  const after = types.find((t) => t.id === typeId);
+  const team = e.no_team && before?.no_team && !after?.no_team ? { no_team: false } : {};
+  const changes = { service_type_id: typeId, type_certainty: typeId ? 'alta' : 'baixa', type_source: 'admin', ...team };
+  return engine.enqueue('event.update_extras', { id: e.id, service_type_id: typeId, ...team }, { baseVersion: e.version, target: { table: 'events', id: e.id, changes } });
 }
 
 /**

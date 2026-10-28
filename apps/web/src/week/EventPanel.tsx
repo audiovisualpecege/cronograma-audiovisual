@@ -98,7 +98,7 @@ export function EventPanel({ event, rows, sources, today, readOnly, onClose, cre
                 { value: UNDEFINED_TYPE, label: 'a definir' },
                 ...rows.types.filter((t) => !t.archived_at || t.id === event.service_type_id).map((t) => ({ value: t.id, label: t.name })),
               ]}
-              onChange={(e) => void changeType(engine, event, e.target.value || null)}
+              onChange={(e) => void changeType(engine, event, e.target.value || null, rows.types)}
             />
           ) : (
             (type?.name ?? 'A definir')

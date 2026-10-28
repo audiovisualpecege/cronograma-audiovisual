@@ -65,7 +65,10 @@ primeiro passo que não der o resultado esperado.
     aprendeu; a troca de tipo à mão grava o tipo da série e muda os eventos futuros da série com tipo automático);
     `type_source` aceita `series`. **Mexe em dados da produção**:
     - os tipos ganham as regras de começo claras do histórico (Reunião, Reunião Mediadores, Reunião Técnica, MBA,
-      Faculdade, Poli, Especialização, Minicurso, Curso, English, Webinar, Evento, Tratamento);
+      Faculdade, Poli, Especialização, Minicurso, Curso, English, Webinar, Evento, Tratamento e Gravação, com
+      os começos mais longos de Gravação: externa, MBA, Solution, podcast, videocast e English);
+    - o evento que chegou com o "não exige equipe" do tipo antigo (NAO ESCALAR) e muda de tipo passa a seguir o
+      tipo novo: "GRAVAÇÃO: Canal Rural" e "GRAVAÇÃO: Melhores TCCs" voltam a ter vagas (a cópia guarda a marca);
     - os eventos de agora em diante com tipo automático mudam para o tipo da regra (as vagas são refeitas onde
       ninguém foi escalado);
     - o histórico importado passa a ter o tipo da regra (49 reuniões estavam como AULA MBA).

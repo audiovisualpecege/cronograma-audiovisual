@@ -38,11 +38,15 @@ const OPENINGS: Record<string, string[]> = {
   'reuniao edicao': ['^reuniao edicao'],
   'reuniao producao': ['^reuniao producao'],
   'reuniao planejamento': ['^reuniao planejamento'],
-  'aula mba': ['^mba', '^faculdade', '^poli', '^especializacao', '^minicurso'],
-  'curso online': ['^curso', '^english'],
+  'aula mba': ['^mba', '^faculdade', '^poli', '^especializacao', '^minicurso', '^gravacao mba'],
+  'curso online': ['^curso', '^english', '^gravacao english'],
   webinar: ['^webinar'],
   evento: ['^evento'],
   'edicao fotos': ['^tratamento'],
+  gravacao: ['^gravacao'],
+  'gravacao externa': ['^gravacao externa'],
+  'aula solution': ['^gravacao solution'],
+  podcast: ['^gravacao podcast', '^gravacao videocast'],
 };
 
 /** A equipe da 0017: tipo, porte, função e quantidade, pelos nomes normalizados. */
@@ -336,7 +340,10 @@ function retype(events: readonly EventRow[], types: readonly ServiceTypeRow[], s
     if (e.status === 'cancelled' || e.type_source === 'admin' || e.title.trimStart().startsWith('*')) return e;
     const c = classifyTitle(e.title, openings, [], series);
     if (!c.typeId || c.typeId === e.service_type_id) return e;
-    return { ...e, service_type_id: c.typeId, type_source: c.source, type_certainty: 'alta' };
+    // Como a retype_event da 0020: o "não exige equipe" copiado do tipo antigo segue o tipo novo.
+    const noTeam = (id: string | null | undefined) => Boolean(types.find((t) => t.id === id)?.no_team);
+    const team = e.no_team && noTeam(e.service_type_id) ? { no_team: noTeam(c.typeId) } : {};
+    return { ...e, service_type_id: c.typeId, type_source: c.source, type_certainty: 'alta', ...team };
   });
 }
 

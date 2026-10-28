@@ -84,7 +84,8 @@ join public._backup_0020 b on b.kind = 'event_type' and b.ref = e.id;
 update public.events e
 set service_type_id = (b.data ->> 'service_type_id')::uuid,
     type_source = b.data ->> 'type_source',
-    type_certainty = b.data ->> 'type_certainty'
+    type_certainty = b.data ->> 'type_certainty',
+    no_team = coalesce((b.data ->> 'no_team')::boolean, e.no_team)
 from public._backup_0020 b
 where b.kind = 'event_type' and e.id = b.ref;
 

@@ -71,4 +71,14 @@ describe('simulação do porte no app local', () => {
     // A troca à mão ensinou a série: o evento automático da mesma série segue a escolha.
     expect(simulateWeek(rows, {}, { 'reuniao mediadores poli usp pro': { type: 'ev' } }).events[0]?.service_type_id).toBe('ev');
   });
+
+  it('0020: "GRAVAÇÃO: Canal Rural" lido como NAO ESCALAR vira GRAVACAO e volta a pedir equipe', () => {
+    const naoEscalar = { ...type('ne', 'NAO ESCALAR'), no_team: true } as ServiceTypeRow;
+    const ev = { ...event('e1', 'ne'), title: 'GRAVAÇÃO: Canal Rural', week_start: '2099-01-05', type_source: 'history', no_team: true } as EventRow;
+    const rows = {
+      weekStart: '2099-01-05', week: null, slots: [], assignments: [], published: [], people: [], personRoles: [], absences: [], roles: ROLES,
+      types: [...TYPES, naoEscalar], crew: CREW, events: [ev],
+    } as WeekRows;
+    expect(simulateWeek(rows, {}).events[0]).toMatchObject({ service_type_id: 'gr', no_team: false, type_source: 'keyword' });
+  });
 });

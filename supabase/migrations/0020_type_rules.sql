@@ -92,7 +92,14 @@ begin
   if not found or e.service_type_id is not distinct from p_type then
     return;
   end if;
-  update public.events set service_type_id = p_type, type_source = p_source, type_certainty = 'alta' where id = p_event;
+  -- O "não exige equipe" copiado do tipo antigo (o serviço de fundo copia na chegada) segue o tipo novo.
+  update public.events
+  set service_type_id = p_type, type_source = p_source, type_certainty = 'alta',
+      no_team = case
+        when e.no_team and public.service_type_no_team(e.service_type_id) then public.service_type_no_team(p_type)
+        else e.no_team
+      end
+  where id = p_event;
   if exists (select 1 from public.weeks w where w.week_start = e.week_start) and not public.is_week_past(e.week_start) then
     if public.event_has_people(e.id) then
       update public.events set crew_outdated = true where id = e.id;
@@ -230,7 +237,12 @@ begin
     ('curso online', '^curso'), ('curso online', '^english'),
     ('webinar', '^webinar'),
     ('evento', '^evento'),
-    ('edicao fotos', '^tratamento');
+    ('edicao fotos', '^tratamento'),
+    -- "Gravação" sozinha é GRAVACAO (3.076 de ~4.600 no histórico); os outros casos têm o começo deles, mais longo.
+    ('gravacao', '^gravacao'), ('gravacao externa', '^gravacao externa'),
+    ('aula mba', '^gravacao mba'), ('aula solution', '^gravacao solution'),
+    ('podcast', '^gravacao podcast'), ('podcast', '^gravacao videocast'),
+    ('curso online', '^gravacao english');
 
   insert into public._backup_0020 (kind, ref, data)
   select 'service_type', t.id, jsonb_build_object('keywords', to_jsonb(t.keywords))
@@ -258,7 +270,8 @@ declare
 begin
   for ev in
     select e.id, public.prefix_type(e.title) as new_type,
-      jsonb_build_object('service_type_id', e.service_type_id, 'type_source', e.type_source, 'type_certainty', e.type_certainty) as old,
+      jsonb_build_object('service_type_id', e.service_type_id, 'type_source', e.type_source, 'type_certainty', e.type_certainty,
+        'no_team', e.no_team) as old,
       e.crew_outdated
     from public.events e
     where e.week_start >= public.monday_of(current_date) and e.status <> 'cancelled'
