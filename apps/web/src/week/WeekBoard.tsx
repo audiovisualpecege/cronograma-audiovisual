@@ -615,8 +615,27 @@ function DayNav({ days, at, today, onGo }: { days: readonly BoardDay[]; at: numb
   );
 }
 
-/** Altura de uma hora na linha do tempo, em pixels. */
+/** Alturas de uma hora na linha do tempo, em pixels: o − e o + passam de uma para outra; 96 é a padrão. */
+const HOUR_STEPS = [40, 56, 72, 96, 128, 160] as const;
 const HOUR_PX = 96;
+const ZOOM_KEY = 'semana.hora';
+
+function readHourPx(): number {
+  try {
+    const v = Number(localStorage.getItem(ZOOM_KEY));
+    return (HOUR_STEPS as readonly number[]).includes(v) ? v : HOUR_PX;
+  } catch {
+    return HOUR_PX;
+  }
+}
+
+function saveHourPx(v: number) {
+  try {
+    localStorage.setItem(ZOOM_KEY, String(v));
+  } catch {
+    // Sem armazenamento, a altura vale só até recarregar.
+  }
+}
 
 /**
  * Um dia como no Google Agenda: as horas de cima para baixo, cada atividade na altura do horário e as que se cruzam
@@ -627,9 +646,17 @@ function DayTimeline({ now, ...props }: Parameters<typeof DayColumn>[0] & { now:
   const { day, today, rows, built, readOnly, dropped, onToggleOff, onOpenEvent, chip } = props;
   // Todas as atividades no mesmo trilho, na ordem do horário; os cancelados ficam nas colunas da direita de cada grupo.
   const layout = useMemo(() => timelineLayout(day.date, day.cards), [day]);
+  const [hourPx, setHourPx] = useState(readHourPx);
+  const at = HOUR_STEPS.indexOf(hourPx as (typeof HOUR_STEPS)[number]);
+  const zoom = (dir: -1 | 1) => {
+    const next = HOUR_STEPS[at + dir];
+    if (next === undefined) return;
+    setHourPx(next);
+    saveHourPx(next);
+  };
   const hours = [];
   for (let m = layout.from; m < layout.to; m += 60) hours.push(m);
-  const y = (min: number) => ((min - layout.from) / 60) * HOUR_PX;
+  const y = (min: number) => ((min - layout.from) / 60) * hourPx;
   const midnight = zonedTime(day.date, '00:00').getTime();
   const nowMin = day.date === today ? Math.round((now.getTime() - midnight) / 60_000) : null;
   return (
@@ -637,6 +664,14 @@ function DayTimeline({ now, ...props }: Parameters<typeof DayColumn>[0] & { now:
       <header className="board-day-head">
         <h3 className="board-day-title">{day.label}</h3>
         {day.date === today && <Seal kind="hoje">hoje</Seal>}
+        <span className="board-zoom" role="group" aria-label="Altura das horas">
+          <button type="button" aria-label="Diminuir a altura" disabled={at <= 0} onClick={() => zoom(-1)}>
+            −
+          </button>
+          <button type="button" aria-label="Aumentar a altura" disabled={at >= HOUR_STEPS.length - 1} onClick={() => zoom(1)}>
+            +
+          </button>
+        </span>
       </header>
       {day.off.length > 0 && <OffStrip items={day.off} dropped={dropped} readOnly={readOnly} onToggle={onToggleOff} />}
       {layout.allDay.length > 0 && (
@@ -669,7 +704,7 @@ function DayTimeline({ now, ...props }: Parameters<typeof DayColumn>[0] & { now:
                       ? { right: `calc(${((it.lanes - it.lane - 1) / it.lanes) * 100}% + 2px)` }
                       : { left: `calc(${(it.lane / it.lanes) * 100}% + 2px)` }) as CSSProperties),
                     width: `calc(${100 / it.lanes}% - 4px)`,
-                    '--h': `${Math.max(((it.end - it.start) / 60) * HOUR_PX - 4, 22)}px`,
+                    '--h': `${Math.max(((it.end - it.start) / 60) * hourPx - 4, 22)}px`,
                   } as CSSProperties
                 }
               >

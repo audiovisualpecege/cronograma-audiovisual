@@ -2313,6 +2313,41 @@ body {
   background: color-mix(in srgb, var(--surface-raised) 55%, transparent);
 }
 
+/* − e + no canto de cima à direita do dia: a altura de cada hora. */
+.board-zoom {
+  display: inline-flex;
+  margin-left: auto;
+  padding: 2px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+}
+
+.board-zoom button {
+  width: 28px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.board-zoom button:hover:not(:disabled),
+.board-zoom button:focus-visible {
+  outline: none;
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--text-primary);
+}
+
+.board-zoom button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 .board-timeline.is-today {
   border-color: color-mix(in srgb, var(--accent) 60%, transparent);
 }
@@ -3011,8 +3046,33 @@ button.board-off-item {
   text-transform: uppercase;
 }
 
-.event-panel > button:last-child {
-  align-self: flex-start;
+/* Diferenças com a agenda, depois da releitura: o evento à esquerda, as duas escolhas à direita. */
+.reread-review {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.reread-review li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.reread-review-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.event-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
 .picker-search {

@@ -77,6 +77,22 @@ describe('Semana: grade', () => {
     expect(screen.getByRole('button', { name: 'Nova atividade' })).toBeInTheDocument();
   });
 
+  it('"Apagar atividade" no painel tira o evento da grade e manda event.hide', async () => {
+    const user = userEvent.setup();
+    const remote = weekRemote({ events: [AULA, TARDE], slots: [slotWith('ea', 'r1', 'p3'), slotWith('eb', 'r1')] });
+    await page(remote);
+    const aula = await card('Gravação aula Biologia');
+    await user.click(within(aula).getByRole('button', { name: 'Gravação aula Biologia' }));
+    const panel = await screen.findByRole('complementary', { name: 'Detalhes de Gravação aula Biologia' });
+    await user.click(within(panel).getByRole('button', { name: 'Apagar atividade' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Apagar atividade' });
+    expect(dialog).toHaveTextContent('Ela continua na Google Agenda');
+    await user.click(within(dialog).getByRole('button', { name: 'Apagar' }));
+    await waitFor(() => expect(screen.queryByRole('article', { name: 'Gravação aula Biologia' })).toBeNull());
+    expect(screen.getByRole('article', { name: 'Gravação aula Química' })).toBeInTheDocument();
+    await waitFor(() => expect(ops(remote).find((o) => o.kind === 'event.hide')).toMatchObject({ payload: { id: 'ea' } }));
+  });
+
   it('semana futura: a vaga aberta já vem com a sugestão tracejada, e Confirmar grava a pessoa', async () => {
     const user = userEvent.setup();
     const open = slotWith('ea', 'r1');
@@ -377,6 +393,11 @@ describe('Semana: linha do tempo', () => {
       // 9h a 12h numa grade que começa às 7h: duas horas abaixo do topo, três de altura.
       expect(items[0]?.style.top).toBe('192px');
       expect(items[0]?.style.getPropertyValue('--h')).toBe('284px');
+      // O + aumenta a altura de cada hora (96 para 128 px), e a escolha fica lembrada.
+      await user.click(within(day).getByRole('button', { name: 'Aumentar a altura' }));
+      expect(day.querySelector<HTMLElement>('.board-timeline-item')?.style.top).toBe('256px');
+      expect(localStorage.getItem('semana.hora')).toBe('128');
+      await user.click(within(day).getByRole('button', { name: 'Diminuir a altura' }));
       expect(screen.queryByRole('button', { name: /^Evento externo,/ })).toBeNull();
       await user.click(within(items[0] as HTMLElement).getByRole('button'));
       const panel = await screen.findByRole('complementary', { name: 'Detalhes de Gravação aula Biologia' });
@@ -392,6 +413,7 @@ describe('Semana: linha do tempo', () => {
       expect(localStorage.getItem('semana.visao')).toBe('timeline');
     } finally {
       localStorage.removeItem('semana.visao');
+      localStorage.removeItem('semana.hora');
     }
   });
 });

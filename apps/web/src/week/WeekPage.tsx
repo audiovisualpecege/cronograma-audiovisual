@@ -1,6 +1,6 @@
 import { addDays, isWeekPast, localDate, weekStartOf } from '@cronograma/core';
 import { AltArrowLeftIcon, AltArrowRightIcon } from '@solar-icons/react/linear';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useTable, type CalendarSourceRow } from '../data/catalog';
 import { useHistory } from '../data/history';
 import { navigate, type RouteProps } from '../router';
@@ -16,6 +16,7 @@ import { dayMonth, publishSummary, relativeWeekLabel, unpublishedChanges, type W
 import { NO_EVENTS, SourceAlerts } from './PreviewPage';
 import { PublishDialog } from './PublishDialog';
 import { RereadButton } from './RereadButton';
+import { RereadReview } from './RereadReview';
 import { UnpublishedBanner } from './UnpublishedBanner';
 import { untyped, useIdentifyTypes } from './useIdentifyTypes';
 import { BoardReview, BoardScore, WeekBoard } from './WeekBoard';
@@ -92,14 +93,18 @@ export function WeekPage({ params }: RouteProps) {
   const [last, setLast] = useState(rows);
   if (rows && rows !== last) setLast(rows);
   const shown = rows ?? last;
+  // Depois da releitura: o que ficou diferente da agenda.
+  const [reviewing, setReviewing] = useState(false);
+  const closeReview = useCallback(() => setReviewing(false), []);
 
   return (
     <section className="page week-page">
       <div className="week-head">
         {shown ? <WeekState rows={shown} now={now} /> : <span />}
         <WeekSwitcher weekStart={weekStart} currentWeek={weekStartOf(today)} />
-        <RereadButton />
+        <RereadButton onRead={() => setReviewing(true)} />
       </div>
+      {reviewing && <RereadReview fromWeek={weekStartOf(today)} onClose={closeReview} />}
       {/* Troca de semana: o conteúdo todo esmaece de uma vez, só quando a semana nova já está pronta (sem piscar o
           "abrindo" no meio). */}
       <div key={`${weekStart}:${Boolean(rows)}`} className="week-fade">

@@ -24,6 +24,8 @@ export const OP_LABELS: Record<OpKind, string> = {
   'event.internal_cancel': 'Cancelar atividade interna',
   'event.mark_reviewed': 'Revisão do evento',
   'event.resolve_duplicate': 'Evento duplicado',
+  'event.hide': 'Apagar atividade',
+  'event.unhide': 'Trazer atividade de volta',
   'week.build': 'Montar semana',
   'slot.add': 'Vaga a mais',
   'slot.remove': 'Remover vaga',

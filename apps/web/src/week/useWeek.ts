@@ -148,6 +148,21 @@ export function removeSlot(engine: SyncEngine, slot: SlotRow) {
   return engine.enqueue('slot.remove', { id: slot.id }, { baseVersion: slot.version, target: { table: 'slots', id: slot.id, changes: { archived_at: new Date().toISOString() } } });
 }
 
+/**
+ * Apagar a atividade (migração 0025): some da grade e as pessoas ficam livres. O app só lê a agenda, então o evento
+ * da agenda fica escondido aqui, e a releitura não o traz de volta.
+ */
+export async function hideEvent(engine: SyncEngine, e: EventRow) {
+  await engine.enqueue('event.hide', { id: e.id }, { baseVersion: e.version, target: { table: 'events', id: e.id, changes: { ignored: true, hidden_at: new Date().toISOString() } } });
+  await sendAndRefresh(engine, ['events', 'slots', 'assignments']);
+}
+
+/** Trazer de volta o que foi apagado: as vagas voltam pela equipe do tipo. */
+export async function unhideEvent(engine: SyncEngine, e: EventRow) {
+  await engine.enqueue('event.unhide', { id: e.id }, { baseVersion: e.version, target: { table: 'events', id: e.id, changes: { ignored: false, hidden_at: null } } });
+  await sendAndRefresh(engine, ['events', 'slots', 'assignments']);
+}
+
 /** Montagem da semana ainda na fila de envio (sem internet). */
 export function useBuildPending(weekStart: string): boolean | undefined {
   return useLocalQuery(

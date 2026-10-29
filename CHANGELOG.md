@@ -17,6 +17,11 @@ PATCH para um conserto, MINOR para algo novo, MAJOR quando o jeito de usar muda.
   escolhem no painel que abre com um clique. O dia cabe na largura da tela, e o cartão estreito vem para a frente
   em tamanho normal ao passar o mouse.
 - Trocar de semana esmaece o conteúdo todo de uma vez, sem piscar.
+- Na linha do tempo, − e + no canto de cima à direita mudam a altura das horas (a escolha fica lembrada).
+- "Apagar atividade" no painel do evento: ela sai do cronograma e as pessoas ficam livres. Como o app só lê o
+  Google Agenda, o evento da agenda continua lá; depois de "Reler agora", o app mostra o que foi apagado aqui e
+  segue na agenda (manter fora ou trazer de volta) e as atividades que só existem no cronograma (manter ou apagar).
+  Precisa da migração 0025.
 - Painel do evento sem o título cortado atrás da barra do topo, e sem "Tipo" repetido nem a certeza do tipo.
 - Os cartões da coluna de hoje não repetem o selo "hoje".
 
