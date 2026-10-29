@@ -1008,7 +1008,11 @@ function MarkerLine({ event, types, color, onOpen }: { event: EventRow; types: r
     >
       <AppIcon icon={typeIcon(type).icon} size={14} />
       <span className="board-line-time">{event.all_day ? 'dia todo' : eventSpan(event).split(' às ')[0]}</span>
-      <span className="board-line-title">{shortTitle(event.title)}</span>
+      {/* O tipo vem antes do título: "NÃO MARCAR NADA" sozinho não diz que é NAO ESCALAR. */}
+      <span className="board-line-text">
+        {type && <span className="board-line-type">{type.name}</span>}
+        <span className="board-line-title">{shortTitle(event.title)}</span>
+      </span>
     </button>
   );
 }
