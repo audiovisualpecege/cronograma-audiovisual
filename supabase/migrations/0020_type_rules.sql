@@ -229,8 +229,8 @@ begin
   insert into _rules_0020 values
     ('reuniao interna', '^reuniao'),
     ('reuniao mediadores', '^reuniao mediadores'), ('reuniao mediadores', '^reuniao mediacao'),
-    ('reuniao tecnica aulas', '^reuniao tecnica'),
-    ('reuniao edicao', '^reuniao edicao'),
+    ('reuniao tecnica aulas', '^reuniao tecnica'), ('reuniao tecnica aulas', '^reuniao equipe tecnica'),
+    ('reuniao edicao', '^reuniao edicao'), ('reuniao edicao', '^reuniao semanal edicao'),
     ('reuniao producao', '^reuniao producao'),
     ('reuniao planejamento', '^reuniao planejamento'),
     ('aula mba', '^mba'), ('aula mba', '^faculdade'), ('aula mba', '^poli'), ('aula mba', '^especializacao'),

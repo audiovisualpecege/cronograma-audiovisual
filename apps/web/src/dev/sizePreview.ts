@@ -34,8 +34,8 @@ const EXTERNAL_KEY = 'cronograma:simulacao-externo';
 const OPENINGS: Record<string, string[]> = {
   'reuniao interna': ['^reuniao'],
   'reuniao mediadores': ['^reuniao mediadores', '^reuniao mediacao'],
-  'reuniao tecnica aulas': ['^reuniao tecnica'],
-  'reuniao edicao': ['^reuniao edicao'],
+  'reuniao tecnica aulas': ['^reuniao tecnica', '^reuniao equipe tecnica'],
+  'reuniao edicao': ['^reuniao edicao', '^reuniao semanal edicao'],
   'reuniao producao': ['^reuniao producao'],
   'reuniao planejamento': ['^reuniao planejamento'],
   'aula mba': ['^mba', '^faculdade', '^poli', '^especializacao', '^minicurso', '^gravacao mba'],
