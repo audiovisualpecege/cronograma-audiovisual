@@ -3046,6 +3046,29 @@ button.board-off-item {
   outline: none;
 }
 
+/* "+ vaga": títulos dos grupos, o setor com a seta de que abre as funções e o "‹ Setores" para voltar. */
+.board-menu-head {
+  padding: 8px 12px 2px;
+  color: var(--text-muted);
+  font: var(--weight-bold) 10px var(--font-display);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.board-menu-item--sub::after {
+  content: '›';
+  float: right;
+  color: var(--text-muted);
+}
+
+.board-menu-item--back {
+  color: var(--text-secondary);
+}
+
+.board-menu-item--back::before {
+  content: '‹ ';
+}
+
 /* Painel do evento, à direita, sem cobrir a grade inteira. */
 .event-panel {
   position: fixed;

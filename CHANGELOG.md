@@ -18,6 +18,7 @@ PATCH para um conserto, MINOR para algo novo, MAJOR quando o jeito de usar muda.
   em tamanho normal ao passar o mouse.
 - Trocar de semana esmaece o conteúdo todo de uma vez, sem piscar.
 - Na grade, segurar o clique fora dos cartões e arrastar rola os dias para os lados.
+- "+ vaga" mostra primeiro as funções que a atividade já tem e depois os setores; o setor abre as funções dele.
 - Na linha do tempo, − e + no canto de cima à direita mudam a altura das horas (a escolha fica lembrada).
 - "Apagar atividade" no painel do evento: ela sai do cronograma e as pessoas ficam livres. Como o app só lê o
   Google Agenda, o evento da agenda continua lá; depois de "Reler agora", o app mostra o que foi apagado aqui e

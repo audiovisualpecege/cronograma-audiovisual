@@ -77,6 +77,25 @@ describe('Semana: grade', () => {
     expect(screen.getByRole('button', { name: 'Nova atividade' })).toBeInTheDocument();
   });
 
+  it('"+ vaga" mostra as funções do evento e os setores; o setor abre as funções dele', async () => {
+    const user = userEvent.setup();
+    const sectorOf: Record<string, string> = { r1: 's-tec', r4: 's-med' };
+    const roles = ROLE_ROWS.map((r) => ({ ...r, sector_id: sectorOf[r.id] ?? null }));
+    const sectors = [row('s-tec', { name: 'Técnica', archived_at: null }), row('s-med', { name: 'Mediação', archived_at: null })];
+    const remote = weekRemote({ events: [AULA], slots: [slotWith('ea', 'r1', 'p3')], extra: { job_roles: roles, sectors } });
+    await page(remote);
+    const aula = await card('Gravação aula Biologia');
+    await user.click(within(aula).getByRole('button', { name: 'Pôr mais uma vaga em Gravação aula Biologia' }));
+    let menu = screen.getByRole('menu', { name: 'Função da vaga a mais em Gravação aula Biologia' });
+    // A função que o evento já tem no topo; depois os setores, "Sem setor" por último.
+    expect(within(menu).getAllByRole('menuitem').map((b) => b.textContent)).toEqual(['Câmera', 'Mediação', 'Técnica', 'Sem setor']);
+    await user.click(within(menu).getByRole('menuitem', { name: 'Mediação' }));
+    menu = screen.getByRole('menu', { name: 'Função da vaga a mais em Gravação aula Biologia' });
+    expect(within(menu).getAllByRole('menuitem').map((b) => b.textContent)).toEqual(['Setores', 'Mediação']);
+    await user.click(within(menu).getAllByRole('menuitem')[1] as HTMLElement);
+    await waitFor(() => expect(ops(remote).find((o) => o.kind === 'slot.add')).toMatchObject({ payload: { event_id: 'ea', job_role_id: 'r4' } }));
+  });
+
   it('"Apagar atividade" no painel tira o evento da grade e manda event.hide', async () => {
     const user = userEvent.setup();
     const remote = weekRemote({ events: [AULA, TARDE], slots: [slotWith('ea', 'r1', 'p3'), slotWith('eb', 'r1')] });

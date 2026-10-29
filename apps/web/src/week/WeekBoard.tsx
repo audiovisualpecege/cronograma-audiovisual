@@ -2,7 +2,7 @@ import { DangerTriangleIcon } from '@solar-icons/react/bold-duotone';
 import { buildSeriesSizes, personLoad, SIZE_LABEL, weekStartOf, zonedTime, type EventSize, type SizeSuggestion, type WeekContext } from '@cronograma/core';
 import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { googleColor, useLocalGoogleColors } from './googleColors';
-import { sizeFor, toFact, type AssignmentRow, type EventRow, type HistoryFactRow, type ServiceTypeRow, type SlotRow } from '../data/catalog';
+import { sizeFor, toFact, useTable, type AssignmentRow, type EventRow, type HistoryFactRow, type JobRoleRow, type SectorRow, type ServiceTypeRow, type SlotRow } from '../data/catalog';
 import { useSyncEngine, useSyncState } from '../sync/SyncProvider';
 import { AppIcon } from '../ui/AppIcon';
 import { Button } from '../ui/chiaro';
@@ -1021,35 +1021,79 @@ function PanelCrew({ event, rows, readOnly, slots, chip }: { event: EventRow; ro
   );
 }
 
-/** "+ vaga": a lista de funções para pôr mais uma vaga no evento (as que o evento já tem primeiro). */
+/**
+ * "+ vaga": primeiro as funções que o evento já tem (o atalho mais comum), depois os setores; o setor abre as
+ * funções dele. Com um setor só (ou nenhum), a lista de funções vem direto.
+ */
 function AddSlot({ event, rows, slots, onAdd }: { event: EventRow; rows: WeekRows; slots: readonly SlotRow[]; onAdd: (e: EventRow, roleId: string) => void }) {
   const [open, setOpen] = useState(false);
+  const [sector, setSector] = useState<string | null>(null);
+  const sectors = useTable<SectorRow>('sectors') ?? [];
   const title = shortTitle(event.title);
   const has = new Set(slots.map((s) => s.job_role_id));
-  const roles = rows.roles
-    .filter((r) => !r.archived_at)
-    .sort((a, b) => Number(has.has(b.id)) - Number(has.has(a.id)) || a.name.localeCompare(b.name, 'pt-BR'));
+  const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name, 'pt-BR');
+  const roles = rows.roles.filter((r) => !r.archived_at);
+  const current = roles.filter((r) => has.has(r.id)).sort(byName);
+  const NONE = '';
+  const groups = [...new Set(roles.map((r) => r.sector_id ?? NONE))]
+    .map((id) => ({ id, name: sectors.find((s) => s.id === id)?.name ?? 'Sem setor' }))
+    .sort((a, b) => Number(a.id === NONE) - Number(b.id === NONE) || byName(a, b));
+  const flat = groups.length < 2;
+  const close = () => {
+    setOpen(false);
+    setSector(null);
+  };
+  const roleItem = (r: JobRoleRow) => (
+    <button
+      key={r.id}
+      type="button"
+      role="menuitem"
+      className="board-menu-item"
+      onClick={() => {
+        close();
+        onAdd(event, r.id);
+      }}
+    >
+      {r.name}
+    </button>
+  );
   return (
     <li className="board-chip board-chip--add">
-      <button type="button" className="board-chip-add" aria-haspopup="menu" aria-expanded={open} aria-label={`Pôr mais uma vaga em ${title}`} title="Pôr mais uma vaga (vale para as próximas semanas da série)" onClick={() => setOpen((o) => !o)}>
+      <button
+        type="button"
+        className="board-chip-add"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`Pôr mais uma vaga em ${title}`}
+        title="Pôr mais uma vaga (vale para as próximas semanas da série)"
+        onClick={() => (open ? close() : setOpen(true))}
+      >
         + vaga
       </button>
       {open && (
-        <ChipMenu onClose={() => setOpen(false)} label={`Função da vaga a mais em ${title}`}>
-          {roles.map((r) => (
-            <button
-              key={r.id}
-              type="button"
-              role="menuitem"
-              className="board-menu-item"
-              onClick={() => {
-                setOpen(false);
-                onAdd(event, r.id);
-              }}
-            >
-              {r.name}
-            </button>
-          ))}
+        <ChipMenu key={sector ?? 'top'} onClose={close} label={`Função da vaga a mais em ${title}`}>
+          {flat ? (
+            [...current, ...roles.filter((r) => !has.has(r.id)).sort(byName)].map(roleItem)
+          ) : sector === null ? (
+            <>
+              {current.length > 0 && <span className="board-menu-head">No evento</span>}
+              {current.map(roleItem)}
+              <span className="board-menu-head">Setores</span>
+              {groups.map((g) => (
+                <button key={g.id} type="button" role="menuitem" aria-haspopup="menu" className="board-menu-item board-menu-item--sub" onClick={() => setSector(g.id)}>
+                  {g.name}
+                </button>
+              ))}
+            </>
+          ) : (
+            <>
+              <button type="button" role="menuitem" className="board-menu-item board-menu-item--back" onClick={() => setSector(null)}>
+                Setores
+              </button>
+              <span className="board-menu-head">{groups.find((g) => g.id === sector)?.name}</span>
+              {roles.filter((r) => (r.sector_id ?? NONE) === sector).sort(byName).map(roleItem)}
+            </>
+          )}
         </ChipMenu>
       )}
     </li>
