@@ -11,9 +11,12 @@ PATCH para um conserto, MINOR para algo novo, MAJOR quando o jeito de usar muda.
 - Fichas das vagas alinhadas: o "!" ou o "✓" e a lixeira ficam sempre na mesma coluna, à direita.
 - O que não pede equipe (reuniões, NAO ESCALAR) entra na ordem do horário, como as outras atividades, sem ficar
   apagado no fim do dia. Só os cancelados vão para o fim, apagados.
+- O que não pede equipe tem o mesmo cartão das outras atividades, só sem as vagas. "NÃO MARCAR NADA" (NAO ESCALAR)
+  leva listras leves, para quem monta a agenda ver de longe.
 - Linha do tempo como no Google Agenda: cada atividade mostra o título, a hora e quantas vagas faltam; as vagas se
-  escolhem no painel que abre com um clique. Num horário cheio, o dia rola para o lado em vez de espremer os
-  cartões.
+  escolhem no painel que abre com um clique. O dia cabe na largura da tela, e o cartão estreito vem para a frente
+  em tamanho normal ao passar o mouse.
+- Trocar de semana esmaece o conteúdo todo de uma vez, sem piscar.
 - Painel do evento sem o título cortado atrás da barra do topo, e sem "Tipo" repetido nem a certeza do tipo.
 - Os cartões da coluna de hoje não repetem o selo "hoje".
 

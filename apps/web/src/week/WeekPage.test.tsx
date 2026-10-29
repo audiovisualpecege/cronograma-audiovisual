@@ -54,7 +54,7 @@ describe('Semana: grade', () => {
     expect(window.location.hash).toBe('#/semana/2026-10-19');
   });
 
-  it('uma coluna por dia, cartão completo por atividade e, na ordem do horário, a linha do que não pede equipe; sem Assistente nem Propor escala', async () => {
+  it('uma coluna por dia, cartão completo por atividade, inclusive o que não pede equipe, na ordem do horário; sem Assistente nem Propor escala', async () => {
     const reserva = eventRow('er', { title: 'Não marcar nada', service_type_id: 't4', starts_at: '2026-10-26T08:00:00-03:00', ends_at: '2026-10-26T09:00:00-03:00' });
     await page(weekRemote({ events: [reserva, AULA], slots: [slotWith('ea', 'r1', 'p17')] }));
     const day = await screen.findByRole('region', { name: 'segunda, 26/10' });
@@ -63,10 +63,11 @@ describe('Semana: grade', () => {
     expect(aula).toHaveClass('board-kind--aula');
     expect(aula).toHaveTextContent('09:00 às 12:00 · Estúdio 1');
     expect(within(aula).getByRole('button', { name: 'Câmera: Pessoa Exemplo 17' })).toBeInTheDocument();
-    const marca = within(day).getByRole('button', { name: 'Não marcar nada, 08:00 às 09:00' });
-    expect(marca).toHaveClass('board-line');
-    // O tipo aparece junto do título: só "Não marcar nada" não diz o que é.
+    // O que não pede equipe tem o mesmo cartão, com o tipo e o horário, só sem vagas.
+    const marca = within(day).getByRole('article', { name: 'Não marcar nada' });
     expect(marca).toHaveTextContent('Reunião');
+    expect(marca).toHaveTextContent('08:00 às 09:00');
+    expect(within(marca).queryByRole('list')).toBeNull();
     // Às 8h, antes da aula das 9h: o que não pede equipe entra na ordem do horário, não no fim do dia.
     expect(marca.compareDocumentPosition(aula) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // Dia sem nada vira uma coluna estreita.

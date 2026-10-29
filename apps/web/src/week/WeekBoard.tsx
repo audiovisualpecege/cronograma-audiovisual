@@ -16,6 +16,7 @@ import {
   crewOrigin,
   eventAlerts,
   isPlanned,
+  isReserved,
   knownSeries,
   plannedRows,
   reviewReasons,
@@ -535,25 +536,22 @@ function DayColumn({
         <p className="board-day-empty">sem atividades</p>
       ) : (
         <div className="board-day-body">
-          {day.cards.map((e) =>
-            isMarker(e, rows.types) ? (
-              <MarkerLine key={e.id} event={e} types={rows.types} color={chip.colorOf(e)} onOpen={onOpenEvent} />
-            ) : (
-              <EventCard
-                key={e.id}
-                event={e}
-                rows={rows}
-                built={built}
-                today={today}
-                readOnly={readOnly}
-                slots={chip.model.slotsByEvent.get(e.id) ?? []}
-                onOpen={onOpenEvent}
-                typeHint={typeHints.get(e.id)}
-                sizeHint={sizeHints.get(e.id)}
-                chip={chip}
-              />
-            ),
-          )}
+          {/* O mesmo cartão para tudo: o que não pede equipe só não tem as vagas. */}
+          {day.cards.map((e) => (
+            <EventCard
+              key={e.id}
+              event={e}
+              rows={rows}
+              built={built}
+              today={today}
+              readOnly={readOnly}
+              slots={chip.model.slotsByEvent.get(e.id) ?? []}
+              onOpen={onOpenEvent}
+              typeHint={typeHints.get(e.id)}
+              sizeHint={sizeHints.get(e.id)}
+              chip={chip}
+            />
+          ))}
         </div>
       )}
     </section>
@@ -634,8 +632,6 @@ function DayTimeline({ now, ...props }: Parameters<typeof DayColumn>[0] & { now:
   const y = (min: number) => ((min - layout.from) / 60) * HOUR_PX;
   const midnight = zonedTime(day.date, '00:00').getTime();
   const nowMin = day.date === today ? Math.round((now.getTime() - midnight) / 60_000) : null;
-  // Num horário cheio, cada cartão guarda ao menos 150px e o dia rola para o lado, em vez de virar uma tira.
-  const lanes = Math.max(1, ...layout.items.map((it) => it.lanes));
   return (
     <section className={`board-timeline${day.date === today ? ' is-today' : ''}`} aria-label={day.label}>
       <header className="board-day-head">
@@ -651,7 +647,7 @@ function DayTimeline({ now, ...props }: Parameters<typeof DayColumn>[0] & { now:
         </div>
       )}
       {layout.items.length === 0 && layout.allDay.length === 0 && <p className="board-day-empty">sem atividades</p>}
-      <div className="board-timeline-grid" style={{ height: y(layout.to), minWidth: 52 + lanes * 150 }}>
+      <div className="board-timeline-grid" style={{ height: y(layout.to) }}>
         {hours.map((m) => (
           <span key={m} className="board-timeline-hour" style={{ top: y(m) }}>
             {`${String(m / 60).padStart(2, '0')}h`}
@@ -661,13 +657,17 @@ function DayTimeline({ now, ...props }: Parameters<typeof DayColumn>[0] & { now:
         {layout.items.length > 0 && (
           <div className="board-timeline-track">
             {layout.items.map((it) => (
+              // O dia cabe na largura da tela; o cartão estreito abre por cima ao passar o mouse, crescendo para dentro
+              // do dia (os da metade direita crescem para a esquerda).
               <div
                 key={it.event.id}
                 className="board-timeline-item"
                 style={
                   {
                     top: y(it.start),
-                    left: `calc(${(it.lane / it.lanes) * 100}% + 2px)`,
+                    ...((it.lane >= it.lanes / 2 && it.lanes > 1
+                      ? { right: `calc(${((it.lanes - it.lane - 1) / it.lanes) * 100}% + 2px)` }
+                      : { left: `calc(${(it.lane / it.lanes) * 100}% + 2px)` }) as CSSProperties),
                     width: `calc(${100 / it.lanes}% - 4px)`,
                     '--h': `${Math.max(((it.end - it.start) / 60) * HOUR_PX - 4, 22)}px`,
                   } as CSSProperties
@@ -739,7 +739,7 @@ function TimelineCard({ event, rows, built, slots, chip, onOpen }: { event: Even
   return (
     <button
       type="button"
-      className={`board-tl-card board-kind--${activityKind(event, rows.types)}${color ? ' has-google-color' : ''}${cancelled ? ' is-cancelled' : ''}${open > 0 ? ' has-open' : ''}${chip.onlyReview && !review ? ' is-dim' : ''}`}
+      className={`board-tl-card board-kind--${activityKind(event, rows.types)}${color ? ' has-google-color' : ''}${isReserved(event, rows.types) ? ' is-reserved' : ''}${cancelled ? ' is-cancelled' : ''}${open > 0 ? ' has-open' : ''}${chip.onlyReview && !review ? ' is-dim' : ''}`}
       style={color ? ({ '--kind-color': color } as CSSProperties) : undefined}
       data-review={review ? '' : undefined}
       data-alert={alerts.length > 0 ? '' : undefined}
@@ -826,7 +826,7 @@ function EventCard({
   const color = chip.colorOf(event);
   return (
     <article
-      className={`board-card board-kind--${kind}${color ? ' has-google-color' : ''}${event.highlighted ? ' is-highlighted' : ''}${cancelled ? ' board-card--cancelled' : ''}${chip.onlyReview && !review ? ' is-dim' : ''}`}
+      className={`board-card board-kind--${kind}${color ? ' has-google-color' : ''}${isReserved(event, rows.types) ? ' is-reserved' : ''}${event.highlighted ? ' is-highlighted' : ''}${cancelled ? ' board-card--cancelled' : ''}${chip.onlyReview && !review ? ' is-dim' : ''}`}
       style={color ? ({ '--kind-color': color } as CSSProperties) : undefined}
       data-color={color ?? undefined}
       aria-label={title}
@@ -1023,28 +1023,6 @@ function hasSeals(e: EventRow): boolean {
     e.status === 'changed' ||
     e.status === 'cancelled' ||
     Boolean(e.restored || e.duplicate_group || e.review_pending)
-  );
-}
-
-/** Reunião, folga, lembrete: uma linha fina e cinza, só para contexto. */
-function MarkerLine({ event, types, color, onOpen }: { event: EventRow; types: readonly ServiceTypeRow[]; color: string | null; onOpen: (eventId: string) => void }) {
-  const type = types.find((t) => t.id === event.service_type_id);
-  return (
-    <button
-      type="button"
-      className={`board-line${color ? ' has-google-color' : ''}`}
-      style={color ? ({ '--kind-color': color } as CSSProperties) : undefined}
-      onClick={() => onOpen(event.id)}
-      aria-label={`${shortTitle(event.title)}, ${eventSpan(event)}`}
-    >
-      <AppIcon icon={typeIcon(type).icon} size={14} />
-      <span className="board-line-time">{event.all_day ? 'dia todo' : eventSpan(event).split(' às ')[0]}</span>
-      {/* O tipo vem antes do título: "NÃO MARCAR NADA" sozinho não diz que é NAO ESCALAR. */}
-      <span className="board-line-text">
-        {type && <span className="board-line-type">{type.name}</span>}
-        <span className="board-line-title">{shortTitle(event.title)}</span>
-      </span>
-    </button>
   );
 }
 

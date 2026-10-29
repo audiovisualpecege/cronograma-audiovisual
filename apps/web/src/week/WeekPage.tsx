@@ -88,18 +88,22 @@ export function WeekPage({ params }: RouteProps) {
   const rows = useWeekRows(weekStart);
   const sources = useTable<CalendarSourceRow>('calendar_sources') ?? [];
   const { lastSyncAt } = useSyncState();
+  // O selo da situação fica com a semana anterior enquanto a nova abre, em vez de sumir e voltar.
+  const [last, setLast] = useState(rows);
+  if (rows && rows !== last) setLast(rows);
+  const shown = rows ?? last;
 
   return (
     <section className="page week-page">
       <div className="week-head">
-        {rows ? <WeekState rows={rows} now={now} /> : <span />}
+        {shown ? <WeekState rows={shown} now={now} /> : <span />}
         <WeekSwitcher weekStart={weekStart} currentWeek={weekStartOf(today)} />
         <RereadButton />
       </div>
-      <div key={weekStart} className={`week-slide week-slide--${slideFrom ?? 'fade'}`}>
-        {!rows ? (
-          <p className="form-text">Abrindo a semana.</p>
-        ) : rows.events.length === 0 && !rows.week && !lastSyncAt ? (
+      {/* Troca de semana: o conteúdo todo esmaece de uma vez, só quando a semana nova já está pronta (sem piscar o
+          "abrindo" no meio). */}
+      <div key={`${weekStart}:${Boolean(rows)}`} className="week-fade">
+        {!rows ? null : rows.events.length === 0 && !rows.week && !lastSyncAt ? (
           <p className="form-text">Buscando os eventos da semana.</p>
         ) : (
           <WeekBody rows={rows} sources={sources} now={now} today={today} />

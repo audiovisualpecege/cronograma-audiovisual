@@ -75,6 +75,15 @@ export const KIND_LABEL: Record<ActivityKind, string> = {
 
 const AULA = /\b(aula|aulas|curso|cursos|mba|transmissao|transmitir|disponibilizar|webinar)\b/;
 
+/**
+ * Horário reservado ("NÃO MARCAR NADA", tipo NAO ESCALAR): leva uma textura listrada leve, para quem monta a agenda
+ * ver de longe que ali não se marca nada.
+ */
+export function isReserved(e: EventRow, types: readonly ServiceTypeRow[]): boolean {
+  const type = nameTokens(types.find((t) => t.id === e.service_type_id)?.name ?? '').join(' ');
+  return type === 'nao escalar' || nameTokens(e.title).join(' ').startsWith('nao marcar nada');
+}
+
 export function activityKind(e: EventRow, types: readonly ServiceTypeRow[]): ActivityKind {
   if (isMarker(e, types) || (!needsTeam(e, types) && e.status !== 'cancelled')) return 'marcacao';
   if (isMeetingEvent(e, types)) return 'reuniao';
