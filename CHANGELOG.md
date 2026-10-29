@@ -3,6 +3,11 @@
 Cada versão nova entra no topo, com a data e o que mudou para quem usa.
 PATCH para um conserto, MINOR para algo novo, MAJOR quando o jeito de usar muda.
 
+## 1.1.1 (29/10/2026)
+
+- Na Semana, o que não pede equipe (NAO ESCALAR, reuniões, folgas) mostra o nome do tipo junto do título. Antes
+  aparecia só o título, e "NÃO MARCAR NADA" não dizia do que se tratava.
+
 ## 1.1.0 (21/10/2026)
 
 - No computador, o menu da esquerda fica recolhido, só com os ícones, e deixa mais espaço para a tela. Passar o

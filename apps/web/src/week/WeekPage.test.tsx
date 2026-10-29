@@ -63,7 +63,10 @@ describe('Semana: grade', () => {
     expect(aula).toHaveClass('board-kind--aula');
     expect(aula).toHaveTextContent('09:00 às 12:00 · Estúdio 1');
     expect(within(aula).getByRole('button', { name: 'Câmera: Pessoa Exemplo 17' })).toBeInTheDocument();
-    expect(within(day).getByRole('button', { name: 'Não marcar nada, 08:00 às 09:00' })).toHaveClass('board-line');
+    const marca = within(day).getByRole('button', { name: 'Não marcar nada, 08:00 às 09:00' });
+    expect(marca).toHaveClass('board-line');
+    // O tipo aparece junto do título: só "Não marcar nada" não diz o que é.
+    expect(marca).toHaveTextContent('Reunião');
     // Dia sem nada vira uma coluna estreita.
     expect(screen.getByRole('region', { name: 'terça, 27/10' })).toHaveClass('is-empty');
     for (const name of [/Assistente/, 'Propor escala', 'Montar semana']) expect(screen.queryByRole('button', { name })).toBeNull();
