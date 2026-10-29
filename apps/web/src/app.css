@@ -791,16 +791,34 @@ body {
   width: 100%;
 }
 
-.crew-row {
+/* Equipe do tipo: os títulos uma vez só, e cada função numa linha (função, quantidade estreita, lixeira). */
+.crew-group {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--space-3);
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.crew-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 84px 40px;
+  align-items: center;
+  gap: var(--space-2);
   width: 100%;
 }
 
-.crew-row > label:first-child {
-  flex: 1 1 220px;
+.crew-row--head {
+  color: var(--text-muted);
+  font: var(--weight-bold) 11px var(--font-display);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.crew-group > button {
+  align-self: flex-start;
 }
 
 .person-status {
@@ -1561,10 +1579,12 @@ body {
 }
 
 /* Banco de ícones do cadastro de tipos. */
+/* O banco ocupa a largura toda (dentro do grupo flexível ele encolhia numa coluna de dois ícones). */
 .icon-bank {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
-  gap: var(--space-2);
+  grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+  gap: 6px;
+  width: 100%;
 }
 
 .icon-choice {
@@ -1573,8 +1593,8 @@ body {
   align-items: center;
   justify-content: center;
   gap: 2px;
-  min-height: 48px;
-  padding: var(--space-2);
+  min-height: 40px;
+  padding: 6px;
   border: 1.5px solid var(--border-subtle);
   border-radius: var(--radius-card);
   background: var(--surface-raised);

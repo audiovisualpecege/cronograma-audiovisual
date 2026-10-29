@@ -22,6 +22,8 @@ PATCH para um conserto, MINOR para algo novo, MAJOR quando o jeito de usar muda.
   Google Agenda, o evento da agenda continua lá; depois de "Reler agora", o app mostra o que foi apagado aqui e
   segue na agenda (manter fora ou trazer de volta) e as atividades que só existem no cronograma (manter ou apagar).
   Precisa da migração 0025.
+- Edição do tipo de serviço mais limpa: o banco de ícones ocupa a largura toda (era uma coluna estreita e comprida),
+  a equipe mostra "Função" e "Qtd." uma vez só, com a quantidade estreita, e as opções e explicações ficaram curtas.
 - Painel do evento sem o título cortado atrás da barra do topo, e sem "Tipo" repetido nem a certeza do tipo.
 - Os cartões da coluna de hoje não repetem o selo "hoje".
 
