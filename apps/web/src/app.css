@@ -2246,6 +2246,20 @@ body {
   height: max(460px, calc(100dvh - 220px));
 }
 
+/* Arrastar a grade para os lados pelo espaço fora dos cartões. */
+.board.is-draggable {
+  cursor: grab;
+}
+
+.board.is-draggable .board-card {
+  cursor: auto;
+}
+
+.board.is-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
 /* Grade ou linha do tempo, e os dias da linha do tempo. */
 .board-views {
   display: flex;

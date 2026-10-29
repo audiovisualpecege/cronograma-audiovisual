@@ -1,6 +1,6 @@
 import { DangerTriangleIcon } from '@solar-icons/react/bold-duotone';
 import { buildSeriesSizes, personLoad, SIZE_LABEL, weekStartOf, zonedTime, type EventSize, type SizeSuggestion, type WeekContext } from '@cronograma/core';
-import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { googleColor, useLocalGoogleColors } from './googleColors';
 import { sizeFor, toFact, type AssignmentRow, type EventRow, type HistoryFactRow, type ServiceTypeRow, type SlotRow } from '../data/catalog';
 import { useSyncEngine, useSyncState } from '../sync/SyncProvider';
@@ -406,6 +406,25 @@ export function WeekBoard({ rows, now, today, historyRows, historyLoading, onOpe
     onlyReview,
     colorOf,
   };
+  // Na grade, segurar o clique fora dos cartões e arrastar rola os dias para os lados (só com o mouse; o toque já rola).
+  const drag = useRef<{ x: number; left: number } | null>(null);
+  const [dragging, setDragging] = useState(false);
+  function startDrag(ev: ReactPointerEvent<HTMLDivElement>) {
+    if (ev.pointerType !== 'mouse' || ev.button !== 0) return;
+    if ((ev.target as HTMLElement).closest('.board-card, button, a, input, select, textarea, [role="menu"]')) return;
+    drag.current = { x: ev.clientX, left: ev.currentTarget.scrollLeft };
+    ev.currentTarget.setPointerCapture(ev.pointerId);
+    setDragging(true);
+  }
+  function moveDrag(ev: ReactPointerEvent<HTMLDivElement>) {
+    if (drag.current) ev.currentTarget.scrollLeft = drag.current.left - (ev.clientX - drag.current.x);
+  }
+  function endDrag(ev: ReactPointerEvent<HTMLDivElement>) {
+    drag.current = null;
+    if (ev.currentTarget.hasPointerCapture(ev.pointerId)) ev.currentTarget.releasePointerCapture(ev.pointerId);
+    setDragging(false);
+  }
+
   const viewSwitch = (
     <span className="board-view-switch" role="group" aria-label="Visualização">
       {(['grid', 'timeline'] as const).map((v) => (
@@ -429,7 +448,14 @@ export function WeekBoard({ rows, now, today, historyRows, historyLoading, onOpe
           <DayNav days={days} at={dayAt} today={today} onGo={setDayAt} />
         </div>
       )}
-      <div id={boardId} className={`board${view === 'timeline' ? ' board--timeline' : ''}${lit ? ' is-lighting' : ''}`}>
+      <div
+        id={boardId}
+        className={`board${view === 'timeline' ? ' board--timeline' : ' is-draggable'}${dragging ? ' is-dragging' : ''}${lit ? ' is-lighting' : ''}`}
+        onPointerDown={view === 'grid' ? startDrag : undefined}
+        onPointerMove={dragging ? moveDrag : undefined}
+        onPointerUp={dragging ? endDrag : undefined}
+        onPointerCancel={dragging ? endDrag : undefined}
+      >
         {(view === 'timeline' ? days.slice(dayAt, dayAt + 1) : days).map((day) => {
           const props = {
             day,
