@@ -40,21 +40,21 @@ const card = (name: string) => screen.findByRole('article', { name });
 const chips = (el: HTMLElement) => within(el).getAllByRole('button').filter((b) => b.className.includes('board-chip-main'));
 
 describe('Semana: grade', () => {
-  it('o topo mostra "< Semana de 26/10 >" com as semanas vizinhas dos lados, e as setas trocam de semana', async () => {
+  it('o topo mostra "< Semana de 26/10 >" com a situação ao lado, e as setas trocam de semana', async () => {
     const user = userEvent.setup();
     await page(weekRemote({ events: [AULA], slots: [slotWith('ea', 'r1')] }));
     const nav = await screen.findByRole('navigation', { name: 'Trocar de semana' });
     expect(within(nav).getByRole('heading', { level: 1 })).toHaveTextContent('SEMANA DE 26/10');
-    expect(nav).toHaveTextContent('Semana de 19/10');
-    expect(nav).toHaveTextContent('Semana de 02/11');
-    expect(nav).toHaveTextContent('Próxima semana');
+    // Sem os nomes das semanas vizinhas dos lados: só as setas.
+    expect(nav).not.toHaveTextContent('Semana de 19/10');
+    expect(screen.getByText('Em montagem')).toBeInTheDocument();
     await user.click(within(nav).getByRole('button', { name: 'Próxima semana' }));
     expect(window.location.hash).toBe('#/semana/2026-11-02');
     await user.click(within(nav).getByRole('button', { name: 'Semana anterior' }));
     expect(window.location.hash).toBe('#/semana/2026-10-19');
   });
 
-  it('uma coluna por dia, cartão completo por atividade e, no fim do dia, a linha fina do que não pede equipe; sem Assistente nem Propor escala', async () => {
+  it('uma coluna por dia, cartão completo por atividade e, na ordem do horário, a linha do que não pede equipe; sem Assistente nem Propor escala', async () => {
     const reserva = eventRow('er', { title: 'Não marcar nada', service_type_id: 't4', starts_at: '2026-10-26T08:00:00-03:00', ends_at: '2026-10-26T09:00:00-03:00' });
     await page(weekRemote({ events: [reserva, AULA], slots: [slotWith('ea', 'r1', 'p17')] }));
     const day = await screen.findByRole('region', { name: 'segunda, 26/10' });
@@ -67,11 +67,13 @@ describe('Semana: grade', () => {
     expect(marca).toHaveClass('board-line');
     // O tipo aparece junto do título: só "Não marcar nada" não diz o que é.
     expect(marca).toHaveTextContent('Reunião');
+    // Às 8h, antes da aula das 9h: o que não pede equipe entra na ordem do horário, não no fim do dia.
+    expect(marca.compareDocumentPosition(aula) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // Dia sem nada vira uma coluna estreita.
     expect(screen.getByRole('region', { name: 'terça, 27/10' })).toHaveClass('is-empty');
     for (const name of [/Assistente/, 'Propor escala', 'Montar semana']) expect(screen.queryByRole('button', { name })).toBeNull();
     expect(screen.queryByRole('list', { name: 'Pessoas disponíveis por função' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Nova atividade interna' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Nova atividade' })).toBeInTheDocument();
   });
 
   it('semana futura: a vaga aberta já vem com a sugestão tracejada, e Confirmar grava a pessoa', async () => {
@@ -166,7 +168,7 @@ describe('Semana: grade', () => {
     expect(within(aula).queryByRole('group', { name: /virou titular/ })).toBeNull();
   });
 
-  it('"Só o que precisa de olho" apaga os cartões sem pendência e conta os que precisam; "Próximo" leva ao cartão', async () => {
+  it('"Precisa de olho" apaga os cartões sem pendência e conta os que precisam; "Próximo" leva ao cartão', async () => {
     const user = userEvent.setup();
     // Biologia tem sugestão limpa e série conhecida; Química só tem vaga de Mediação, que ninguém de P1 a P13 faz.
     const fact = { event_id: 'h1', week_start: '2026-10-19', event_date: '2026-10-19', title: 'Gravação aula Biologia', service_type_id: 't1', service_type_name: 'T1', job_role_id: 'r1', job_role_name: 'Câmera', person_id: 'p3', person_name: 'p3', raw_name: null, hours: 3, source: 'platform' };
@@ -175,8 +177,8 @@ describe('Semana: grade', () => {
     remote.views = { ...remote.views, history_facts: [fact, quimica] };
     await page(remote);
     const review = await screen.findByRole('group', { name: 'Revisão' });
-    await waitFor(() => expect(review).toHaveTextContent('1 para revisar'));
-    await user.click(within(review).getByRole('button', { name: 'Só o que precisa de olho' }));
+    await waitFor(() => expect(review).toHaveTextContent('Precisa de olho 1'));
+    await user.click(within(review).getByRole('button', { name: /^Precisa de olho/ }));
     expect(await card('Gravação aula Biologia')).toHaveClass('is-dim');
     const quimicaCard = await card('Gravação aula Química');
     expect(quimicaCard).not.toHaveClass('is-dim');
@@ -192,7 +194,8 @@ describe('Semana: grade', () => {
     const remote = weekRemote({ events: [AULA, TARDE], slots: [slotWith('ea', 'r1'), slotWith('ea', 'r5', 'p17', 'proposed'), slotWith('eb', 'r1', 'p3')] });
     await page(remote);
     const score = await screen.findByLabelText('Placar da semana');
-    await waitFor(() => expect(score).toHaveTextContent('1 confirmada2 sugestões0 abertas0 avisos'));
+    // Só o que tem: sem "0 abertas" nem "0 avisos".
+    await waitFor(() => expect(score).toHaveTextContent(/^1 confirmada2 sugestões$/));
     await user.click(screen.getByRole('button', { name: 'Confirmar sugestões (2)' }));
     await waitFor(() => {
       const kinds = ops(remote).map((o) => o.kind);
@@ -354,7 +357,7 @@ describe('Semana: cores do Google Agenda', () => {
 });
 
 describe('Semana: linha do tempo', () => {
-  it('mostra um dia por vez, com os cartões na altura do horário; os dias trocam e a escolha fica lembrada', async () => {
+  it('mostra um dia por vez, com cartões compactos na altura do horário; o clique abre as vagas no painel; os dias trocam e a escolha fica lembrada', async () => {
     const user = userEvent.setup();
     const terca = eventRow('ec', { title: 'Evento externo', service_type_id: 't2', starts_at: '2026-10-27T09:00:00-03:00', ends_at: '2026-10-27T12:00:00-03:00' });
     try {
@@ -365,16 +368,22 @@ describe('Semana: linha do tempo', () => {
       // Abre no primeiro dia com atividade (a semana não é a de hoje): a segunda, sem a terça.
       const day = await screen.findByRole('region', { name: 'segunda, 26/10' });
       const items = [...day.querySelectorAll<HTMLElement>('.board-timeline-item')];
-      expect(items.map((el) => within(el).getByRole('article').getAttribute('aria-label'))).toEqual(['Gravação aula Biologia', 'Gravação aula Química']);
+      // Título, hora e quantas vagas faltam; as fichas ficam no painel.
+      expect(items.map((el) => within(el).getByRole('button').getAttribute('aria-label'))).toEqual([
+        'Gravação aula Biologia, 09:00 às 12:00, 1 a confirmar',
+        'Gravação aula Química, 14:00 às 17:00, 1 a confirmar',
+      ]);
       // 9h a 12h numa grade que começa às 7h: duas horas abaixo do topo, três de altura.
       expect(items[0]?.style.top).toBe('192px');
       expect(items[0]?.style.getPropertyValue('--h')).toBe('284px');
-      expect(screen.queryByRole('article', { name: 'Evento externo' })).toBeNull();
-      // As fichas da vaga funcionam como na grade.
-      expect(within(items[0] as HTMLElement).getByRole('button', { name: /^Câmera:/ })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^Evento externo,/ })).toBeNull();
+      await user.click(within(items[0] as HTMLElement).getByRole('button'));
+      const panel = await screen.findByRole('complementary', { name: 'Detalhes de Gravação aula Biologia' });
+      expect(within(panel).getByRole('button', { name: /^Câmera:/ })).toBeInTheDocument();
+      await user.click(within(panel).getByRole('button', { name: 'Fechar os detalhes' }));
 
       await user.click(screen.getByRole('button', { name: 'Próximo dia' }));
-      expect(await card('Evento externo')).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: /^Evento externo,/ })).toBeInTheDocument();
       // Dia inteiro: barra fina no topo, com as vagas; o clique abre o painel.
       await user.click(screen.getByRole('button', { name: /^Gravação dia todo, dia inteiro, 1 vaga/ }));
       expect(await screen.findByRole('complementary', { name: 'Detalhes de Gravação dia todo' })).toBeInTheDocument();
@@ -394,7 +403,7 @@ describe('Semana sem montagem', () => {
     const aula = await card('Gravação aula Biologia');
     // T1: 1 Câmera e 1 Técnico de aula.
     await waitFor(() => expect(chips(aula)).toHaveLength(2));
-    expect(screen.getByText('Escolha as pessoas: a semana é montada sozinha na primeira confirmação.')).toBeInTheDocument();
+    expect(screen.getByText('Sem montagem')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Publicar' })).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Confirmar sugestões (2)' }));
     await waitFor(() => expect(ops(remote).some((o) => o.kind === 'week.build')).toBe(true));
@@ -470,7 +479,7 @@ describe('Semana sem montagem', () => {
     expect(aula).toHaveTextContent('Tipo a definir');
     expect(aula).toHaveTextContent('Escolha o tipo para ver as vagas.');
     expect(within(aula).getByRole('img', { name: /tipo de serviço a definir/ })).toBeInTheDocument();
-    expect(screen.getByText(/1 atividade está sem tipo de serviço/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Identificar tipos (1)' })).toHaveAttribute('title', expect.stringContaining('1 atividade está sem tipo de serviço'));
     await user.click(await within(aula).findByRole('button', { name: /^Usar .+ em Gravação aula Física$/ }));
     await waitFor(() => expect(ops(remote).find((o) => o.kind === 'event.update_extras')).toMatchObject({ payload: { id: 'b2' } }));
   });

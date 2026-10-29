@@ -3,6 +3,20 @@
 Cada versão nova entra no topo, com a data e o que mudou para quem usa.
 PATCH para um conserto, MINOR para algo novo, MAJOR quando o jeito de usar muda.
 
+## 1.1.2 (29/10/2026)
+
+- Semana mais enxuta: a situação (Em montagem, Publicada) fica ao lado do título, sem os nomes das semanas
+  vizinhas e sem as frases de explicação. Visualização, placar, filtro e ações numa linha só; o placar mostra só o
+  que não é zero, e "Identificar tipos (12)" virou um botão com a contagem.
+- Fichas das vagas alinhadas: o "!" ou o "✓" e a lixeira ficam sempre na mesma coluna, à direita.
+- O que não pede equipe (reuniões, NAO ESCALAR) entra na ordem do horário, como as outras atividades, sem ficar
+  apagado no fim do dia. Só os cancelados vão para o fim, apagados.
+- Linha do tempo como no Google Agenda: cada atividade mostra o título, a hora e quantas vagas faltam; as vagas se
+  escolhem no painel que abre com um clique. Num horário cheio, o dia rola para o lado em vez de espremer os
+  cartões.
+- Painel do evento sem o título cortado atrás da barra do topo, e sem "Tipo" repetido nem a certeza do tipo.
+- Os cartões da coluna de hoje não repetem o selo "hoje".
+
 ## 1.1.1 (29/10/2026)
 
 - Na Semana, o que não pede equipe (NAO ESCALAR, reuniões, folgas) mostra o nome do tipo junto do título. Antes

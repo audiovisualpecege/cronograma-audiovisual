@@ -1,5 +1,5 @@
 import { DangerTriangleIcon } from '@solar-icons/react/bold-duotone';
-import { buildSeriesSizes, localDate, personLoad, SIZE_LABEL, weekStartOf, zonedTime, type EventSize, type SizeSuggestion, type WeekContext } from '@cronograma/core';
+import { buildSeriesSizes, personLoad, SIZE_LABEL, weekStartOf, zonedTime, type EventSize, type SizeSuggestion, type WeekContext } from '@cronograma/core';
 import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { googleColor, useLocalGoogleColors } from './googleColors';
 import { sizeFor, toFact, type AssignmentRow, type EventRow, type HistoryFactRow, type ServiceTypeRow, type SlotRow } from '../data/catalog';
@@ -106,8 +106,8 @@ interface BoardProps {
   /** Evento aberto no painel da direita; o painel recebe as vagas dele, editáveis como na grade. */
   viewing?: string | null;
   renderPanel?: (event: EventRow, crew: ReactNode) => ReactNode;
-  /** A barra do topo (placar e "Confirmar sugestões") fica na página; a grade passa o que ela mostra. */
-  renderBar: (state: BoardState, scrollTo: (what: BoardTarget) => void) => ReactNode;
+  /** A barra do topo (placar e "Confirmar sugestões") fica na página; a grade passa o que ela mostra e a troca de visualização. */
+  renderBar: (state: BoardState, scrollTo: (what: BoardTarget) => void, viewSwitch: ReactNode) => ReactNode;
 }
 
 /**
@@ -405,25 +405,29 @@ export function WeekBoard({ rows, now, today, historyRows, historyLoading, onOpe
     onlyReview,
     colorOf,
   };
+  const viewSwitch = (
+    <span className="board-view-switch" role="group" aria-label="Visualização">
+      {(['grid', 'timeline'] as const).map((v) => (
+        <button key={v} type="button" className={view === v ? 'is-on' : undefined} aria-pressed={view === v} onClick={() => chooseView(v)}>
+          {v === 'grid' ? 'Grade' : 'Linha do tempo'}
+        </button>
+      ))}
+    </span>
+  );
   return (
     <>
-      {renderBar(state, scrollTo)}
+      {renderBar(state, scrollTo, viewSwitch)}
       {lit && litLoad && (
         <p className="board-lit" role="status">
           {model.personName(lit)}: {hoursText(litLoad.hours)} e {activitiesText(litLoad.count)} na semana
         </p>
       )}
       <TypeIconSprite types={cardTypes} />
-      <div className="board-views">
-        <span className="board-view-switch" role="group" aria-label="Visualização">
-          {(['grid', 'timeline'] as const).map((v) => (
-            <button key={v} type="button" className={view === v ? 'is-on' : undefined} aria-pressed={view === v} onClick={() => chooseView(v)}>
-              {v === 'grid' ? 'Grade' : 'Linha do tempo'}
-            </button>
-          ))}
-        </span>
-        {view === 'timeline' && <DayNav days={days} at={dayAt} today={today} onGo={setDayAt} />}
-      </div>
+      {view === 'timeline' && (
+        <div className="board-views">
+          <DayNav days={days} at={dayAt} today={today} onGo={setDayAt} />
+        </div>
+      )}
       <div id={boardId} className={`board${view === 'timeline' ? ' board--timeline' : ''}${lit ? ' is-lighting' : ''}`}>
         {(view === 'timeline' ? days.slice(dayAt, dayAt + 1) : days).map((day) => {
           const props = {
@@ -519,7 +523,7 @@ function DayColumn({
   sizeHints: ReadonlyMap<string, SizeSuggestion>;
   chip: ChipProps;
 }) {
-  const empty = day.cards.length === 0 && day.lines.length === 0;
+  const empty = day.cards.length === 0;
   return (
     <section className={`board-day${empty ? ' is-empty' : ''}${day.date === today ? ' is-today' : ''}`} aria-label={day.label}>
       <header className="board-day-head">
@@ -531,24 +535,25 @@ function DayColumn({
         <p className="board-day-empty">sem atividades</p>
       ) : (
         <div className="board-day-body">
-          {day.cards.map((e) => (
-            <EventCard
-              key={e.id}
-              event={e}
-              rows={rows}
-              built={built}
-              today={today}
-              readOnly={readOnly}
-              slots={chip.model.slotsByEvent.get(e.id) ?? []}
-              onOpen={onOpenEvent}
-              typeHint={typeHints.get(e.id)}
-              sizeHint={sizeHints.get(e.id)}
-              chip={chip}
-            />
-          ))}
-          {day.lines.map((e) => (
-            <MarkerLine key={e.id} event={e} types={rows.types} color={chip.colorOf(e)} onOpen={onOpenEvent} />
-          ))}
+          {day.cards.map((e) =>
+            isMarker(e, rows.types) ? (
+              <MarkerLine key={e.id} event={e} types={rows.types} color={chip.colorOf(e)} onOpen={onOpenEvent} />
+            ) : (
+              <EventCard
+                key={e.id}
+                event={e}
+                rows={rows}
+                built={built}
+                today={today}
+                readOnly={readOnly}
+                slots={chip.model.slotsByEvent.get(e.id) ?? []}
+                onOpen={onOpenEvent}
+                typeHint={typeHints.get(e.id)}
+                sizeHint={sizeHints.get(e.id)}
+                chip={chip}
+              />
+            ),
+          )}
         </div>
       )}
     </section>
@@ -579,7 +584,7 @@ function saveView(v: BoardView) {
 function firstDay(days: readonly BoardDay[], today: string): number {
   const at = days.findIndex((d) => d.date === today);
   if (at >= 0) return at;
-  return Math.max(0, days.findIndex((d) => d.cards.length + d.lines.length > 0));
+  return Math.max(0, days.findIndex((d) => d.cards.length > 0));
 }
 
 /** Setas e os sete dias da semana, com quantas atividades cada um tem. */
@@ -590,7 +595,7 @@ function DayNav({ days, at, today, onGo }: { days: readonly BoardDay[]; at: numb
         ‹
       </button>
       {days.map((d, i) => {
-        const n = d.cards.length + d.lines.length;
+        const n = d.cards.length;
         return (
           <button
             key={d.date}
@@ -621,35 +626,16 @@ const HOUR_PX = 96;
  * teclado. Dia inteiro e as folgas ficam no topo.
  */
 function DayTimeline({ now, ...props }: Parameters<typeof DayColumn>[0] & { now: Date }) {
-  const { day, today, rows, built, readOnly, dropped, onToggleOff, onOpenEvent, typeHints, sizeHints, chip } = props;
-  // Marcações (não escalar, folga) ficam numa faixa à direita, sem apertar os cartões; os cancelados ficam com os
-  // cartões, nas colunas da direita de cada grupo.
-  const layout = useMemo(() => timelineLayout(day.date, [...day.cards, ...day.lines]), [day]);
-  const cardItems = useMemo(() => timelineLayout(day.date, day.cards).items, [day]);
-  const markItems = useMemo(() => timelineLayout(day.date, day.lines).items, [day]);
-  const markers = useMemo(() => new Set(day.lines.map((e) => e.id)), [day.lines]);
+  const { day, today, rows, built, readOnly, dropped, onToggleOff, onOpenEvent, chip } = props;
+  // Todas as atividades no mesmo trilho, na ordem do horário; os cancelados ficam nas colunas da direita de cada grupo.
+  const layout = useMemo(() => timelineLayout(day.date, day.cards), [day]);
   const hours = [];
   for (let m = layout.from; m < layout.to; m += 60) hours.push(m);
   const y = (min: number) => ((min - layout.from) / 60) * HOUR_PX;
   const midnight = zonedTime(day.date, '00:00').getTime();
   const nowMin = day.date === today ? Math.round((now.getTime() - midnight) / 60_000) : null;
-  const card = (e: EventRow) =>
-    markers.has(e.id) ? (
-      <MarkerLine event={e} types={rows.types} color={chip.colorOf(e)} onOpen={onOpenEvent} />
-    ) : (
-      <EventCard
-        event={e}
-        rows={rows}
-        built={built}
-        today={today}
-        readOnly={readOnly}
-        slots={chip.model.slotsByEvent.get(e.id) ?? []}
-        onOpen={onOpenEvent}
-        typeHint={typeHints.get(e.id)}
-        sizeHint={sizeHints.get(e.id)}
-        chip={chip}
-      />
-    );
+  // Num horário cheio, cada cartão guarda ao menos 150px e o dia rola para o lado, em vez de virar uma tira.
+  const lanes = Math.max(1, ...layout.items.map((it) => it.lanes));
   return (
     <section className={`board-timeline${day.date === today ? ' is-today' : ''}`} aria-label={day.label}>
       <header className="board-day-head">
@@ -665,38 +651,32 @@ function DayTimeline({ now, ...props }: Parameters<typeof DayColumn>[0] & { now:
         </div>
       )}
       {layout.items.length === 0 && layout.allDay.length === 0 && <p className="board-day-empty">sem atividades</p>}
-      <div className="board-timeline-grid" style={{ height: y(layout.to) }}>
+      <div className="board-timeline-grid" style={{ height: y(layout.to), minWidth: 52 + lanes * 150 }}>
         {hours.map((m) => (
           <span key={m} className="board-timeline-hour" style={{ top: y(m) }}>
             {`${String(m / 60).padStart(2, '0')}h`}
           </span>
         ))}
         {nowMin !== null && nowMin >= layout.from && nowMin <= layout.to && <span className="board-timeline-now" style={{ top: y(nowMin) }} aria-hidden="true" />}
-        {[
-          { key: 'cards', items: cardItems, className: `board-timeline-track${markItems.length > 0 ? ' has-marks' : ''}` },
-          { key: 'marks', items: markItems, className: 'board-timeline-marks' },
-        ].map(
-          (col) =>
-            col.items.length > 0 && (
-              <div key={col.key} className={col.className} aria-label={col.key === 'marks' ? 'Marcações do dia' : undefined}>
-                {col.items.map((it) => (
-                  <div
-                    key={it.event.id}
-                    className={`board-timeline-item${markers.has(it.event.id) ? ' is-marker' : ''}`}
-                    style={
-                      {
-                        top: y(it.start),
-                        left: `calc(${(it.lane / it.lanes) * 100}% + 2px)`,
-                        width: `calc(${100 / it.lanes}% - 4px)`,
-                        '--h': `${Math.max(((it.end - it.start) / 60) * HOUR_PX - 4, 22)}px`,
-                      } as CSSProperties
-                    }
-                  >
-                    {card(it.event)}
-                  </div>
-                ))}
+        {layout.items.length > 0 && (
+          <div className="board-timeline-track">
+            {layout.items.map((it) => (
+              <div
+                key={it.event.id}
+                className="board-timeline-item"
+                style={
+                  {
+                    top: y(it.start),
+                    left: `calc(${(it.lane / it.lanes) * 100}% + 2px)`,
+                    width: `calc(${100 / it.lanes}% - 4px)`,
+                    '--h': `${Math.max(((it.end - it.start) / 60) * HOUR_PX - 4, 22)}px`,
+                  } as CSSProperties
+                }
+              >
+                <TimelineCard event={it.event} rows={rows} built={built} slots={chip.model.slotsByEvent.get(it.event.id) ?? []} chip={chip} onOpen={onOpenEvent} />
               </div>
-            ),
+            ))}
+          </div>
         )}
       </div>
     </section>
@@ -724,6 +704,59 @@ function AllDayBar({ event, slots, chip, onOpen }: { event: EventRow; slots: rea
     >
       <span className="board-allday-title">{title}</span>
       {vagas && <span className="board-allday-slots">{vagas}</span>}
+    </button>
+  );
+}
+
+/**
+ * Cartão da linha do tempo, como no Google Agenda: título, hora e quantas vagas faltam. As fichas ficam no painel
+ * da direita, que abre no clique: lado a lado, num horário cheio, elas viravam "C.. v..".
+ */
+function TimelineCard({ event, rows, built, slots, chip, onOpen }: { event: EventRow; rows: WeekRows; built: boolean; slots: readonly SlotRow[]; chip: ChipProps; onOpen: (eventId: string) => void }) {
+  const type = rows.types.find((t) => t.id === event.service_type_id);
+  const color = chip.colorOf(event);
+  const title = shortTitle(event.title);
+  const cancelled = event.status === 'cancelled';
+  const states = slots.map((s) => chipState(chip.model.bySlot.get(s.id), chip.drafts.get(s.id)));
+  const open = states.filter((s) => s === 'open').length;
+  const suggested = states.filter((s) => s === 'suggested').length;
+  const alerts = eventAlerts(event, slots.length, built, rows.types);
+  const review = chip.reviews.get(event.id);
+  const status = cancelled
+    ? 'cancelado'
+    : !needsTeam(event, rows.types)
+      ? (type?.name ?? '')
+      : !type
+        ? 'tipo a definir'
+        : slots.length === 0
+          ? 'sem vagas'
+          : open > 0
+            ? `${open} de ${slots.length} ${slots.length === 1 ? 'vaga aberta' : 'abertas'}`
+            : suggested > 0
+              ? `${suggested} a confirmar`
+              : `${slots.length} ${slots.length === 1 ? 'vaga preenchida' : 'preenchidas'}`;
+  const worst = open > 0 ? 'open' : suggested > 0 ? 'suggested' : states.length > 0 ? 'confirmed' : undefined;
+  return (
+    <button
+      type="button"
+      className={`board-tl-card board-kind--${activityKind(event, rows.types)}${color ? ' has-google-color' : ''}${cancelled ? ' is-cancelled' : ''}${open > 0 ? ' has-open' : ''}${chip.onlyReview && !review ? ' is-dim' : ''}`}
+      style={color ? ({ '--kind-color': color } as CSSProperties) : undefined}
+      data-review={review ? '' : undefined}
+      data-alert={alerts.length > 0 ? '' : undefined}
+      data-chip={worst}
+      aria-label={`${title}, ${eventSpan(event)}${status ? `, ${status}` : ''}`}
+      title={[title, eventSpan(event), status, ...alerts].filter(Boolean).join(' · ')}
+      onClick={() => onOpen(event.id)}
+    >
+      <span className="board-tl-title">
+        {event.highlighted && <span className="mask-icon mask-icon--sm mask-star-on" aria-hidden="true" />}
+        {title}
+      </span>
+      <span className="board-tl-meta">
+        {eventSpan(event).split(' às ')[0]}
+        {status && ` · ${status}`}
+        {alerts.length > 0 && !cancelled && <span className="board-tl-alert"> !</span>}
+      </span>
     </button>
   );
 }
@@ -833,9 +866,10 @@ function EventCard({
         {eventSpan(event)}
         {event.location ? ` · ${event.location}` : ''}
       </span>
-      {hasSeals(event, today) && (
+      {/* Sem o "hoje": a coluna do dia já diz. */}
+      {hasSeals(event) && (
         <span className="list-row-tags">
-          <EventSeals event={event} today={today} />
+          <EventSeals event={event} today={today} noToday />
         </span>
       )}
       {!readOnly && !cancelled && (typeHint || (sizeHint && sized)) && (
@@ -982,12 +1016,9 @@ function TypeIconSprite({ types }: { types: readonly (ServiceTypeRow | undefined
   );
 }
 
-/** O evento tem algum selo (hoje, interna, mudou...)? Sem selo, o cartão não leva a linha vazia. */
-function hasSeals(e: EventRow, today: string): boolean {
-  const first = localDate(new Date(e.starts_at));
-  const last = localDate(new Date(Math.max(Date.parse(e.starts_at), Date.parse(e.ends_at) - 1)));
+/** O evento tem algum selo (interna, mudou...)? Sem selo, o cartão não leva a linha vazia. */
+function hasSeals(e: EventRow): boolean {
   return (
-    (first <= today && today <= last) ||
     e.origin === 'internal' ||
     e.status === 'changed' ||
     e.status === 'cancelled' ||
@@ -1127,11 +1158,13 @@ function ChipMenu({ children, onClose, label }: { children: ReactNode; onClose: 
 
 /** Placar e ações da escala, na barra da semana. */
 export function BoardScore({ counts, onGo }: { counts: BoardCounts; onGo: (what: BoardTarget) => void }) {
-  const item = (what: BoardTarget, n: number, one: string, many: string) => (
-    <button type="button" className={`board-score-item is-${what}`} disabled={n === 0} onClick={() => onGo(what)}>
-      <strong>{n}</strong> {n === 1 ? one : many}
-    </button>
-  );
+  // Só o que tem: "0 sugestões" é ruído.
+  const item = (what: BoardTarget, n: number, one: string, many: string) =>
+    n > 0 && (
+      <button type="button" className={`board-score-item is-${what}`} onClick={() => onGo(what)}>
+        <strong>{n}</strong> {n === 1 ? one : many}
+      </button>
+    );
   return (
     <span className="board-score" aria-label="Placar da semana">
       {item('confirmed', counts.confirmed, 'confirmada', 'confirmadas')}
@@ -1142,20 +1175,25 @@ export function BoardScore({ counts, onGo }: { counts: BoardCounts; onGo: (what:
   );
 }
 
-/** "Só o que precisa de olho", com quantos cartões e o "Próximo" que pula de um em um. */
+/** "Precisa de olho (n)": o filtro com quantos cartões; ligado, o "Próximo" pula de um em um. */
 export function BoardReview({ state, onGo }: { state: BoardState; onGo: (what: BoardTarget) => void }) {
   const n = state.counts.review ?? 0;
   return (
     <span className="board-review" role="group" aria-label="Revisão">
-      <button type="button" className={`board-review-toggle${state.onlyReview ? ' is-on' : ''}`} aria-pressed={state.onlyReview} onClick={state.toggleReview}>
-        Só o que precisa de olho
+      <button
+        type="button"
+        className={`board-review-toggle${state.onlyReview ? ' is-on' : ''}`}
+        aria-pressed={state.onlyReview}
+        title="Apaga os cartões que já estão resolvidos"
+        onClick={state.toggleReview}
+      >
+        Precisa de olho <strong>{n}</strong>
       </button>
-      <span className="board-review-count">
-        <strong>{n}</strong> para revisar
-      </span>
-      <button type="button" className="text-button" disabled={n === 0} onClick={() => onGo('review')}>
-        Próximo
-      </button>
+      {state.onlyReview && (
+        <button type="button" className="text-button" disabled={n === 0} onClick={() => onGo('review')}>
+          Próximo
+        </button>
+      )}
     </span>
   );
 }

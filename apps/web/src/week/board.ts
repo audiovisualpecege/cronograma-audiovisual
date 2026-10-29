@@ -91,10 +91,11 @@ export interface BoardDay {
   date: string;
   label: string;
   short: string;
-  /** Atividades com cartão (pedem equipe, canceladas ou com estrela), em ordem de horário. */
+  /**
+   * Todas as atividades do dia em ordem de horário, inclusive as que não pedem equipe (reuniões, NAO ESCALAR), que
+   * entram na ordem como as outras. Só as canceladas vão para o fim.
+   */
   cards: EventRow[];
-  /** Reuniões, folgas e o que não pede equipe: uma linha fina no fim do dia. */
-  lines: EventRow[];
   /** Quem está fora no dia. */
   off: TimeOff[];
 }
@@ -104,12 +105,10 @@ export function boardDays(rows: WeekRows, timeOff: readonly TimeOff[]): BoardDay
   const byDay = eventsByDay(rows.weekStart, rows.events.filter((e) => !e.ignored));
   return weekDays(rows.weekStart).map((d) => {
     const all = byDay.get(d.date) ?? [];
-    const cards = all.filter((e) => !isMarker(e, rows.types));
     return {
       ...d,
       // Os cancelados vão para o fim do dia, para não se misturar com os ativos.
-      cards: [...cards.filter((e) => e.status !== 'cancelled'), ...cards.filter((e) => e.status === 'cancelled')],
-      lines: all.filter((e) => isMarker(e, rows.types)),
+      cards: [...all.filter((e) => e.status !== 'cancelled'), ...all.filter((e) => e.status === 'cancelled')],
       off: timeOff.filter((t) => t.from <= d.date && d.date <= t.to),
     };
   });

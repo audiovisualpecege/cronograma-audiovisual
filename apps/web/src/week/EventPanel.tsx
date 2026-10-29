@@ -1,6 +1,7 @@
 import { CloseIcon } from '@solar-icons/react/linear';
 import { localDate, type EventSize } from '@cronograma/core';
 import { useEffect, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import type { CalendarSourceRow, EventRow } from '../data/catalog';
 import { navigate } from '../router';
 import { useSyncEngine } from '../sync/SyncProvider';
@@ -10,7 +11,7 @@ import { Select } from '../ui/Select';
 import { shortTitle } from './board';
 import { EventSeals } from './EventSeals';
 import { HighlightToggle } from './HighlightToggle';
-import { activeSlots, CERTAINTY_LABEL, estimatedCrew, eventSpan, sizedType, slotState, weekDays, type WeekRows } from './model';
+import { activeSlots, estimatedCrew, eventSpan, sizedType, slotState, weekDays, type WeekRows } from './model';
 import { changeSize, changeType, SizeLine } from './PreviewPage';
 
 /** A descrição do Google vem às vezes em HTML: quebras de linha viram linhas e as marcações saem. */
@@ -74,7 +75,8 @@ export function EventPanel({ event, rows, sources, today, readOnly, onClose, cre
   const editable = !readOnly && event.status !== 'cancelled';
   const title = shortTitle(event.title);
 
-  return (
+  // No body: a animação da troca de semana (transform) prendia o painel fixo dentro da página, atrás da barra do topo.
+  return createPortal(
     <aside className="event-panel" aria-label={`Detalhes de ${shortTitle(title)}`}>
       <header className="event-panel-head">
         <HighlightToggle event={event} readOnly={readOnly} />
@@ -101,7 +103,6 @@ export function EventPanel({ event, rows, sources, today, readOnly, onClose, cre
         <dd>
           {editable ? (
             <Select
-              label="Tipo de serviço"
               aria-label={`Tipo de serviço de ${title}`}
               value={event.service_type_id ?? UNDEFINED_TYPE}
               options={[
@@ -113,7 +114,6 @@ export function EventPanel({ event, rows, sources, today, readOnly, onClose, cre
           ) : (
             (type?.name ?? 'A definir')
           )}
-          {type && event.type_certainty && <span className="list-row-sub"> {CERTAINTY_LABEL[event.type_certainty]}</span>}
         </dd>
         {sized && (
           <>
@@ -160,6 +160,7 @@ export function EventPanel({ event, rows, sources, today, readOnly, onClose, cre
       <Button variant="secondary" size="sm" onClick={() => navigate(`/evento/${event.id}`)}>
         Abrir a página do evento
       </Button>
-    </aside>
+    </aside>,
+    document.body,
   );
 }
