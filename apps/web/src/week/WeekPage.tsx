@@ -1,47 +1,75 @@
-import { addDays, buildHistoryIndex, isWeekPast, localDate, weekStartOf } from '@cronograma/core';
+import { addDays, isWeekPast, localDate, weekStartOf } from '@cronograma/core';
 import { AltArrowLeftIcon, AltArrowRightIcon } from '@solar-icons/react/linear';
-import { useMemo, useState } from 'react';
-import { toFact, useTable, type CalendarSourceRow } from '../data/catalog';
+import { useState } from 'react';
+import { useTable, type CalendarSourceRow } from '../data/catalog';
 import { useHistory } from '../data/history';
-import { PageTitle } from '../layout/PageTitle';
 import { navigate, type RouteProps } from '../router';
-import { useSettings } from '../settings/jobs';
 import { useSyncState } from '../sync/SyncProvider';
-import { Badge, Button, Tabs } from '../ui/chiaro';
-import { Dialog } from '../ui/Dialog';
+import { OnlineButton } from '../sync/OnlineButton';
+import { Badge, Button, Card } from '../ui/chiaro';
 import { formatStamp } from '../ui/format';
 import { IconButton } from '../ui/IconButton';
 import { Toast } from '../ui/Toast';
 import { InternalEventForm } from '../event/InternalEventForm';
-import { LoadPanel } from './LoadPanel';
-import { dayMonth, loadRows, publishSummary, roleBalance, slotState, unpublishedChanges, weekContext, type WeekRows } from './model';
-import { PersonPicker } from './PersonPicker';
-import { PreviewPage, SourceAlerts } from './PreviewPage';
-import { ProposalBar } from './ProposalBar';
+import { EventPanel } from './EventPanel';
+import { dayMonth, publishSummary, relativeWeekLabel, unpublishedChanges, type WeekRows } from './model';
+import { NO_EVENTS, SourceAlerts } from './PreviewPage';
 import { PublishDialog } from './PublishDialog';
 import { RereadButton } from './RereadButton';
-import { RoleBalancePanel } from './RoleBalancePanel';
-import { ScheduleGrid } from './ScheduleGrid';
-import { ScheduleList } from './ScheduleList';
-import { scheduleModel } from './schedule';
-import { SlotLine } from './SlotLine';
-import { OnlineButton } from '../sync/OnlineButton';
 import { UnpublishedBanner } from './UnpublishedBanner';
+import { untyped, useIdentifyTypes } from './useIdentifyTypes';
+import { BoardReview, BoardScore, WeekBoard } from './WeekBoard';
 import { useNow, useWeekRows } from './useWeek';
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+const plural = (n: number, one: string, many: string) => (n === 1 ? `1 ${one}` : `${n} ${many}`);
 
 /** Segunda-feira da semana pedida na rota; sem data (ou data inválida), a semana de hoje. */
 export function routeWeek(date: string | undefined, now: Date): string {
   return weekStartOf(date && DATE.test(date) ? date : localDate(now));
 }
 
-function stateLabel(rows: WeekRows): string {
+export function stateLabel(rows: WeekRows): string {
   if (!rows.week) return 'Sem montagem';
   return rows.week.state === 'published' ? 'Publicada' : 'Em montagem';
 }
 
-/** Semana do administrador: prévia antes de montar; escala, proposta e publicação depois. */
+// Lado da última troca pelas setas: a semana nova entra deslizando por ele. Fora das setas (link, rota
+// digitada), entra só com o esmaecer.
+let slideFrom: 'next' | 'prev' | null = null;
+
+function go(base: string, weekStart: string, dir: 'next' | 'prev') {
+  slideFrom = dir;
+  navigate(`${base}/${weekStart}`);
+}
+
+/** "< Semana de 19/10 >" no centro, com a anterior e a seguinte esmaecidas dos lados e "Semana atual" embaixo. */
+export function WeekSwitcher({ weekStart, currentWeek, base = '/semana' }: { weekStart: string; currentWeek: string; base?: string }) {
+  const prev = addDays(weekStart, -7);
+  const next = addDays(weekStart, 7);
+  const relative = relativeWeekLabel(weekStart, currentWeek);
+  return (
+    <nav className="week-switcher" aria-label="Trocar de semana">
+      <button type="button" className="week-switcher-side" onClick={() => go(base, prev, 'prev')} tabIndex={-1} aria-hidden="true">
+        Semana de {dayMonth(prev)}
+      </button>
+      <IconButton icon={AltArrowLeftIcon} label="Semana anterior" onClick={() => go(base, prev, 'prev')} />
+      <span key={weekStart} className={`week-switcher-center week-slide week-slide--${slideFrom ?? 'fade'}`}>
+        <h1 className="screen-title page-title week-switcher-title">
+          <span className="screen-title-light">SEMANA DE</span> <span className="screen-title-black">{dayMonth(weekStart)}</span>
+        </h1>
+        <span className={`week-relative${weekStart === currentWeek ? ' is-current' : ''}`}>{relative}</span>
+      </span>
+      <IconButton icon={AltArrowRightIcon} label="Próxima semana" onClick={() => go(base, next, 'next')} />
+      <button type="button" className="week-switcher-side" onClick={() => go(base, next, 'next')} tabIndex={-1} aria-hidden="true">
+        Semana de {dayMonth(next)}
+      </button>
+    </nav>
+  );
+}
+
+/** Semana do administrador: a grade da escala numa tela só, com o placar e as ações no topo. */
 export function WeekPage({ params }: RouteProps) {
   const now = useNow();
   const today = localDate(now);
@@ -52,152 +80,143 @@ export function WeekPage({ params }: RouteProps) {
 
   return (
     <section className="page week-page">
-      <div className="page-head">
-        <PageTitle light="SEMANA DE" black={dayMonth(weekStart)} />
-        <span className="week-nav">
-          <IconButton icon={AltArrowLeftIcon} label="Semana anterior" onClick={() => navigate(`/semana/${addDays(weekStart, -7)}`)} />
-          {rows && <Badge tone={rows.week?.state === 'published' ? 'success' : rows.week ? 'brand' : 'soft'}>{stateLabel(rows)}</Badge>}
-          <IconButton icon={AltArrowRightIcon} label="Próxima semana" onClick={() => navigate(`/semana/${addDays(weekStart, 7)}`)} />
-          <RereadButton />
-        </span>
+      <div className="week-head">
+        <WeekSwitcher weekStart={weekStart} currentWeek={weekStartOf(today)} />
+        <RereadButton />
       </div>
-      {!rows ? (
-        <p className="form-text">Abrindo a semana.</p>
-      ) : rows.events.length === 0 && !rows.week && !lastSyncAt ? (
-        <p className="form-text">Buscando os eventos da semana.</p>
-      ) : rows.week ? (
-        <BuiltWeek rows={rows} sources={sources} now={now} today={today} />
-      ) : (
-        <PreviewPage rows={rows} sources={sources} now={now} today={today} />
-      )}
+      <div key={weekStart} className={`week-slide week-slide--${slideFrom ?? 'fade'}`}>
+        {!rows ? (
+          <p className="form-text">Abrindo a semana.</p>
+        ) : rows.events.length === 0 && !rows.week && !lastSyncAt ? (
+          <p className="form-text">Buscando os eventos da semana.</p>
+        ) : (
+          <WeekBody rows={rows} sources={sources} now={now} today={today} />
+        )}
+      </div>
     </section>
   );
 }
 
-interface BuiltProps {
+interface BodyProps {
   rows: WeekRows;
   sources: readonly CalendarSourceRow[];
   now: Date;
   today: string;
 }
 
-function BuiltWeek({ rows, sources, now, today }: BuiltProps) {
-  const week = rows.week as NonNullable<WeekRows['week']>;
-  const settings = useSettings();
+function WeekBody({ rows, sources, now, today }: BodyProps) {
   const history = useHistory();
-  const [view, setView] = useState<'lista' | 'grade'>('lista');
-  const [picking, setPicking] = useState<string | null>(null);
-  const [selected, setSelected] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [viewing, setViewing] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const readOnly = isWeekPast(rows.weekStart, now);
-
-  const index = useMemo(() => buildHistoryIndex((history.rows ?? []).map(toFact)), [history.rows]);
-  // O relógio só importa por dia aqui (semana passada); recalcula quando as linhas mudam.
-  const ctx = useMemo(() => weekContext(rows, now), [rows, today]); // eslint-disable-line react-hooks/exhaustive-deps
-  const model = useMemo(() => scheduleModel(rows, ctx, index), [rows, ctx, index]);
-  const loads = useMemo(() => loadRows(rows, ctx), [rows, ctx]);
-  const balance = useMemo(() => roleBalance(rows, 'built'), [rows]);
-  const summary = publishSummary(rows);
+  const past = isWeekPast(rows.weekStart, now);
+  const week = rows.week;
   const changes = unpublishedChanges(rows);
-  const proposed = rows.assignments.filter((a) => slotState(a) === 'proposed' && model.slotsByEvent.get(a.event_id)?.some((s) => s.id === a.slot_id));
-  const publishedBy = rows.people.find((p) => p.id === week.published_by)?.name;
+  const publishedBy = rows.people.find((p) => p.id === week?.published_by)?.name;
+  const historyLoading = history.rows === null && history.status === 'loading';
+  const identify = useIdentifyTypes(rows, false);
+  const missingType = untyped(rows).length;
 
-  const pickSlot = picking ? rows.slots.find((s) => s.id === picking) : undefined;
-  const pickAssignment = picking ? model.bySlot.get(picking) : undefined;
-  const pickEvent = pickSlot ? rows.events.find((e) => e.id === pickSlot.event_id) : undefined;
-  const selSlot = selected ? rows.slots.find((s) => s.id === selected) : undefined;
-  const selEvent = selSlot ? rows.events.find((e) => e.id === selSlot.event_id) : undefined;
+  const note = past
+    ? 'Semana passada fica só para consulta.'
+    : !week
+      ? 'Escolha as pessoas: a semana é montada sozinha na primeira confirmação.'
+      : week.state === 'published' && week.published_at
+        ? `Publicada em ${formatStamp(week.published_at)}${publishedBy ? ` por ${publishedBy}` : ''}.`
+        : 'Em montagem: a equipe ainda não vê esta semana.';
+  const newActivity = !past && (
+    <Button variant="secondary" size="sm" onClick={() => setCreating(true)}>
+      Nova atividade interna
+    </Button>
+  );
 
   return (
     <div className="week-built">
-      {week.state === 'published' && <UnpublishedBanner week={week} changes={changes} onPublish={() => setPublishing(true)} onDone={setNotice} />}
+      {week?.state === 'published' && <UnpublishedBanner week={week} changes={changes} onPublish={() => setPublishing(true)} onDone={setNotice} />}
       <SourceAlerts sources={sources} />
-      <div className="week-actions">
-        <p className="form-text" style={{ margin: 0 }}>
-          {week.state === 'published' && week.published_at
-            ? `Publicada em ${formatStamp(week.published_at)}${publishedBy ? ` por ${publishedBy}` : ''}.`
-            : 'Em montagem: a equipe ainda não vê esta semana.'}
-        </p>
-        <span className="week-actions-buttons">
-          {!readOnly && (
-            <Button variant="secondary" size="sm" onClick={() => setCreating(true)}>
-              Nova atividade interna
-            </Button>
+      {rows.events.filter((e) => !e.ignored).length === 0 ? (
+        <>
+          <div className="week-toolbar">
+            <span className="week-status">
+              <Badge tone="soft">{stateLabel(rows)}</Badge>
+            </span>
+            <span className="week-actions-buttons">{newActivity}</span>
+          </div>
+          <Card variant="raised" padding={24}>
+            <p className="form-text" style={{ margin: 0 }}>
+              {NO_EVENTS}.
+            </p>
+          </Card>
+        </>
+      ) : (
+        <WeekBoard
+          rows={rows}
+          now={now}
+          today={today}
+          historyRows={history.rows}
+          historyLoading={historyLoading}
+          onOpenEvent={setViewing}
+          viewing={viewing}
+          renderPanel={(event, crew) => (
+            <EventPanel event={event} rows={rows} sources={sources} today={today} readOnly={past} crew={crew} onClose={() => setViewing(null)} />
           )}
-          {week.state === 'building' && !readOnly && <OnlineButton onClick={() => setPublishing(true)}>Publicar</OnlineButton>}
-        </span>
-      </div>
-      <ProposalBar week={week} settings={settings} proposed={proposed} readOnly={readOnly} />
-      <div className="week-columns">
-        <div className="week-main">
-          <Tabs
-            variant="pill"
-            items={[
-              { value: 'lista', label: 'Lista por evento' },
-              { value: 'grade', label: 'Grade por pessoa' },
-            ]}
-            value={view}
-            onChange={(v) => setView(v as 'lista' | 'grade')}
-            style={{ marginBottom: 'var(--space-4)' }}
-          />
-          {view === 'lista' ? (
-            <ScheduleList model={model} readOnly={readOnly} today={today} onPick={setPicking} />
-          ) : (
-            <ScheduleGrid model={model} readOnly={readOnly} today={today} onPick={setSelected} />
+          renderBar={(board, scrollTo) => (
+            <>
+              <div className="week-toolbar board-bar">
+                <span className="week-status">
+                  <Badge tone={week?.state === 'published' ? 'success' : week ? 'brand' : 'soft'}>{stateLabel(rows)}</Badge>
+                  <span className="form-text">{note}</span>
+                </span>
+                <BoardScore counts={board.counts} onGo={scrollTo} />
+                {!past && <BoardReview state={board} onGo={scrollTo} />}
+                {!past && (
+                  <span className="week-actions-buttons">
+                    {board.toConfirm > 0 && (
+                      <Button size="sm" onClick={board.confirmAll}>
+                        Confirmar sugestões ({board.toConfirm})
+                      </Button>
+                    )}
+                    {newActivity}
+                    {week?.state === 'building' && (
+                      <OnlineButton variant="secondary" size="sm" onClick={() => setPublishing(true)}>
+                        Publicar
+                      </OnlineButton>
+                    )}
+                  </span>
+                )}
+              </div>
+              {!past && (missingType > 0 || board.historyLoading) && (
+                <p className="form-text board-note" role="status">
+                  {board.historyLoading && 'Lendo o histórico da equipe para sugerir as pessoas. '}
+                  {missingType > 0 && `${plural(missingType, 'atividade está', 'atividades estão')} sem tipo de serviço: sem tipo, não há vagas. `}
+                  {missingType > 0 && (
+                    <OnlineButton variant="ghost" size="sm" disabled={identify.running} onClick={() => void identify.identify()}>
+                      {identify.running ? 'Identificando' : 'Identificar os tipos'}
+                    </OnlineButton>
+                  )}
+                </p>
+              )}
+              {identify.error && (
+                <p className="form-message form-message--alert" role="alert">
+                  {identify.error}
+                </p>
+              )}
+              {publishing && week && (
+                <PublishDialog
+                  week={week}
+                  summary={publishSummary(rows)}
+                  suggested={board.drafts}
+                  changes={changes}
+                  onClose={() => setPublishing(false)}
+                  onDone={(m) => {
+                    setPublishing(false);
+                    setNotice(m);
+                  }}
+                />
+              )}
+            </>
           )}
-        </div>
-        <aside className="week-side">
-          <RoleBalancePanel balance={balance} roleName={model.roleName} />
-          <LoadPanel rows={loads} />
-        </aside>
-      </div>
-
-      {selSlot && selEvent && (
-        <Dialog open onClose={() => setSelected(null)} title={selEvent.title || 'Vaga'} width={640}>
-          <ul className="plain-list slot-list">
-            <SlotLine
-              model={model}
-              event={selEvent}
-              slot={selSlot}
-              readOnly={readOnly}
-              onPick={(id) => {
-                setSelected(null);
-                setPicking(id);
-              }}
-            />
-          </ul>
-          <p className="form-text">
-            <a className="text-link" href={`#/evento/${selEvent.id}`}>
-              Abrir o evento
-            </a>
-          </p>
-        </Dialog>
-      )}
-      {pickSlot && pickAssignment && pickEvent && (
-        <PersonPicker
-          ctx={ctx}
-          slot={pickSlot}
-          assignment={pickAssignment}
-          people={rows.people}
-          history={index}
-          title={slotState(pickAssignment) === 'open' ? 'Escalar' : 'Trocar pessoa'}
-          roleName={model.roleName(pickSlot.job_role_id)}
-          eventTitle={pickEvent.title}
-          onClose={() => setPicking(null)}
-        />
-      )}
-      {publishing && (
-        <PublishDialog
-          week={week}
-          summary={summary}
-          changes={changes}
-          onClose={() => setPublishing(false)}
-          onDone={(m) => {
-            setPublishing(false);
-            setNotice(m);
-          }}
         />
       )}
       {creating && <InternalEventForm defaultDate={rows.weekStart} types={rows.types} onClose={() => setCreating(false)} />}

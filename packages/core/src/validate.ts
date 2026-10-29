@@ -10,6 +10,7 @@ export type ValidationCode =
   | 'roles_required'
   | 'invalid_quantity'
   | 'type_without_crew'
+  | 'size_without_crew'
   | 'end_before_start'
   | 'notes_too_long';
 
@@ -81,17 +82,24 @@ export function validateName(name: string, existing: string[] = []): Validation<
 export interface ServiceTypeInput {
   name: string;
   keywords?: string[];
-  crew: { jobRoleId: string; quantity: number }[];
+  /** Porte de cada item (1 Simples, 2 Médio, 3 Grande) quando o tipo tem porte. */
+  crew: { jobRoleId: string; quantity: number; size?: number }[];
   noTeam: boolean;
+  /** Tipo com porte: uma equipe típica para cada um dos três. */
+  sized?: boolean;
 }
 
-/** Tipo de serviço: nome único, quantidade de 1 a 30 por função e equipe ou "não exige equipe". */
+/**
+ * Tipo de serviço: nome único, quantidade de 1 a 30 por função e equipe ou "não exige equipe"; com porte, os três
+ * portes com alguém.
+ */
 export function validateServiceType(input: ServiceTypeInput, existingNames: string[] = []): Validation<ServiceTypeInput> {
   const errors: ValidationCode[] = [...validateName(input.name, existingNames).errors];
   if (input.crew.some((c) => !Number.isInteger(c.quantity) || c.quantity < CREW_QUANTITY_MIN || c.quantity > CREW_QUANTITY_MAX)) {
     errors.push('invalid_quantity');
   }
   if (input.crew.length === 0 && !input.noTeam) errors.push('type_without_crew');
+  else if (input.sized && !input.noTeam && [1, 2, 3].some((s) => !input.crew.some((c) => c.size === s))) errors.push('size_without_crew');
   const keywords = [...new Set((input.keywords ?? []).map((k) => k.trim()).filter(Boolean))];
   return result(errors, { ...input, name: input.name.trim(), keywords });
 }

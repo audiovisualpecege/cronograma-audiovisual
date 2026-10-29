@@ -136,6 +136,7 @@ function ActivityCard({ activity: a, today }: { activity: MyActivity; today: boo
         <div className="tag-row">
           {today && !a.cancelled && <Seal kind="hoje">hoje</Seal>}
           {e.origin === 'internal' && <Seal kind="soft">interna</Seal>}
+          {a.meetingSectors && <Seal kind="soft">reunião do setor</Seal>}
           {a.changes && <Seal kind="mudou">mudou</Seal>}
           {a.cancelled && <Seal kind="cancelado">cancelado</Seal>}
         </div>
@@ -149,8 +150,12 @@ function ActivityCard({ activity: a, today }: { activity: MyActivity; today: boo
           </ul>
         )}
         <dl className="field-list">
-          <dt>Função</dt>
-          <dd>{a.myRoles.join(', ')}</dd>
+          {!a.meetingSectors && (
+            <>
+              <dt>Função</dt>
+              <dd>{a.myRoles.join(', ')}</dd>
+            </>
+          )}
           <dt>Local</dt>
           <dd>
             {e.location ? (
@@ -168,7 +173,8 @@ function ActivityCard({ activity: a, today }: { activity: MyActivity; today: boo
               <dd style={{ whiteSpace: 'pre-wrap' }}>{a.notes}</dd>
             </>
           )}
-          <dt>Colegas</dt>
+          {!a.meetingSectors && <dt>Colegas</dt>}
+          {!a.meetingSectors && (
           <dd>
             {a.colleagues.length === 0 ? (
               'Só você'
@@ -182,6 +188,7 @@ function ActivityCard({ activity: a, today }: { activity: MyActivity; today: boo
               </ul>
             )}
           </dd>
+          )}
         </dl>
       </article>
     </Card>

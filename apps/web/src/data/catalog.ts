@@ -1,7 +1,7 @@
 // Leitura dos cadastros na cópia local (ADR-009). As linhas chegam do servidor em snake_case; as que estão
 // na fila trazem também os campos gravados na hora (`role_ids`, `crew`), que o servidor guarda em outras
 // tabelas e só voltam na próxima leitura.
-import type { HistoryFact } from '@cronograma/core';
+import { effectiveSize, isEventSize, SINGLE_CREW_SIZE, type EventSize, type HistoryFact } from '@cronograma/core';
 import { useLocalQuery } from '../sync/SyncProvider';
 import type { Row, TableName } from '../sync/types';
 
@@ -14,14 +14,29 @@ export interface PersonRow extends Row {
   weekly_limit_hours: number | string;
   active: boolean;
   invite_status: 'pending' | 'sent' | 'accepted';
+  /** Funções na ordem de prioridade, enquanto o cadastro está na fila. */
   role_ids?: string[];
+  /** Nível em cada função (1 Apoio, 2 Titular, 3 Referência), enquanto o cadastro está na fila. */
+  role_levels?: Record<string, number>;
+  /** Sede (migração 0022); vazia, a sede não pesa na escala. */
+  base?: 'piracicaba' | 'sao_paulo' | null;
+  /** Horário de trabalho por dia ISO ('1' segunda a '7' domingo); vazio, o horário não pesa. */
+  work_hours?: Record<string, [string, string]> | null;
 }
+
+export const BASE_LABEL: Record<'piracicaba' | 'sao_paulo', string> = { piracicaba: 'Piracicaba', sao_paulo: 'São Paulo' };
 
 export interface PersonRoleRow extends Row {
   person_id: string;
   job_role_id: string;
   archived_at: string | null;
+  /** Ordem da função na lista da pessoa (1 = principal); nulo antes de alguém ordenar. */
+  priority?: number | null;
+  /** 1 Apoio, 2 Titular, 3 Referência. */
+  level?: number;
 }
+
+export const LEVEL_LABEL: Record<number, string> = { 1: 'Apoio', 2: 'Titular', 3: 'Referência' };
 
 export interface SectorRow extends Row {
   name: string;
@@ -33,11 +48,15 @@ export interface JobRoleRow extends Row {
   name: string;
   sector_id: string | null;
   archived_at: string | null;
+  /** Não ocupa horário (Disponibilizador): não soma horas nem bate horário com as outras atividades. */
+  no_hours?: boolean;
 }
 
 export interface CrewItem {
   job_role_id: string;
   quantity: number;
+  /** Porte (1 Simples, 2 Médio, 3 Grande); tipo sem porte guarda a equipe única no 2. Sem o campo, 2. */
+  size?: number;
 }
 
 export interface ServiceTypeRow extends Row {
@@ -45,6 +64,18 @@ export interface ServiceTypeRow extends Row {
   name: string;
   keywords: string[];
   no_team: boolean;
+  /** Chave do banco de ícones (ui/typeIcons); nulo usa um ícone pelo nome. */
+  icon?: string | null;
+  /** Trabalho complexo: a escala sugerida chama a Referência da função primeiro. */
+  complex?: boolean;
+  /** Tem porte (Simples, Médio, Grande), com uma equipe típica para cada um. */
+  sized?: boolean;
+  /** Porte de quem não escolheu (1 Simples, 2 Médio, 3 Grande). */
+  default_size?: number;
+  /** Setores que veem os eventos do tipo na agenda (reuniões, sem escala). */
+  sector_ids?: string[];
+  /** Externo (cobertura fora do estúdio): só a equipe de Piracicaba faz (migração 0022). */
+  external?: boolean;
   archived_at: string | null;
   crew?: CrewItem[];
 }
@@ -84,6 +115,9 @@ export interface SettingsRow extends Row {
   ai_provider: string;
   ai_model: string;
   ai_key_hint: string | null;
+  /** Modelo local (MiniCPM5 ou outro): endereço do servidor e nome do modelo nele. */
+  ai_local_url?: string | null;
+  ai_local_model?: string;
   push_enabled_global: boolean;
   worker_seen_at?: string | null;
 }
@@ -141,6 +175,13 @@ export interface EventRow extends Row {
   notes?: string | null;
   crew_outdated?: boolean;
   source_disconnected?: boolean;
+  /** Atividade principal da semana (estrela de quem monta a escala). */
+  highlighted?: boolean;
+  /** Porte escolhido (1 Simples, 2 Médio, 3 Grande); vazio vale o porte padrão do tipo. */
+  size?: number | null;
+  google_event_id?: string | null;
+  /** Cor própria do evento no Google Agenda (colorId de 1 a 11); vazia segue a cor do tipo (migração 0024). */
+  color_id?: string | null;
 }
 
 export interface SlotRow extends Row {
@@ -163,6 +204,32 @@ export interface AssignmentRow extends Row {
   decided_at?: string | null;
 }
 
+/** O que uma série (eventSeries do título) aprendeu com quem monta a escala (migrações 0020 e 0021). */
+export interface SeriesRuleRow extends Row {
+  series: string;
+  /** Tipo da última correção de tipo num evento da série. */
+  service_type_id: string | null;
+  /** Vagas do último evento da série em que alguém pôs ou tirou vaga, valendo para o tipo crew_type_id. */
+  crew?: { job_role_id: string; quantity: number }[] | null;
+  crew_type_id?: string | null;
+  /** Porte da última troca de porte num evento da série. */
+  size?: number | null;
+  /** Turma fixa gravada: por função, [titular, reserva] (migração 0023). */
+  titulars?: Record<string, string[]> | null;
+}
+
+/** Tipo aprendido de cada série, para o classifyTitle. */
+export function seriesTypesOf(rules: readonly SeriesRuleRow[] | undefined): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const r of rules ?? []) if (r.service_type_id) out.set(r.series, r.service_type_id);
+  return out;
+}
+
+/** O que cada série aprendeu, pela série. */
+export function seriesRuleMap(rules: readonly SeriesRuleRow[] | undefined): Map<string, SeriesRuleRow> {
+  return new Map((rules ?? []).map((r) => [r.series, r]));
+}
+
 export interface PublishedRow extends Row {
   week_id: string;
   revision: number;
@@ -180,18 +247,57 @@ export function useTable<T extends Row>(table: TableName): T[] | undefined {
 
 export const byName = <T extends { name: string }>(a: T, b: T) => a.name.localeCompare(b.name, 'pt-BR');
 
-/** Funções habilitadas da pessoa: as da fila, quando há, senão as do servidor. */
+const activeRoles = (person: PersonRow, personRoles: readonly PersonRoleRow[]) =>
+  personRoles.filter((r) => r.person_id === person.id && !r.archived_at);
+
+/** Funções habilitadas da pessoa, da mais para a menos prioritária: as da fila, quando há, senão as do servidor. */
 export function rolesOf(person: PersonRow, personRoles: readonly PersonRoleRow[]): string[] {
   if (person.role_ids) return person.role_ids;
-  return personRoles.filter((r) => r.person_id === person.id && !r.archived_at).map((r) => r.job_role_id);
+  // Sem prioridade gravada fica no fim, na ordem em que veio.
+  return activeRoles(person, personRoles)
+    .map((r, i) => ({ id: r.job_role_id, order: r.priority ?? 1000 + i }))
+    .sort((a, b) => a.order - b.order)
+    .map((r) => r.id);
 }
 
-/** Equipe típica do tipo: a da fila, quando há, senão a do servidor. */
-export function crewOf(type: ServiceTypeRow, crew: readonly CrewRow[]): CrewItem[] {
-  if (type.crew) return type.crew;
-  return crew
-    .filter((c) => c.service_type_id === type.id && !c.archived_at)
-    .map((c) => ({ job_role_id: c.job_role_id, quantity: c.quantity }));
+/** A pessoa já tem as funções ordenadas (pela tela ou pela carga), e não só na ordem em que foram marcadas. */
+export function hasRoleOrder(person: PersonRow, personRoles: readonly PersonRoleRow[]): boolean {
+  return Boolean(person.role_ids) || activeRoles(person, personRoles).some((r) => r.priority != null);
+}
+
+/** Nível da pessoa em cada função; função sem nível gravado vale Titular (2). */
+export function levelsOf(person: PersonRow, personRoles: readonly PersonRoleRow[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const r of activeRoles(person, personRoles)) out[r.job_role_id] = r.level ?? 2;
+  return { ...out, ...person.role_levels };
+}
+
+/**
+ * Equipe típica do tipo (a da fila, quando há, senão a do servidor), de todos os portes; com `size`, só a
+ * daquele porte.
+ */
+export function crewOf(type: ServiceTypeRow, crew: readonly CrewRow[], size?: number): CrewItem[] {
+  const all = type.crew ?? crew.filter((c) => c.service_type_id === type.id && !c.archived_at);
+  return all
+    .map((c) => ({ job_role_id: c.job_role_id, quantity: c.quantity, size: c.size ?? SINGLE_CREW_SIZE }))
+    .filter((c) => size === undefined || c.size === size);
+}
+
+/** Porte que vale para o evento deste tipo: o escolhido, senão o padrão do tipo. */
+export function sizeFor(type: ServiceTypeRow, size: number | null | undefined): EventSize {
+  return effectiveSize(size, Boolean(type.sized), type.default_size);
+}
+
+/** Equipe do tipo no porte que vale para o evento (sem porte escolhido, o padrão; tipo sem porte, a única). */
+export function crewForSize(type: ServiceTypeRow, crew: readonly CrewRow[], size: number | null | undefined): CrewItem[] {
+  return crewOf(type, crew, sizeFor(type, size));
+}
+
+/** Total de vagas de cada porte do tipo. */
+export function crewTotals(type: ServiceTypeRow, crew: readonly CrewRow[]): Record<EventSize, number> {
+  const out: Record<EventSize, number> = { 1: 0, 2: 0, 3: 0 };
+  for (const c of crewOf(type, crew)) if (isEventSize(c.size)) out[c.size] += c.quantity;
+  return out;
 }
 
 /** Linha da view history_facts como o PostgREST devolve. */

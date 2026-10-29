@@ -12,6 +12,11 @@ export interface WorkerConfig {
   logLevel: string;
   /** Consulta de reserva da fila, além do Realtime (ADR-006). */
   queuePollMs: number;
+  /**
+   * Modelo local (AI_LOCAL_URL, AI_LOCAL_MODEL): valem quando a configuração do banco não tem o endereço, por
+   * exemplo para testar o MiniCPM5 num computador antes da migração 0014.
+   */
+  aiLocal: { url: string; model: string | null } | null;
 }
 
 function required(env: NodeJS.ProcessEnv, name: string): string {
@@ -47,5 +52,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): WorkerConfig {
         : null,
     logLevel: env.LOG_LEVEL?.trim() || 'info',
     queuePollMs: Number(env.QUEUE_POLL_SECONDS ?? 30) * 1000,
+    aiLocal: env.AI_LOCAL_URL?.trim() ? { url: env.AI_LOCAL_URL.trim(), model: env.AI_LOCAL_MODEL?.trim() || null } : null,
   };
 }

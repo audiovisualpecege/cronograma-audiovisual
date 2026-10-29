@@ -24,19 +24,28 @@ export interface Row {
   [column: string]: unknown;
 }
 
-/** Tabelas que a cópia local espelha. A RLS decide o que cada perfil recebe. */
+/**
+ * Tabelas que a cópia local espelha. A RLS decide o que cada perfil recebe. A equipe lê os tipos de serviço
+ * (migração 0019) para saber de que setor é cada reunião; antes dela, a leitura volta vazia.
+ */
 export const TEAM_TABLES = [
   'sectors', 'job_roles', 'people', 'people_public', 'person_roles', 'weeks', 'events',
-  'published_assignments', 'absences', 'notifications',
+  'published_assignments', 'absences', 'notifications', 'service_types',
 ] as const;
 
 export const ADMIN_TABLES = [
   ...TEAM_TABLES,
-  'service_types', 'service_type_crew', 'calendar_sources', 'slots', 'assignments', 'publications', 'jobs',
-  'settings',
+  'service_type_crew', 'calendar_sources', 'slots', 'assignments', 'publications', 'jobs',
+  'settings', 'series_rules',
 ] as const;
 
 export type TableName = (typeof ADMIN_TABLES)[number];
+
+/**
+ * Tabelas de migração que pode ainda não estar no banco (series_rules, da 0020): a leitura recusada fica vazia
+ * em vez de parar a sincronização.
+ */
+export const OPTIONAL_TABLES: readonly TableName[] = ['series_rules'];
 
 /** Tabelas com aviso pelo Realtime (migrações 0008 e 0010); o aviso só dispara a leitura incremental. */
 export const REALTIME_TABLES: readonly TableName[] = [

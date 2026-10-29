@@ -25,6 +25,9 @@ export interface SettingsRow {
   ai_classification_enabled: boolean;
   ai_provider: string;
   ai_model: string;
+  /** Endereço do servidor do modelo local (Ollama e similares); nulo até alguém configurar. */
+  ai_local_url?: string | null;
+  ai_local_model?: string;
   push_enabled_global: boolean;
 }
 
@@ -61,12 +64,14 @@ export interface StoredEventRow {
   fingerprint: string | null;
   status: 'active' | 'changed' | 'cancelled';
   change_original: EventSnapshot | null;
+  /** Cor do evento no Google (colorId), migração 0024. */
+  color_id?: string | null;
 }
 
 export interface EventType {
   service_type_id: string | null;
   certainty: 'alta' | 'media' | 'baixa';
-  source: 'keyword' | 'history' | 'ai' | null;
+  source: 'series' | 'keyword' | 'history' | 'ai' | null;
   no_team: boolean;
 }
 
@@ -126,7 +131,8 @@ export interface ProposalData {
   slots: { id: string; event_id: string; job_role_id: string }[];
   assignments: { slot_id: string; event_id: string; person_id: string | null; status: 'proposed' | 'confirmed' | null; locked: boolean }[];
   absences: { person_id: string; starts_at: string; ends_at: string }[];
-  jobRoles: { id: string; code: string }[];
+  /** no_hours só existe no banco com a migração 0018 (Disponibilizador). */
+  jobRoles: { id: string; code: string; no_hours?: boolean }[];
   serviceTypes: { id: string; code: string; no_team: boolean }[];
   history: { person_id: string | null; job_role_id: string | null; service_type_id: string | null }[];
 }
@@ -197,6 +203,8 @@ export interface CalendarStore extends NoticeStore {
   storedEvents(sourceId: string, from: Date, to: Date): Promise<StoredEventRow[]>;
   storedByGoogleIds(sourceId: string, googleIds: string[]): Promise<StoredEventRow[]>;
   updateSource(id: string, patch: Partial<Pick<SourceRow, 'status' | 'last_synced_at' | 'last_error'>>): Promise<void>;
+  /** Cor do Google (colorId, ou nula) dos eventos da origem, agrupados pela cor nova. */
+  setEventColors(sourceId: string, colors: ReadonlyMap<string | null, string[]>): Promise<void>;
   applyCalendarChange(sourceId: string, googleEventId: string, change: CalendarChange, type: EventType | null): Promise<void>;
   markSourceDisconnected(sourceId: string, disconnected: boolean): Promise<void>;
   setFingerprint(eventId: string, fingerprint: string): Promise<void>;
@@ -205,6 +213,8 @@ export interface CalendarStore extends NoticeStore {
 export interface ClassifierStore extends SettingsStore {
   serviceTypes(): Promise<ServiceTypeRow[]>;
   historyTitles(): Promise<{ title: string; serviceTypeId: string }[]>;
+  /** Tipo que cada série aprendeu com a correção do administrador (migração 0020). */
+  seriesTypes(): Promise<Map<string, string>>;
   secret(name: string): Promise<string | null>;
   unclassifiedEvents(fromWeek: string): Promise<{ id: string; title: string }[]>;
   setEventType(eventId: string, type: EventType): Promise<void>;
@@ -365,7 +375,7 @@ export class SupabaseStore implements Store {
     return this.all<StoredEventRow>(
       (a, b) =>
         this.db.from('events')
-          .select('id, google_event_id, week_start, title, location, description, starts_at, ends_at, all_day, fingerprint, status, change_original')
+          .select('id, google_event_id, week_start, title, location, description, starts_at, ends_at, all_day, fingerprint, status, change_original, color_id')
           .eq('calendar_source_id', sourceId).not('google_event_id', 'is', null)
           .gte('starts_at', from.toISOString()).lt('starts_at', to.toISOString())
           .order('id').range(a, b),
@@ -378,7 +388,7 @@ export class SupabaseStore implements Store {
     for (let i = 0; i < googleIds.length; i += 100) {
       out.push(...(check(
         await this.db.from('events')
-          .select('id, google_event_id, week_start, title, location, description, starts_at, ends_at, all_day, fingerprint, status, change_original')
+          .select('id, google_event_id, week_start, title, location, description, starts_at, ends_at, all_day, fingerprint, status, change_original, color_id')
           .eq('calendar_source_id', sourceId).in('google_event_id', googleIds.slice(i, i + 100)),
         'storedByGoogleIds',
       ) as StoredEventRow[]));
@@ -388,6 +398,17 @@ export class SupabaseStore implements Store {
 
   async updateSource(id: string, patch: Partial<Pick<SourceRow, 'status' | 'last_synced_at' | 'last_error'>>) {
     check(await this.db.from('calendar_sources').update(patch).eq('id', id), 'updateSource');
+  }
+
+  async setEventColors(sourceId: string, colors: ReadonlyMap<string | null, string[]>) {
+    for (const [color, ids] of colors) {
+      for (let i = 0; i < ids.length; i += 100) {
+        check(
+          await this.db.from('events').update({ color_id: color }).eq('calendar_source_id', sourceId).in('google_event_id', ids.slice(i, i + 100)),
+          'setEventColors',
+        );
+      }
+    }
   }
 
   async applyCalendarChange(sourceId: string, googleEventId: string, change: CalendarChange, type: EventType | null) {
@@ -430,6 +451,14 @@ export class SupabaseStore implements Store {
       out.push({ title: r.title, serviceTypeId: r.service_type_id });
     }
     return out;
+  }
+
+  async seriesTypes() {
+    const rows = await this.all<{ series: string; service_type_id: string }>(
+      (a, b) => this.db.from('series_rules').select('series, service_type_id').not('service_type_id', 'is', null).order('series').range(a, b),
+      'seriesTypes',
+    );
+    return new Map(rows.map((r) => [r.series, r.service_type_id]));
   }
 
   async secret(name: string): Promise<string | null> {
@@ -495,7 +524,8 @@ export class SupabaseStore implements Store {
           .lt('starts_at', weekEnd.toISOString()).gt('ends_at', weekStart.toISOString()).order('id').range(a, b),
         'proposalData.absences',
       ),
-      this.all<{ id: string; code: string }>((a, b) => this.db.from('job_roles').select('id, code').order('id').range(a, b), 'proposalData.jobRoles'),
+      // "*" e não a lista de colunas: com o banco ainda sem a 0018, no_hours só não vem.
+      this.all<{ id: string; code: string; no_hours?: boolean }>((a, b) => this.db.from('job_roles').select('*').order('id').range(a, b), 'proposalData.jobRoles'),
       this.all<{ id: string; code: string; no_team: boolean }>(
         (a, b) => this.db.from('service_types').select('id, code, no_team').order('id').range(a, b),
         'proposalData.serviceTypes',
@@ -515,7 +545,7 @@ export class SupabaseStore implements Store {
       slots: slots.map(({ id, event_id, job_role_id }) => ({ id, event_id, job_role_id })),
       assignments: assignments.map(({ slot_id, event_id, person_id, status, locked }) => ({ slot_id, event_id, person_id, status, locked })),
       absences,
-      jobRoles,
+      jobRoles: jobRoles.map(({ id, code, no_hours }) => ({ id, code, ...(no_hours ? { no_hours } : {}) })),
       serviceTypes,
       history,
     };

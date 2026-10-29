@@ -3,7 +3,20 @@
 
 export type Certainty = 'alta' | 'media' | 'baixa';
 export type AssignmentStatus = 'proposed' | 'confirmed';
-export type Warning = 'overlap' | 'absent' | 'over_limit' | 'role_not_enabled';
+/**
+ * off_hours: fora do horário de trabalho da pessoa (pode ser sugerida, por último, com o aviso); other_base: outra
+ * sede (externo é só de Piracicaba; aula e gravação seguem a sede da série), nunca sugerida.
+ */
+export type Warning = 'overlap' | 'absent' | 'over_limit' | 'role_not_enabled' | 'off_hours' | 'other_base';
+
+/** Sede da pessoa e da série. */
+export type Base = 'piracicaba' | 'sao_paulo';
+
+/**
+ * Horário de trabalho por dia da semana ISO ('1' segunda a '7' domingo): entrada e saída 'HH:MM'. Dia sem chave
+ * é dia de não trabalhar.
+ */
+export type WorkHours = Readonly<Record<string, readonly [string, string]>>;
 export type Blocker = 'person_inactive' | 'event_cancelled' | 'same_event_twice' | 'week_past';
 export type EventStatus = 'active' | 'changed' | 'cancelled';
 export type EventOrigin = 'calendar' | 'internal';
@@ -26,7 +39,20 @@ export interface Candidate {
   loadHours: number;
   loadCount: number;
   inTieGroup: boolean;
+  /** Vezes que fez a função neste mesmo evento (turma fixa) nas 8 semanas anteriores; 0 sem datas no histórico. */
+  series?: number;
+  /** Posição da função na lista da pessoa (0 = principal); ausente quando a pessoa não tem ordem definida. */
+  priority?: number;
+  /** Nível da pessoa na função: 1 Apoio, 2 Titular, 3 Referência; ausente vale Titular. */
+  level?: number;
+  /** Fora do horário de trabalho: vem depois de quem está no horário, com o aviso. */
+  offHours?: boolean;
+  /** Turma fixa gravada da série: 0 titular, 1 reserva. Vem antes de todos. */
+  pinned?: number;
 }
+
+/** Nível da pessoa numa função (person_roles.level). */
+export const ROLE_LEVELS = { apoio: 1, titular: 2, referencia: 3 } as const;
 
 export interface PersonLike {
   id: string;
@@ -36,6 +62,14 @@ export interface PersonLike {
   active: boolean;
   weeklyLimitHours: number;
   roleIds: string[];
+  /** Funções da mais para a menos prioritária, quando a pessoa tem ordem definida no cadastro. */
+  rolePriority?: string[];
+  /** Nível em cada função (1 Apoio, 2 Titular, 3 Referência); função fora do mapa vale Titular. */
+  roleLevels?: Record<string, number>;
+  /** Sede; sem sede, a sede não pesa. */
+  base?: Base | null;
+  /** Horário de trabalho; sem horário cadastrado, o horário não pesa. */
+  workHours?: WorkHours | null;
 }
 
 export interface EventLike {
@@ -50,6 +84,14 @@ export interface EventLike {
   serviceTypeId?: string | null;
   noTeam?: boolean;
   title?: string;
+  /** Trabalho complexo (tipo marcado como complexo ou evento com estrela): pede a Referência primeiro. */
+  complex?: boolean;
+  /** Tipo externo (cobertura fora do estúdio): só a equipe de Piracicaba faz. */
+  external?: boolean;
+  /** Sede da série (aprendida de quem costuma fazer); nula quando não dá para saber. */
+  base?: Base | null;
+  /** Turma fixa gravada da série: por função, [titular, reserva] (series_rules.titulars). */
+  titulars?: Readonly<Record<string, readonly string[]>>;
 }
 
 export interface SlotLike {
@@ -58,6 +100,11 @@ export interface SlotLike {
   eventId: string;
   jobRoleId: string;
   archived?: boolean;
+  /**
+   * Função que não ocupa horário (Disponibilizador): a vaga não soma horas na carga da pessoa e não bate
+   * horário com as outras atividades dela.
+   */
+  noHours?: boolean;
 }
 
 export interface AssignmentLike {

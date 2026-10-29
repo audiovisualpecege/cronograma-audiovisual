@@ -12,5 +12,8 @@ playwright-report/
 .env
 segredos/
 
+# Cores do Google lidas por scripts/cores-google.ts, só para o app local (não vão para o repositório nem para o site)
+apps/web/public/dev/
+
 # Instaladores do programa de desktop
 apps/desktop/release/

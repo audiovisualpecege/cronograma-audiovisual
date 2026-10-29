@@ -5,6 +5,13 @@ Desde a 1.0.1 (19/10/2026) o código mora aqui no GitHub e os ajustes são feito
 repositório; a forja do Task Forge não mexe mais nele. O guia de como trabalhar está em `docs/ajustes-de-interface.md`
 e o guia técnico (configuração, publicação, problemas) em `docs/como-usar.md`.
 
+## Publicação pendente
+A 1.1.0 (PR #2, branch `ajuste/painel-e-semana`) tem migrações ainda não aplicadas (0012 a 0024), mais os dados iniciais de prioridade
+(`..\dados-iniciais\aplicar-prioridades.mjs`, fora do repositório), muda o
+serviço de fundo (IA local) e ainda não teve merge.
+Antes de publicar, ou se for preciso desfazer, siga `docs/publicar-1.1.0.md`. Apague esta seção quando a 1.1.0
+estiver no ar e firme.
+
 ## Como trabalhar
 - Quem pede os ajustes conversa com você: pergunte no chat quando faltar uma decisão, mostre o resultado e itere.
 - Cada rodada de ajustes vai num branch próprio (`ajuste/<assunto-curto>`) e entra na `main` por pull request.
@@ -13,7 +20,8 @@ e o guia técnico (configuração, publicação, problemas) em `docs/como-usar.m
   Teste novo para o que mudou de comportamento; ajuste de visual não precisa de teste novo, mas não pode quebrar
   os que existem.
 - A visualização local (`npm run dev`) usa o banco de verdade, com o login de administrador de quem está testando.
-  Mexer na tela é seguro; **Publicar**, **Escalar**, **Montar semana**, cadastros e importação gravam de verdade e a
+  Mexer na tela é seguro; **Publicar**, **Confirmar** (fichas e "Confirmar sugestões", que montam a semana),
+  escolher pessoa, cadastros e importação gravam de verdade e a
   equipe vê. Avise antes de clicar em qualquer um deles e prefira uma semana futura sem uso.
 - Migração nova em `supabase/migrations/` não se aplica sozinha: ela precisa de `npx supabase db push`, feito pelo
   responsável depois de revisar, antes do merge do código que depende dela. Diga isso no PR.

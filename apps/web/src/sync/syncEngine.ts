@@ -6,6 +6,7 @@ import { RemoteError, type Profile, type Remote } from '../supabase';
 import type { LocalStore } from './localStore';
 import {
   ADMIN_TABLES,
+  OPTIONAL_TABLES,
   REALTIME_TABLES,
   TEAM_TABLES,
   type ConflictEntry,
@@ -342,7 +343,13 @@ export class SyncEngine {
       this.pullAgain.add(table);
       return running;
     }
-    const p = this.doPull(table).finally(() => {
+    const read = OPTIONAL_TABLES.includes(table)
+      ? this.doPull(table).catch((err: unknown) => {
+          if (isNetwork(err)) throw err;
+          return 0;
+        })
+      : this.doPull(table);
+    const p = read.finally(() => {
       this.pulls.delete(table);
       if (this.pullAgain.delete(table)) void this.pull(table).catch(() => undefined);
     });

@@ -10,15 +10,17 @@ import type {
   PersonRoleRow,
   PersonRow,
   PublishedRow,
+  SeriesRuleRow,
   ServiceTypeRow,
   SlotRow,
   WeekRow,
 } from '../data/catalog';
+import { isSimulating, learnPreviewTitular, previewWeekRows, setPreviewSize, usePreviewExternal, usePreviewPeople, usePreviewSeries, usePreviewSizes } from '../dev/sizePreview';
 import type { LocalStore } from '../sync/localStore';
 import type { SyncEngine } from '../sync/syncEngine';
 import { useLocalQuery } from '../sync/SyncProvider';
 import type { TableName } from '../sync/types';
-import type { WeekRows } from './model';
+import type { AutoSize, WeekRows } from './model';
 
 async function all<T>(store: LocalStore, table: TableName): Promise<T[]> {
   return (await store.mirror(table).toArray()) as unknown as T[];
@@ -34,19 +36,27 @@ export async function readWeekRows(store: LocalStore, weekStart: string): Promis
   const published = week
     ? ((await store.mirror('published_assignments').where('week_id').equals(week.id).toArray()) as unknown as PublishedRow[])
     : [];
-  const [people, personRoles, absences, roles, types, crew] = await Promise.all([
+  const [people, personRoles, absences, roles, types, crew, seriesRules] = await Promise.all([
     all<PersonRow>(store, 'people'),
     all<PersonRoleRow>(store, 'person_roles'),
     all<AbsenceRow>(store, 'absences'),
     all<JobRoleRow>(store, 'job_roles'),
     all<ServiceTypeRow>(store, 'service_types'),
     all<CrewRow>(store, 'service_type_crew'),
+    all<SeriesRuleRow>(store, 'series_rules'),
   ]);
-  return { weekStart, week: week ?? null, events, slots, assignments, published, people, personRoles, absences, roles, types, crew };
+  return { weekStart, week: week ?? null, events, slots, assignments, published, people, personRoles, absences, roles, types, crew, seriesRules };
 }
 
 export function useWeekRows(weekStart: string): WeekRows | undefined {
-  return useLocalQuery((store) => readWeekRows(store, weekStart), [weekStart]);
+  const rows = useLocalQuery((store) => readWeekRows(store, weekStart), [weekStart]);
+  // No app local, sem as migrações 0017 a 0020 no banco, a semana aparece como ficaria com elas (dev/sizePreview).
+  const sizes = usePreviewSizes();
+  const learned = usePreviewSeries();
+  // Sede, horário e "externo" guardados no navegador entram pela simulação; mudar um deles refaz a semana.
+  const people = usePreviewPeople();
+  const external = usePreviewExternal();
+  return useMemo(() => rows && previewWeekRows(rows, sizes, learned), [rows, sizes, learned, people, external]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
 /** Relógio da tela, atualizado a cada minuto (selo "hoje", aviso do serviço de fundo). */
@@ -105,3 +115,43 @@ export async function sendAndRefresh(engine: SyncEngine, tables: TableName[]): P
 }
 
 export const WEEK_TABLES: TableName[] = ['weeks', 'events', 'slots', 'assignments', 'published_assignments', 'publications'];
+
+/**
+ * "Montar semana" (US-012): cria as vagas pelos tipos dos eventos, pela fila (`week.build`). `sizes` leva o porte
+ * aplicado sozinho (série ou histórico) dos eventos sem porte; na simulação do app local, fica neste navegador.
+ */
+export async function buildWeek(engine: SyncEngine, weekStart: string, sizes: ReadonlyMap<string, AutoSize> = new Map()): Promise<void> {
+  if (isSimulating()) for (const [id, s] of sizes) setPreviewSize(id, s.size);
+  const payload = sizes.size > 0 ? { week_start: weekStart, sizes: Object.fromEntries([...sizes].map(([id, s]) => [id, s.size])) } : { week_start: weekStart };
+  await engine.enqueue('week.build', payload);
+  await sendAndRefresh(engine, WEEK_TABLES);
+}
+
+/**
+ * Grava a turma fixa da série numa função: [titular, reserva] (migração 0023). Precisa de internet; na simulação
+ * do app local, fica neste navegador.
+ */
+export async function setSeriesTitular(engine: SyncEngine, series: string, roleId: string, people: string[]): Promise<void> {
+  if (isSimulating()) return learnPreviewTitular(series, roleId, people);
+  await engine.runOnline((remote) => remote.rpc('set_series_titular', { p_series: series, p_role: roleId, p_people: people }));
+  await engine.pull('series_rules').catch(() => 0);
+}
+
+/** Vaga a mais no evento; ensina a série (migração 0021). Sem versão de base: pôr vaga não entra em conflito. */
+export function addSlot(engine: SyncEngine, eventId: string, roleId: string) {
+  const id = crypto.randomUUID();
+  return engine.enqueue('slot.add', { id, event_id: eventId, job_role_id: roleId }, { target: { table: 'slots', id, changes: { event_id: eventId, job_role_id: roleId, extra: true, archived_at: null } } });
+}
+
+/** Tira a vaga do evento, mesmo com alguém nela (a pessoa é liberada); ensina a série (migração 0021). */
+export function removeSlot(engine: SyncEngine, slot: SlotRow) {
+  return engine.enqueue('slot.remove', { id: slot.id }, { baseVersion: slot.version, target: { table: 'slots', id: slot.id, changes: { archived_at: new Date().toISOString() } } });
+}
+
+/** Montagem da semana ainda na fila de envio (sem internet). */
+export function useBuildPending(weekStart: string): boolean | undefined {
+  return useLocalQuery(
+    async (store) => (await store.outbox.toArray()).some((op) => op.kind === 'week.build' && (op.payload as { week_start?: string }).week_start === weekStart),
+    [weekStart],
+  );
+}

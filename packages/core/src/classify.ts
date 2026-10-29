@@ -1,5 +1,6 @@
 // Classificação do tipo de serviço pelo título (ADR-012 item 5) e possíveis duplicados (US-010 EC-3).
 import { nameTokens } from './names.ts';
+import { eventSeries } from './scheduling.ts';
 import type { Certainty, EventOrigin } from './types.ts';
 
 export interface ServiceTypeLike {
@@ -12,11 +13,14 @@ export interface ServiceTypeLike {
 /** Títulos do histórico com o tipo que tiveram. */
 export type TitleIndex = { title: string; serviceTypeId: string }[];
 
+/** Tipo que cada série aprendeu quando alguém corrigiu o tipo de um evento dela (série pelo título, eventSeries). */
+export type SeriesTypes = ReadonlyMap<string, string>;
+
 export interface Classification {
   typeId: string | null;
   type: string | null; // código T..
   certainty: Certainty;
-  source: 'keyword' | 'history' | null;
+  source: 'series' | 'keyword' | 'history' | null;
   score?: number; // Jaccard da semelhança com o histórico
 }
 
@@ -46,17 +50,70 @@ function containsPhrase(words: string[], phrase: string[]): boolean {
 }
 
 /**
- * Palavra-chave do tipo dá certeza alta; senão o título mais parecido do histórico (Jaccard >= 0,6)
- * dá certeza média; senão fica "a definir" com certeza baixa, para a IA ou o administrador.
+ * Palavra-chave com asterisco ("*disponibilizar") vale quando o título começa com ela, com o asterisco
+ * ("*DISPONIBILIZAR: aula 3"), e ganha de qualquer outra palavra-chave.
  */
-export function classifyTitle(title: string, types: ServiceTypeLike[], history: TitleIndex): Classification {
+export function startsWithMarker(title: string, keyword: string): boolean {
+  const k = keyword.trim();
+  if (!k.startsWith('*') || !title.trimStart().startsWith('*')) return false;
+  const phrase = nameTokens(k);
+  const words = nameTokens(title);
+  return phrase.length > 0 && phrase.every((p, i) => words[i] === p);
+}
+
+/** Palavra-chave de começo ("^reuniao"): só vale quando o título começa com ela. */
+export const isPrefixKeyword = (keyword: string) => keyword.trim().startsWith('^');
+
+/** O tipo cuja palavra-chave de começo é a mais longa que abre o título; nulo sem nenhuma ou no empate. */
+function prefixMatch(words: string[], types: ServiceTypeLike[]): ServiceTypeLike | null {
+  let best: { t: ServiceTypeLike; len: number } | null = null;
+  let tie = false;
+  for (const t of types) {
+    for (const k of t.keywords) {
+      if (!isPrefixKeyword(k)) continue;
+      const phrase = nameTokens(k);
+      if (phrase.length === 0 || !phrase.every((p, i) => words[i] === p)) continue;
+      if (!best || phrase.length > best.len) {
+        best = { t, len: phrase.length };
+        tie = false;
+      } else if (phrase.length === best.len && best.t.id !== t.id) {
+        tie = true;
+      }
+    }
+  }
+  return best && !tie ? best.t : null;
+}
+
+/**
+ * Tipo do evento pelo título, nesta ordem (pedido do Raoni em 27/10/2026, depois de "Reunião Mediadores POLI USP
+ * PRO" virar AULA MBA pelo histórico):
+ *   1. a série aprendeu o tipo com a correção de alguém (certeza alta);
+ *   2. o título começa com a palavra-chave de asterisco do tipo ("*DISPONIBILIZAR") (alta);
+ *   3. o título começa com a palavra-chave de começo do tipo ("^reuniao"); a mais longa ganha, e "^reuniao
+ *      mediadores" vence "^reuniao" (alta);
+ *   4. a palavra-chave aparece no título (alta);
+ *   5. o título mais parecido do histórico (Jaccard >= 0,6) (média);
+ * senão fica "a definir" com certeza baixa, para a IA ou o administrador.
+ */
+export function classifyTitle(title: string, types: ServiceTypeLike[], history: TitleIndex, seriesTypes?: SeriesTypes): Classification {
   const active = types.filter((t) => !t.archived);
   const words = nameTokens(title);
+
+  const learned = seriesTypes?.get(eventSeries(title));
+  const fromSeries = learned ? active.find((t) => t.id === learned) : undefined;
+  if (fromSeries) return { typeId: fromSeries.id, type: fromSeries.code, certainty: 'alta', source: 'series' };
+
+  const marked = active.find((t) => t.keywords.some((k) => startsWithMarker(title, k)));
+  if (marked) return { typeId: marked.id, type: marked.code, certainty: 'alta', source: 'keyword' };
+
+  const opening = prefixMatch(words, active);
+  if (opening) return { typeId: opening.id, type: opening.code, certainty: 'alta', source: 'keyword' };
 
   let best: { t: ServiceTypeLike; len: number } | null = null;
   let tie = false;
   for (const t of active) {
     for (const k of t.keywords) {
+      if (isPrefixKeyword(k)) continue;
       const phrase = nameTokens(k);
       if (!containsPhrase(words, phrase)) continue;
       if (!best || phrase.length > best.len) {

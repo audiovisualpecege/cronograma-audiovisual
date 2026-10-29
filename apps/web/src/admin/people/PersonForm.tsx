@@ -1,6 +1,10 @@
 import { DEFAULT_WEEKLY_LIMIT, normalizeName, validatePerson, WEEKLY_LIMIT_MAX, WEEKLY_LIMIT_MIN } from '@cronograma/core';
 import { useState, type FormEvent } from 'react';
-import { byName, rolesOf, type JobRoleRow, type PersonRoleRow, type PersonRow, type SectorRow } from '../../data/catalog';
+import { AltArrowDownIcon, AltArrowUpIcon } from '@solar-icons/react/linear';
+import { BASE_LABEL, byName, LEVEL_LABEL, levelsOf, rolesOf, type JobRoleRow, type PersonRoleRow, type PersonRow, type SectorRow } from '../../data/catalog';
+import { peopleColumnsMissing, setPreviewPerson, usePreviewPeople } from '../../dev/sizePreview';
+import { hoursDraft, hoursErrors, hoursValue, WorkHoursField, type HoursDraft } from './WorkHoursField';
+import { IconButton } from '../../ui/IconButton';
 import { EMAIL_TAKEN, firstError } from '../../data/messages';
 import { useSyncEngine, useSyncState } from '../../sync/SyncProvider';
 import { OnlineButton } from '../../sync/OnlineButton';
@@ -30,6 +34,22 @@ export function PersonForm({ person, people, personRoles, sectors, roles, onClos
   const [profile, setProfile] = useState<'admin' | 'team'>(person?.profile ?? 'team');
   const [limit, setLimit] = useState(person ? String(person.weekly_limit_hours) : '');
   const [roleIds, setRoleIds] = useState<string[]>(() => (person ? rolesOf(person, personRoles) : []));
+  const [levels, setLevels] = useState<Record<string, number>>(() => (person ? levelsOf(person, personRoles) : {}));
+  // Sede e horário (0022); no app local sem a migração, ficam guardados neste navegador.
+  const simulated = peopleColumnsMissing(people);
+  const stored = usePreviewPeople();
+  const extras = simulated && person ? stored[person.id] : person;
+  const [base, setBase] = useState<string>(extras?.base ?? '');
+  const [hours, setHours] = useState<HoursDraft>(() => hoursDraft(extras?.work_hours));
+  const roleName = (id: string) => roles.find((r) => r.id === id)?.name ?? 'Função';
+  function move(i: number, by: -1 | 1) {
+    setRoleIds((ids) => {
+      const next = [...ids];
+      const [it] = next.splice(i, 1);
+      next.splice(i + by, 0, it as string);
+      return next;
+    });
+  }
   const [tried, setTried] = useState(false);
   const [deactivating, setDeactivating] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -44,7 +64,7 @@ export function PersonForm({ person, people, personRoles, sectors, roles, onClos
   async function submit(e: FormEvent) {
     e.preventDefault();
     setTried(true);
-    if (!check.ok || taken) return;
+    if (!check.ok || taken || hoursErrors(hours).length > 0) return;
     const v = check.value;
     const fields = {
       name: v.name,
@@ -53,16 +73,23 @@ export function PersonForm({ person, people, personRoles, sectors, roles, onClos
       profile,
       weekly_limit_hours: v.weeklyLimitHours,
     };
+    const place = { base: (base || null) as PersonRow['base'], work_hours: hoursValue(hours) };
+    if (simulated) setPreviewPerson(id, place);
+    // A ordem de role_ids é a prioridade; o nível vai junto, por função.
+    const roleLevels = Object.fromEntries(v.roleIds.map((r) => [r, levels[r] ?? 2]));
     await engine.enqueue(
       'person.upsert',
-      { id, ...fields, role_ids: v.roleIds },
+      { id, ...fields, ...place, role_ids: v.roleIds, role_levels: roleLevels },
       {
         target: {
           table: 'people',
           id,
           changes: {
             ...fields,
+            // Sem a coluna no banco (simulação), a linha local não ganha a sede: ela fica no navegador.
+            ...(simulated ? {} : place),
             role_ids: v.roleIds,
+            role_levels: roleLevels,
             active: person?.active ?? true,
             invite_status: person?.invite_status ?? 'pending',
             code: person?.code ?? '',
@@ -127,6 +154,15 @@ export function PersonForm({ person, people, personRoles, sectors, roles, onClos
             ]}
           />
         </div>
+        <Select
+          label="Sede"
+          value={base}
+          onChange={(e) => setBase(e.target.value)}
+          placeholder="Sem sede"
+          hint="Externo é só de Piracicaba; as aulas e gravações seguem a sede de quem costuma fazer a série. Sem sede, não pesa."
+          options={Object.entries(BASE_LABEL).map(([value, label]) => ({ value, label }))}
+        />
+        <WorkHoursField value={hours} onChange={setHours} />
         <Input
           label="Limite semanal de horas"
           inputMode="decimal"
@@ -153,6 +189,38 @@ export function PersonForm({ person, people, personRoles, sectors, roles, onClos
             </span>
           )}
         </fieldset>
+        {roleIds.length > 0 && (
+          <fieldset className="check-group">
+            <legend className="field-label">Prioridade e nível</legend>
+            <p className="form-text">
+              A 1ª é a função principal. Na escala sugerida, a ordem desempata entre pessoas com o mesmo histórico, e a Referência é chamada
+              primeiro nos trabalhos complexos (e fica por último nos simples).
+            </p>
+            <ol className="role-order" aria-label="Funções em ordem de prioridade">
+              {roleIds.map((rid, i) => {
+                const name = roleName(rid);
+                return (
+                  <li key={rid} className="role-order-item">
+                    <span className="role-order-pos">{i + 1}</span>
+                    <span className="role-order-name">{name}</span>
+                    <Select
+                      label="Nível"
+                      aria-label={`Nível em ${name}`}
+                      value={String(levels[rid] ?? 2)}
+                      onChange={(e) => setLevels((l) => ({ ...l, [rid]: Number(e.target.value) }))}
+                      options={[1, 2, 3].map((n) => ({ value: String(n), label: LEVEL_LABEL[n] as string }))}
+                      style={{ minWidth: 150 }}
+                    />
+                    <span className="role-order-actions">
+                      <IconButton icon={AltArrowUpIcon} label={`Subir ${name}`} size={36} disabled={i === 0} onClick={() => move(i, -1)} />
+                      <IconButton icon={AltArrowDownIcon} label={`Descer ${name}`} size={36} disabled={i === roleIds.length - 1} onClick={() => move(i, 1)} />
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+          </fieldset>
+        )}
 
         {person && (
           <div className="person-status">

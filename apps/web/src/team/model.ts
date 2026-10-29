@@ -39,6 +39,8 @@ export interface Activity {
   crew: Crew[];
   notes: string | null;
   cancelled: boolean;
+  /** Reunião (tipo sem equipe ligado a setores): sem escala, aparece para quem é destes setores. */
+  meetingSectors?: string[];
 }
 
 export interface PublishedWeek {
@@ -51,7 +53,17 @@ export function isPublished(week: WeekRow | null): week is WeekRow {
   return Boolean(week && (week.state === 'published' || (week.revision ?? 0) > 0));
 }
 
-/** Atividades da fotografia corrente, em ordem de início; eventos que não exigem equipe ficam de fora. */
+/** Tipo sem equipe ligado a setores: reunião que a equipe desses setores vê, sem escala. */
+export function meetingSectorsOf(e: EventRow, types: readonly ServiceTypeRow[]): string[] | null {
+  const type = types.find((t) => t.id === e.service_type_id);
+  if (!type?.no_team || !type.sector_ids?.length) return null;
+  return type.sector_ids;
+}
+
+/**
+ * Atividades da fotografia corrente, em ordem de início, mais as reuniões ligadas a setores (sem escala);
+ * os outros eventos que não exigem equipe ficam de fora.
+ */
 export function publishedWeek(rows: TeamRows): PublishedWeek {
   const week = rows.week;
   if (!isPublished(week)) return { published: false, activities: [] };
@@ -80,6 +92,12 @@ export function publishedWeek(rows: TeamRows): PublishedWeek {
       notes: list.find((p) => p.notes)?.notes ?? event.notes ?? null,
       cancelled: event.status === 'cancelled',
     });
+  }
+  for (const event of rows.events) {
+    if (event.ignored || byEvent.has(event.id)) continue;
+    const sectors = meetingSectorsOf(event, rows.types);
+    if (!sectors) continue;
+    activities.push({ event, day: localDate(new Date(event.starts_at)), crew: [], notes: event.notes ?? null, cancelled: event.status === 'cancelled', meetingSectors: sectors });
   }
   activities.sort((a, b) => a.event.starts_at.localeCompare(b.event.starts_at) || a.event.title.localeCompare(b.event.title, 'pt-BR'));
   return { published: true, activities };
@@ -131,8 +149,9 @@ function absenceDays(a: AbsenceRow, weekStart: string): Set<string> {
 export function myWeek(rows: TeamRows, personId: string, now: Date, seenAt: string | null): MyWeek {
   const week = publishedWeek(rows);
   const today = localDate(now);
+  const sector = rows.people.find((p) => p.id === personId)?.sector_id ?? null;
   const mine: MyActivity[] = week.activities
-    .filter((a) => a.crew.some((c) => c.personId === personId))
+    .filter((a) => a.crew.some((c) => c.personId === personId) || Boolean(sector && a.meetingSectors?.includes(sector)))
     .map((a) => ({
       ...a,
       myRoles: a.crew.filter((c) => c.personId === personId).map((c) => c.roleName),
@@ -178,7 +197,8 @@ export function hasFilter(f: TeamFilter): boolean {
 
 /**
  * Atividades com ao menos uma linha que passa em todos os filtros. Setor é o da pessoa escalada; numa vaga
- * "a definir", o da função.
+ * "a definir", o da função. Reunião de setor entra pelo setor (o filtrado ou o da pessoa filtrada); filtro por
+ * função a deixa de fora.
  */
 export function filterActivities(activities: readonly Activity[], f: TeamFilter, rows: Pick<TeamRows, 'people' | 'roles'>): Activity[] {
   if (!hasFilter(f)) return [...activities];
@@ -188,7 +208,12 @@ export function filterActivities(activities: readonly Activity[], f: TeamFilter,
     (!f.roleId || c.roleId === f.roleId) &&
     (!f.personId || c.personId === f.personId) &&
     (!f.sectorId || (c.personId ? personSector.get(c.personId) : roleSector.get(c.roleId)) === f.sectorId);
-  return activities.filter((a) => a.crew.some(match));
+  const meetingMatch = (sectors: readonly string[]) => {
+    if (f.roleId) return false;
+    const of = f.personId ? personSector.get(f.personId) : null;
+    return (!f.sectorId || sectors.includes(f.sectorId)) && (!f.personId || Boolean(of && sectors.includes(of)));
+  };
+  return activities.filter((a) => (a.meetingSectors ? meetingMatch(a.meetingSectors) : a.crew.some(match)));
 }
 
 /** Linhas da lista virtual da "Equipe": dia, atividade e cada vaga, todas da mesma altura. */

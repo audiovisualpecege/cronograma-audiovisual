@@ -272,6 +272,32 @@ body {
   font-weight: var(--weight-bold);
 }
 
+/* Grupo do menu (Dados, Configurações) com o submenu recuado embaixo. */
+.nav-group-toggle.is-active {
+  color: var(--text-brand);
+}
+
+.nav-group-arrow {
+  display: inline-flex;
+  margin-left: auto;
+  transition: transform var(--dur-fast) var(--ease-cine);
+}
+
+.nav-group-arrow.is-open {
+  transform: rotate(180deg);
+}
+
+.nav-sublist {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: var(--space-1) 0 0;
+  padding: 0 0 0 var(--space-4);
+  list-style: none;
+  border-left: 1px solid var(--border-subtle);
+  margin-left: var(--space-5);
+}
+
 .side-nav {
   display: none;
 }
@@ -402,13 +428,75 @@ body {
     display: flex;
     flex-direction: column;
     flex: none;
-    width: 248px;
+    z-index: 30;
+    width: 68px;
     height: 100vh;
     height: 100dvh;
     padding: var(--space-5) var(--space-3);
+    overflow: hidden;
     background: var(--surface-card);
     border-right: 1px solid var(--border-subtle);
     box-sizing: border-box;
+    transition:
+      width var(--dur-fast) var(--ease-cine),
+      margin-right var(--dur-fast) var(--ease-cine),
+      box-shadow var(--dur-fast) var(--ease-cine);
+  }
+
+  /* Menu recolhido: só os ícones. Com o mouse ou o teclado (Tab) nele, abre por cima da tela (a margem negativa
+     segura o conteúdo no lugar) e os nomes aparecem; depois do clique, recolhe quando o mouse sai. */
+  .side-nav:hover,
+  .side-nav:has(:focus-visible) {
+    width: 248px;
+    margin-right: -180px;
+    box-shadow: 12px 0 32px rgb(0 0 0 / 45%);
+  }
+
+  .side-nav .nav-link,
+  .side-nav-user,
+  .side-nav-footer .app-version {
+    white-space: nowrap;
+  }
+
+  /* O ícone nunca encolhe: o nome, sem quebra de linha, espremia o ícone até sumir com o menu recolhido. */
+  .side-nav .nav-link > svg,
+  .side-nav-brand img {
+    flex: none;
+  }
+
+  .side-nav .nav-link > span {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  /* "CRONOGRAMA" em cima e "AUDIOVISUAL" embaixo, para caber sem alargar o menu. */
+  .side-nav-brand .screen-title {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.1;
+    white-space: nowrap;
+  }
+
+  .side-nav .nav-link > span,
+  .side-nav-brand .screen-title,
+  .side-nav-user,
+  .side-nav-footer .app-version {
+    opacity: 0;
+    transition: opacity var(--dur-fast) var(--ease-cine);
+  }
+
+  .side-nav:hover :is(.nav-link > span, .side-nav-brand .screen-title, .side-nav-user, .app-version),
+  .side-nav:has(:focus-visible) :is(.nav-link > span, .side-nav-brand .screen-title, .side-nav-user, .app-version) {
+    opacity: 1;
+  }
+
+  .side-nav:not(:hover, :has(:focus-visible)) .nav-sublist {
+    display: none;
+  }
+
+  .side-nav-list {
+    overflow-x: hidden;
   }
 
   .bottom-nav,
@@ -900,9 +988,7 @@ body {
   gap: var(--space-2);
 }
 
-.week-preview,
 .week-built,
-.schedule-list,
 .source-alerts {
   display: flex;
   flex-direction: column;
@@ -917,7 +1003,6 @@ body {
   gap: var(--space-3);
 }
 
-.week-columns,
 .event-columns {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -925,7 +1010,6 @@ body {
   align-items: start;
 }
 
-.week-side,
 .event-main,
 .event-side {
   display: flex;
@@ -933,20 +1017,159 @@ body {
   gap: var(--space-4);
 }
 
-@media (min-width: 1100px) {
-  .week-columns {
-    grid-template-columns: minmax(0, 1fr) 320px;
-  }
+/* Topo da semana: "< Semana de 19/10 >" no centro, vizinhas esmaecidas e o "Reler agora" à direita. */
+.week-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  gap: var(--space-3);
+}
 
-  .event-columns {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+.week-switcher {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.week-switcher-title {
+  margin: 0;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.week-switcher-side {
+  display: none;
+  padding: 0 var(--space-2);
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font: var(--weight-bold) var(--text-body) var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  white-space: nowrap;
+  cursor: pointer;
+  opacity: 0.45;
+  transition: opacity 0.2s var(--ease-cine);
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 70%);
+  mask-image: linear-gradient(to right, transparent, #000 70%);
+}
+
+.week-switcher-side:last-child {
+  -webkit-mask-image: linear-gradient(to left, transparent, #000 70%);
+  mask-image: linear-gradient(to left, transparent, #000 70%);
+}
+
+.week-switcher-side:hover {
+  opacity: 0.8;
+}
+
+.week-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.week-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.week-status .form-text {
+  margin: 0;
+}
+
+/* Centro do seletor de semana: título e "Semana atual" embaixo. */
+.week-switcher-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.week-relative {
+  color: var(--text-muted);
+  font: var(--weight-bold) var(--text-caption) var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+}
+
+.week-relative.is-current {
+  color: var(--chiaro-pessego);
+}
+
+/* Troca de semana: a nova entra deslizando pelo lado da seta clicada. */
+.week-slide {
+  animation: week-fade 0.28s var(--ease-cine) both;
+}
+
+.week-slide--next {
+  animation-name: week-from-right;
+}
+
+.week-slide--prev {
+  animation-name: week-from-left;
+}
+
+@keyframes week-fade {
+  from {
+    opacity: 0;
   }
 }
 
-.day-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
+@keyframes week-from-right {
+  from {
+    opacity: 0;
+    transform: translateX(32px);
+  }
+}
+
+@keyframes week-from-left {
+  from {
+    opacity: 0;
+    transform: translateX(-32px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .week-slide {
+    animation: none;
+  }
+}
+
+.is-missing.slot-line {
+  border: 1.5px dashed var(--chiaro-pessego);
+  background: rgba(250, 206, 149, 0.08);
+}
+
+@media (min-width: 900px) {
+  .week-head {
+    grid-template-columns: 1fr auto 1fr;
+  }
+
+  .week-switcher {
+    grid-column: 2;
+  }
+
+  .week-head .reread {
+    grid-column: 3;
+    justify-self: end;
+  }
+
+  .week-switcher-side {
+    display: inline-block;
+  }
+}
+
+@media (min-width: 1100px) {
+  .event-columns {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
 }
 
 .day-title {
@@ -960,16 +1183,12 @@ body {
   color: var(--text-secondary);
 }
 
-.preview-list,
 .slot-list,
 .picker-list,
-.load-list,
-.balance-list,
 .pending-list {
   margin-top: 0;
 }
 
-.preview-event,
 .slot-line {
   display: flex;
   flex-wrap: wrap;
@@ -981,38 +1200,8 @@ body {
   border: 1px solid var(--border-subtle);
 }
 
-.preview-event .list-row-main,
 .slot-line .list-row-main {
   min-width: 220px;
-}
-
-.preview-event a.list-row-title,
-.schedule-event-title {
-  color: var(--text-primary);
-  text-decoration: none;
-}
-
-.preview-event a.list-row-title:hover,
-.schedule-event-title:hover {
-  color: var(--text-brand);
-}
-
-.schedule-event {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.schedule-event-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2) var(--space-3);
-}
-
-.schedule-event-title {
-  font: var(--weight-bold) var(--text-body-l) var(--font-display);
-  text-transform: uppercase;
 }
 
 .is-cancelled {
@@ -1030,119 +1219,6 @@ body {
   flex-wrap: wrap;
   gap: var(--space-2);
   margin-left: auto;
-}
-
-.schedule-grid-scroll {
-  max-height: 70vh;
-  overflow: auto;
-}
-
-.schedule-grid {
-  width: 100%;
-  min-width: 960px;
-  border-collapse: separate;
-  border-spacing: 4px;
-  font-size: var(--text-body-s);
-}
-
-.schedule-grid thead th {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  padding: var(--space-2);
-  background: var(--surface-card);
-  color: var(--text-secondary);
-  font: var(--weight-bold) var(--text-caption) var(--font-display);
-  text-transform: uppercase;
-  text-align: left;
-  white-space: nowrap;
-}
-
-.schedule-grid tbody th {
-  padding: var(--space-2);
-  color: var(--text-primary);
-  font-weight: var(--weight-medium);
-  text-align: left;
-  white-space: nowrap;
-}
-
-.schedule-grid td {
-  min-width: 120px;
-  padding: 4px;
-  vertical-align: top;
-  background: var(--surface-raised);
-  border-radius: var(--radius-sm);
-}
-
-.schedule-grid-open th {
-  color: var(--text-brand);
-}
-
-.grid-chip {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  width: 100%;
-  margin-bottom: 4px;
-  padding: 6px 8px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  background: var(--surface-card);
-  color: var(--text-primary);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.grid-chip:hover,
-.grid-chip:focus-visible {
-  border-color: var(--border-brand);
-  outline: none;
-}
-
-.grid-chip--proposed {
-  border-style: dashed;
-  border-color: var(--accent);
-}
-
-.grid-chip--open {
-  background: var(--accent-soft);
-}
-
-.grid-chip-title {
-  font-weight: var(--weight-medium);
-}
-
-.grid-chip-role {
-  color: var(--text-secondary);
-  font-size: var(--text-caption);
-}
-
-.load-item,
-.balance-item {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) 0;
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.load-item.is-over,
-.balance-item.is-short {
-  color: var(--chiaro-pessego);
-}
-
-.load-name {
-  flex: 1;
-  min-width: 120px;
-  font-weight: var(--weight-medium);
-}
-
-.load-hours {
-  color: var(--text-secondary);
-  font-size: var(--text-body-s);
 }
 
 .picker-item {
@@ -1272,12 +1348,433 @@ body {
   gap: var(--space-2);
 }
 
-.week-shortcut {
+/* Tipo de serviço: ícone do banco, nome em negrito e o lápis para trocar. */
+.type-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--chiaro-lavanda);
+}
+
+/* Porte do evento (Simples, Médio, Grande): três botões colados, o escolhido em destaque. */
+.size-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin-top: var(--space-1);
+}
+
+.size-picker {
+  display: inline-flex;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.size-option {
+  padding: 2px var(--space-3);
+  border: 0;
+  background: var(--surface-raised);
+  color: var(--text-muted);
+  font: var(--weight-bold) var(--text-caption) var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  cursor: pointer;
+}
+
+.size-option + .size-option {
+  border-left: 1px solid var(--border-subtle);
+}
+
+.size-option:hover,
+.size-option:focus-visible {
+  color: var(--text-primary);
+  outline: none;
+}
+
+.size-option.is-selected {
+  background: var(--border-brand);
+  color: var(--surface-page);
+}
+
+/*
+ * Ícones de linha que se repetem em listas longas (estrela, lápis): o mesmo desenho do Solar, mas como máscara
+ * de CSS, num elemento só. Como componente, cada um criava um SVG com seus caminhos em cada linha, e a prévia
+ * com 120 eventos passava do tempo pedido (US-010 EC-8).
+ */
+.mask-icon {
+  display: inline-block;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  background-color: currentColor;
+  -webkit-mask: var(--mask) center / contain no-repeat;
+  mask: var(--mask) center / contain no-repeat;
+}
+
+.mask-icon--sm {
+  width: 16px;
+  height: 16px;
+}
+
+.mask-star {
+  --mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5'%3E%3Cpath d='M9.15316 5.40838C10.4198 3.13613 11.0531 2 12 2C12.9469 2 13.5802 3.13612 14.8468 5.40837L15.1745 5.99623C15.5345 6.64193 15.7144 6.96479 15.9951 7.17781C16.2757 7.39083 16.6251 7.4699 17.3241 7.62805L17.9605 7.77203C20.4201 8.32856 21.65 8.60682 21.9426 9.54773C22.2352 10.4886 21.3968 11.4691 19.7199 13.4299L19.2861 13.9372C18.8096 14.4944 18.5713 14.773 18.4641 15.1177C18.357 15.4624 18.393 15.8341 18.465 16.5776L18.5306 17.2544C18.7841 19.8706 18.9109 21.1787 18.1449 21.7602C17.3788 22.3417 16.2273 21.8115 13.9243 20.7512L13.3285 20.4768C12.6741 20.1755 12.3469 20.0248 12 20.0248C11.6531 20.0248 11.3259 20.1755 10.6715 20.4768L10.0757 20.7512C7.77268 21.8115 6.62118 22.3417 5.85515 21.7602C5.08912 21.1787 5.21588 19.8706 5.4694 17.2544L5.53498 16.5776C5.60703 15.8341 5.64305 15.4624 5.53586 15.1177C5.42868 14.773 5.19043 14.4944 4.71392 13.9372L4.2801 13.4299C2.60325 11.4691 1.76482 10.4886 2.05742 9.54773C2.35002 8.60682 3.57986 8.32856 6.03954 7.77203L6.67589 7.62805C7.37485 7.4699 7.72433 7.39083 8.00494 7.17781C8.28555 6.96479 8.46553 6.64194 8.82547 5.99623L9.15316 5.40838Z' stroke='black' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+
+.mask-star-on {
+  --mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24'%3E%3Cpath d='M9.15316 5.40838C10.4198 3.13613 11.0531 2 12 2C12.9469 2 13.5802 3.13612 14.8468 5.40837L15.1745 5.99623C15.5345 6.64193 15.7144 6.96479 15.9951 7.17781C16.2757 7.39083 16.6251 7.4699 17.3241 7.62805L17.9605 7.77203C20.4201 8.32856 21.65 8.60682 21.9426 9.54773C22.2352 10.4886 21.3968 11.4691 19.7199 13.4299L19.2861 13.9372C18.8096 14.4944 18.5713 14.773 18.4641 15.1177C18.357 15.4624 18.393 15.8341 18.465 16.5776L18.5306 17.2544C18.7841 19.8706 18.9109 21.1787 18.1449 21.7602C17.3788 22.3417 16.2273 21.8115 13.9243 20.7512L13.3285 20.4768C12.6741 20.1755 12.3469 20.0248 12 20.0248C11.6531 20.0248 11.3259 20.1755 10.6715 20.4768L10.0757 20.7512C7.77268 21.8115 6.62118 22.3417 5.85515 21.7602C5.08912 21.1787 5.21588 19.8706 5.4694 17.2544L5.53498 16.5776C5.60703 15.8341 5.64305 15.4624 5.53586 15.1177C5.42868 14.773 5.19043 14.4944 4.71392 13.9372L4.2801 13.4299C2.60325 11.4691 1.76482 10.4886 2.05742 9.54773C2.35002 8.60682 3.57986 8.32856 6.03954 7.77203L6.67589 7.62805C7.37485 7.4699 7.72433 7.39083 8.00494 7.17781C8.28555 6.96479 8.46553 6.64194 8.82547 5.99623L9.15316 5.40838Z' fill='black'/%3E%3C/svg%3E");
+}
+
+/* Horário de trabalho: uma linha por dia, entrada e saída; no celular, dois dias por linha não cabem, um só. */
+.work-hours {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: var(--space-2) var(--space-4);
+}
+
+.work-hours-day {
+  display: grid;
+  grid-template-columns: 40px 1fr 1fr;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.work-hours-label {
+  color: var(--text-secondary);
+  font: var(--weight-bold) 13px/1 var(--font-display);
+}
+
+.work-hours-input {
+  min-width: 0;
+  height: 36px;
+  padding: 0 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--surface-input, var(--surface-card));
+  color: var(--text-primary);
+  color-scheme: dark;
+  font: inherit;
+  font-size: 14px;
+}
+
+/* Funções da pessoa em ordem de prioridade, com o nível de cada uma. */
+.role-order {
   display: flex;
   flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.role-order-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-card);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+}
+
+.role-order-pos {
+  display: inline-flex;
+  align-self: center;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-pill);
+  background: var(--gradient-chiaro);
+  color: #fff;
+  font: var(--weight-black) var(--text-body-s) var(--font-display);
+}
+
+.role-order-name {
+  flex: 1;
+  align-self: center;
+  min-width: 120px;
+  font-weight: var(--weight-bold);
+}
+
+.role-order-actions {
+  display: inline-flex;
+  align-self: center;
   gap: var(--space-1);
+}
+
+/* Estrela de atividade principal da semana. */
+.star-toggle {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.2s var(--ease-cine), transform 0.2s var(--ease-cine);
+}
+
+.star-toggle:hover:not(:disabled),
+.star-toggle:focus-visible {
+  color: var(--chiaro-pessego);
+  outline: none;
+  transform: scale(1.1);
+}
+
+.star-toggle.is-on {
+  color: var(--chiaro-pessego);
+}
+
+.star-toggle:disabled {
+  cursor: default;
+}
+
+/* Título que abre a janela de detalhes, com a cara do link. */
+.title-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.title-button:hover,
+.title-button:focus-visible {
+  color: var(--text-brand);
+  outline: none;
+  text-decoration: underline;
+}
+
+/* Banco de ícones do cadastro de tipos. */
+.icon-bank {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+  gap: var(--space-2);
+}
+
+.icon-choice {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 48px;
+  padding: var(--space-2);
+  border: 1.5px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.icon-choice--auto {
+  grid-column: span 2;
+}
+
+.icon-choice-label {
+  font: var(--weight-bold) 10px var(--font-display);
+  text-transform: uppercase;
+}
+
+.icon-choice:hover,
+.icon-choice:focus-visible {
+  border-color: var(--border-brand);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.icon-choice.is-selected {
+  border-color: var(--chiaro-lavanda);
+  background: var(--accent-soft);
+  color: var(--chiaro-lavanda);
+}
+
+/* Equipe e descrição no painel de detalhes do evento. */
+.quick-view-crew li {
+  padding: 2px 0;
+}
+
+.quick-view-crew li.is-open {
+  color: var(--chiaro-pessego);
+}
+
+.quick-view-description {
+  max-height: 220px;
+  margin: 0;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  color: var(--text-secondary);
+}
+
+/* Painel: as próximas 3 semanas em cartões, lado a lado no computador. */
+.dashboard-weeks {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+@media (min-width: 900px) {
+  .dashboard-weeks {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.week-card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: 20px;
+  border-radius: var(--radius-card);
   color: inherit;
   text-decoration: none;
+  transition: background-color 0.2s var(--ease-cine);
+}
+
+/* O cartão já sobe no hover; em vez de sublinhar o texto, ele fica num tom mais claro. */
+.week-card:hover,
+.week-card:focus-visible {
+  background-color: rgba(255, 255, 255, 0.06);
+  text-decoration: none;
+  outline: none;
+}
+
+/* Semana atual: moldura no gradiente da Chiaro com brilho, para saltar aos olhos. */
+.week-card-slot--current {
+  padding: 2px;
+  border-radius: calc(var(--radius-card) + 2px);
+  background: var(--gradient-chiaro);
+  box-shadow: var(--shadow-glow);
+}
+
+.week-card--current .week-card-label {
+  color: var(--chiaro-pessego);
+}
+
+.week-card-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-pill);
+}
+
+.week-card-icon--unbuilt {
+  background: rgba(247, 225, 196, 0.14);
+  color: var(--chiaro-areia);
+}
+
+.week-card-icon--building {
+  background: rgba(250, 206, 149, 0.18);
+  color: var(--chiaro-pessego);
+}
+
+.week-card-icon--published {
+  background: rgba(46, 155, 107, 0.2);
+  color: var(--success);
+}
+
+/* Avisos da agenda: cor e ícone por tipo de mudança. */
+.notice-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: 0;
+}
+
+.notice {
+  --notice-color: var(--chiaro-lavanda);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-subtle);
+  border-left: 4px solid var(--notice-color);
+  background: var(--surface-card);
+}
+
+.notice--new {
+  --notice-color: var(--success);
+}
+
+.notice--changed {
+  --notice-color: var(--warning);
+}
+
+.notice--cancelled {
+  --notice-color: var(--danger);
+}
+
+.notice-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--notice-color) 18%, transparent);
+  color: var(--notice-color);
+}
+
+.notice-text {
+  flex: 1;
+  min-width: 200px;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.notice-text:hover {
+  color: var(--text-brand);
+}
+
+.week-card-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.week-card-body .form-text {
+  margin: 0;
+}
+
+.week-card-label {
+  color: var(--text-muted);
+  font: var(--weight-bold) var(--text-caption) var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+}
+
+.week-card-detail {
+  margin-top: var(--space-1);
+  color: var(--text-secondary);
+  font-size: var(--text-body-s);
+}
+
+.notice-time {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  white-space: nowrap;
 }
 
 /* Ação discreta em linha, para listas longas (prévia com 100 eventos ou mais). */
@@ -1296,14 +1793,6 @@ body {
 .text-button:focus-visible {
   text-decoration: underline;
   outline: none;
-}
-
-.preview-type {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  min-width: 160px;
 }
 
 /* ---------------------------------------------------------------------------------------------
@@ -1609,4 +2098,933 @@ body {
   display: block;
   height: 20px;
   width: auto;
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Grade da semana: uma coluna por dia, atividades em cartões com a cor da família (Lavanda aulas, Pêssego
+   produção, cinza reuniões) e vagas como fichas (verde confirmada, tracejada sugestão, vermelha aberta). */
+
+.board-bar {
+  flex-wrap: wrap;
+  row-gap: var(--space-3);
+}
+
+.board-score {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* Revisão só das exceções: o filtro, quantos cartões e o "Próximo". */
+.board-review {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+.board-review-toggle {
+  padding: 4px var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.board-review-toggle.is-on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--text-primary);
+}
+
+.board-review-count strong {
+  color: var(--text-primary);
+  font: var(--weight-bold) 16px/1 var(--font-display);
+}
+
+/* Com o filtro, o cartão sem pendência apaga (continua lá, para dar contexto). */
+.board-card.is-dim {
+  opacity: 0.28;
+}
+
+.board-review-why {
+  color: var(--warning);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.board-score-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 4px var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-caption);
+  cursor: pointer;
+}
+
+.board-score-item strong {
+  font: var(--weight-bold) 16px/1 var(--font-display);
+}
+
+.board-score-item:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.board-score-item.is-confirmed strong { color: var(--success); }
+.board-score-item.is-suggested { border-style: dashed; }
+.board-score-item.is-suggested strong { color: var(--accent); }
+.board-score-item.is-open strong { color: var(--danger); }
+.board-score-item.is-alert strong { color: var(--warning); }
+
+.board-score-item:hover:not(:disabled),
+.board-score-item:focus-visible {
+  border-color: var(--accent);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.board-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.board-lit {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--text-caption);
+}
+
+/* Colunas dos dias: lado a lado, com rolagem para o lado na grade e para baixo em cada dia. */
+.board {
+  display: flex;
+  gap: var(--space-3);
+  align-items: stretch;
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
+  height: max(460px, calc(100dvh - 300px));
+}
+
+/* Grade ou linha do tempo, e os dias da linha do tempo. */
+.board-views {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+.board-view-switch {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+}
+
+.board-view-switch button,
+.board-daynav button {
+  padding: 4px var(--space-3);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.board-view-switch button.is-on,
+.board-daynav-day.is-on {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--text-primary);
+}
+
+.board-view-switch button:hover,
+.board-daynav button:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+
+.board-daynav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+}
+
+.board-daynav-step {
+  font-size: 18px !important;
+  line-height: 1;
+}
+
+.board-daynav-step:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.board-daynav-day {
+  text-transform: capitalize;
+}
+
+.board-daynav-day.is-today {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+.board-daynav-count {
+  margin-left: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+/* Linha do tempo: um dia, as horas de cima para baixo e os cartões na altura do horário. */
+.board--timeline {
+  display: block;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.board-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--surface-raised) 55%, transparent);
+}
+
+.board-timeline.is-today {
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+.board-timeline-allday {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-left: 52px;
+}
+
+/* Dia inteiro: barra fina com a cor do tipo, como no Google Agenda. */
+.board-allday {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 26px;
+  padding: 3px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--kind-color, var(--neutral-600)) 70%, var(--surface-page));
+  color: var(--surface-page);
+  font: inherit;
+  font-size: 13px;
+  font-weight: var(--weight-medium);
+  text-align: left;
+  cursor: pointer;
+}
+
+.board-allday:hover,
+.board-allday:focus-visible {
+  outline: none;
+  background: var(--kind-color, var(--neutral-500));
+}
+
+.board-allday-title {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.board-allday-slots {
+  flex: none;
+  margin-left: auto;
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.board-allday.has-open .board-allday-slots {
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--danger);
+  color: #fff;
+  opacity: 1;
+}
+
+.board-allday.is-cancelled {
+  opacity: 0.4;
+  filter: grayscale(1);
+  text-decoration: line-through;
+}
+
+.board-timeline-grid {
+  position: relative;
+}
+
+/* A hora na calha da esquerda, na altura da linha que atravessa o dia. */
+.board-timeline-hour {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 0;
+}
+
+.board-timeline-hour::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 44px;
+  right: 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.board-timeline-now {
+  position: absolute;
+  left: 44px;
+  right: 0;
+  z-index: 4;
+  height: 2px;
+  background: var(--danger);
+  pointer-events: none;
+}
+
+.board-timeline-now::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: -5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--danger);
+}
+
+.board-timeline-track {
+  position: absolute;
+  inset: 0 0 0 52px;
+}
+
+.board-timeline-track.has-marks {
+  right: 156px;
+}
+
+/* Faixa das marcações (não escalar, folga), à direita: hachurada, sem apertar os cartões. */
+.board-timeline-marks {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 148px;
+}
+
+.board-timeline-marks .board-line {
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--kind-color, var(--neutral-600)) 14%, var(--surface-page)) 0 6px,
+    var(--surface-page) 6px 12px
+  ) !important;
+}
+
+.board-timeline-item {
+  position: absolute;
+  height: var(--h);
+  overflow: hidden;
+  border-radius: var(--radius-card);
+}
+
+/* O que não coube na altura aparece ao passar o mouse ou entrar com o teclado, por cima dos vizinhos. */
+.board-timeline-item:hover,
+.board-timeline-item:focus-within {
+  z-index: 3;
+  height: auto;
+  min-height: var(--h);
+  overflow: visible;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 45%);
+}
+
+.board-timeline-item > .board-card {
+  min-height: 100%;
+  padding: var(--space-2) var(--space-3);
+}
+
+.board-timeline-item.is-marker > .board-line {
+  height: 100%;
+  align-items: flex-start;
+  background: var(--surface-page);
+}
+
+.board-timeline-item.is-marker > .board-line.has-google-color {
+  background: color-mix(in srgb, var(--kind-color) 14%, var(--surface-page));
+}
+
+.board-day {
+  display: flex;
+  flex: 1 0 280px;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 280px;
+  max-width: 360px;
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--surface-raised) 55%, transparent);
+}
+
+.board-day.is-empty {
+  flex: 0 0 96px;
+  min-width: 96px;
+}
+
+.board-day.is-today {
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+.board-day-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.board-day-title {
+  margin: 0;
+  color: var(--text-primary);
+  font: var(--weight-bold) 15px/1.2 var(--font-display);
+  text-transform: capitalize;
+}
+
+.board-day-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+.board-day-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+/* Quem está fora no dia */
+.board-off {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.board-off-label {
+  color: var(--chiaro-pessego);
+  font-weight: var(--weight-bold);
+}
+
+.board-off-item {
+  padding: 1px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+}
+
+button.board-off-item {
+  cursor: pointer;
+}
+
+.board-off-item.is-dropped {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+/* Cartões */
+/* Com a cor do Google Agenda (do evento ou da agenda), o cartão inteiro leva um toque dela, como na agenda. */
+.board-card.has-google-color {
+  background: color-mix(in srgb, var(--kind-color) 16%, var(--surface-raised));
+}
+
+.board-line.has-google-color {
+  border-left: 3px solid var(--kind-color);
+  background: color-mix(in srgb, var(--kind-color) 10%, transparent);
+}
+
+.board-kind--aula { --kind-color: var(--chiaro-lavanda); }
+.board-kind--producao { --kind-color: var(--chiaro-pessego); }
+.board-kind--reuniao { --kind-color: var(--neutral-400); }
+.board-kind--marcacao { --kind-color: var(--neutral-600); }
+
+.board-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-left: 4px solid var(--kind-color);
+  border-radius: var(--radius-card);
+  background: var(--surface-raised);
+  cursor: pointer;
+}
+
+.board-card:hover {
+  border-color: color-mix(in srgb, var(--kind-color) 45%, var(--border-subtle));
+  border-left-color: var(--kind-color);
+}
+
+.board-card.is-highlighted {
+  box-shadow: 0 0 0 1px var(--kind-color);
+}
+
+.board-card--cancelled .board-card-title {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+/* Cancelado na agenda: apagado e sem cor, para não se confundir com os ativos. Volta ao passar o mouse. */
+.board-card.board-card--cancelled {
+  opacity: 0.4;
+  filter: grayscale(1);
+  border-style: dashed;
+  background: var(--surface-raised);
+  transition: opacity var(--dur-fast) var(--ease-cine), filter var(--dur-fast) var(--ease-cine);
+}
+
+.board-card.board-card--cancelled:hover,
+.board-card.board-card--cancelled:focus-within {
+  opacity: 0.85;
+  filter: none;
+}
+
+.board-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.board-card-icon {
+  display: inline-flex;
+  flex: none;
+  padding: 5px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--kind-color) 18%, transparent);
+  color: var(--kind-color);
+}
+
+.board-card-type {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  font: var(--weight-bold) 11px/1.2 var(--font-display);
+  letter-spacing: var(--tracking-wide);
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.board-alert {
+  display: inline-flex;
+  color: var(--warning);
+}
+
+.board-card-title {
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: var(--weight-bold);
+  line-height: 1.3;
+  text-align: left;
+}
+
+.board-card-meta {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+.board-card-hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  font-size: var(--text-caption);
+}
+
+/* Fichas das vagas */
+.board-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.board-chip {
+  position: relative;
+  display: inline-flex;
+  max-width: 100%;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  background: var(--surface-card);
+  transition: opacity 0.12s ease;
+}
+
+.board-chip {
+  border-radius: 10px;
+}
+
+/* Ficha em duas linhas: a função em letra pequena e a pessoa embaixo; a marca da situação no canto. */
+.board-chip-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 6px;
+  min-width: 0;
+  padding: 4px 10px 5px;
+  border: 0;
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.25;
+  text-align: left;
+  cursor: pointer;
+}
+
+.board-chip-main::after {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  font-size: 12px;
+  font-weight: var(--weight-bold);
+}
+
+.board-chip.is-confirmed .board-chip-main::after {
+  content: '✓';
+  color: var(--success);
+}
+
+.board-chip.is-open .board-chip-main::after {
+  content: '!';
+  color: var(--danger);
+}
+
+.board-chip-role {
+  grid-column: 1;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 10px;
+  letter-spacing: var(--tracking-wide);
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.board-chip-flags {
+  display: flex;
+  grid-column: 1;
+  gap: 4px;
+}
+
+.board-chip-flag {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.board-chip-flag.is-warning {
+  color: var(--warning);
+  font-weight: var(--weight-bold);
+}
+
+.board-chip-main:disabled {
+  cursor: default;
+}
+
+.board-chip-main:hover:not(:disabled),
+.board-chip-main:focus-visible {
+  outline: none;
+  text-decoration: underline;
+}
+
+.board-chip-name {
+  grid-column: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.board-chip.is-confirmed {
+  border-color: color-mix(in srgb, var(--success) 55%, transparent);
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+}
+
+.board-chip.is-confirmed .board-chip-main {
+  color: var(--text-primary);
+}
+
+.board-chip.is-suggested {
+  border-style: dashed;
+  border-color: var(--accent);
+}
+
+.board-chip.is-suggested .board-chip-main {
+  color: var(--text-primary);
+}
+
+.board-chip.is-open {
+  border-color: color-mix(in srgb, var(--danger) 55%, transparent);
+}
+
+.board-chip.is-open .board-chip-main {
+  color: var(--danger);
+}
+
+/* A pessoa sob o mouse acende na semana toda; as outras fichas apagam. */
+.board.is-lighting .board-chip {
+  opacity: 0.35;
+}
+
+.board.is-lighting .board-chip.is-lit {
+  opacity: 1;
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+/* Lixeira que tira a vaga: sempre à vista na vaga aberta; nas outras, só com o mouse ou o foco na ficha.
+   O ícone (Solar, lixeira linear) vem por máscara de CSS: uma regra só, sem um SVG por ficha, que deixava a grade lenta. */
+.board-chip-drop {
+  display: none;
+  flex: none;
+  align-self: center;
+  width: 24px;
+  height: 24px;
+  margin-right: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.board-chip-drop::before {
+  content: '';
+  display: block;
+  width: 15px;
+  height: 15px;
+  margin: auto;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23000' stroke-width='1.8' stroke-linecap='round'%3E%3Cpath d='M9.17 4a3 3 0 0 1 5.66 0M20.5 6h-17M18.83 8.5l-.46 6.9c-.18 2.65-.27 3.98-1.13 4.79-.86.81-2.2.81-4.86.81h-.77c-2.66 0-4 0-4.86-.81-.86-.81-.95-2.14-1.13-4.79l-.46-6.9M9.5 11l.5 5M14.5 11l-.5 5'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23000' stroke-width='1.8' stroke-linecap='round'%3E%3Cpath d='M9.17 4a3 3 0 0 1 5.66 0M20.5 6h-17M18.83 8.5l-.46 6.9c-.18 2.65-.27 3.98-1.13 4.79-.86.81-2.2.81-4.86.81h-.77c-2.66 0-4 0-4.86-.81-.86-.81-.95-2.14-1.13-4.79l-.46-6.9M9.5 11l.5 5M14.5 11l-.5 5'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.board-chip.is-open .board-chip-drop,
+.board-chip:hover .board-chip-drop,
+.board-chip:focus-within .board-chip-drop {
+  display: block;
+}
+
+.board-chip-drop:hover,
+.board-chip-drop:focus-visible {
+  outline: none;
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+  color: var(--danger);
+}
+
+/* "+ vaga": ficha tracejada e discreta no fim das vagas. */
+.board-chip--add {
+  border-style: dashed;
+  background: none;
+}
+
+.board-chip-add {
+  padding: 4px 10px 5px;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.25;
+  cursor: pointer;
+}
+
+.board-chip-add:hover,
+.board-chip-add:focus-visible {
+  color: var(--text-primary);
+}
+
+/* "Virou o titular?": pergunta curta no cartão, com Sim e Não. */
+.board-ask {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+/* "pela série": as vagas ou o porte vieram do que a série aprendeu. */
+.board-card-origin {
+  color: var(--accent);
+  text-transform: none;
+}
+
+.board-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 170px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-lg);
+}
+
+.board-menu-item {
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.board-menu-item:hover,
+.board-menu-item:focus-visible {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  outline: none;
+}
+
+/* Reunião, folga e lembrete: uma linha fina e cinza. */
+.board-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px dashed var(--border-subtle);
+  border-radius: 8px;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.board-line:hover,
+.board-line:focus-visible {
+  color: var(--text-secondary);
+  outline: none;
+}
+
+.board-line-time {
+  flex: none;
+}
+
+.board-line-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Painel do evento, à direita, sem cobrir a grade inteira. */
+.event-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: min(420px, 100vw);
+  padding: var(--space-5);
+  overflow-y: auto;
+  border-left: 1px solid var(--border-subtle);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-lg);
+  color: var(--text-secondary);
+  box-sizing: border-box;
+}
+
+.event-panel-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.event-panel-title {
+  flex: 1;
+  margin: 0;
+  color: var(--text-brand);
+  font: 800 20px/1.15 var(--font-display);
+  text-transform: uppercase;
+}
+
+.event-panel > button:last-child {
+  align-self: flex-start;
+}
+
+.picker-search {
+  width: 100%;
+  margin-bottom: var(--space-4);
+  padding: 10px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  font: inherit;
+  box-sizing: border-box;
+}
+
+.picker-search:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
+@media (max-width: 560px) {
+  .board {
+    height: auto;
+    flex-direction: column;
+    overflow-x: visible;
+  }
+
+  .board-day,
+  .board-day.is-empty {
+    flex: none;
+    max-width: none;
+    min-width: 0;
+  }
+
+  .board-day-body {
+    overflow: visible;
+  }
 }

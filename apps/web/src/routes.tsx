@@ -39,6 +39,8 @@ export const ROUTES: readonly RouteDef[] = [
   { path: '/painel', access: 'admin', title: 'Painel', component: DashboardPage },
   { path: '/semana', access: 'admin', title: 'Semana', component: WeekPage },
   { path: '/semana/:date', access: 'admin', title: 'Semana', component: WeekPage },
+  // "Propor escala" virou a grade da própria semana; o endereço antigo continua abrindo a semana.
+  { path: '/semana/:date/proposta', access: 'admin', title: 'Semana', component: WeekPage },
   { path: '/admin/pessoas', access: 'admin', title: 'Pessoas', component: PeoplePage },
   { path: '/admin/ausencias', access: 'admin', title: 'Ausências', component: AbsencesPage },
   { path: '/admin/funcoes', access: 'admin', title: 'Funções', component: RolesPage },

@@ -1,33 +1,45 @@
 // Regras de tela da semana do administrador, puras: contexto das regras do core a partir das linhas da cópia
-// local, equipe estimada, falta por função, contagens de publicação e alterações não publicadas.
+// local, equipe estimada, folgas da semana, contagens de publicação e alterações não publicadas.
 import {
   addDays,
   daysOf,
-  demandFromSlots,
-  eventHours,
+  diffDays,
+  eventSeries,
+  isEventSize,
   localDate,
   localTime,
-  roleDemandSupply,
+  nameTokens,
+  suggestSize,
   type AbsenceLike,
   type AssignmentLike,
+  type Base,
   type EventLike,
+  type EventSize,
   type PersonLike,
-  type RoleBalance,
+  type SeriesSize,
+  type SizeSuggestion,
   type SlotLike,
   type WeekContext,
 } from '@cronograma/core';
 import {
-  crewOf,
+  crewForSize,
+  crewTotals,
+  hasRoleOrder,
+  seriesRuleMap,
+  sizeFor,
+  levelsOf,
   rolesOf,
   type AbsenceRow,
   type AssignmentRow,
   type CrewItem,
   type CrewRow,
   type EventRow,
+  type HistoryFactRow,
   type JobRoleRow,
   type PersonRoleRow,
   type PersonRow,
   type PublishedRow,
+  type SeriesRuleRow,
   type ServiceTypeRow,
   type SlotRow,
   type WeekRow,
@@ -46,6 +58,8 @@ export interface WeekRows {
   roles: JobRoleRow[];
   types: ServiceTypeRow[];
   crew: CrewRow[];
+  /** O que cada série aprendeu com quem monta a escala (migração 0020); vazio antes dela. */
+  seriesRules?: SeriesRuleRow[];
 }
 
 export type SlotState = 'open' | 'proposed' | 'confirmed';
@@ -85,13 +99,38 @@ export function typeNoTeam(types: readonly ServiceTypeRow[], typeId: string | nu
   return Boolean(typeId && types.find((t) => t.id === typeId)?.no_team);
 }
 
+/**
+ * Marcação da agenda que não pede equipe (férias, folga, horário reservado): aparece à parte, no fim do dia.
+ * Evento cancelado continua na ordem normal, riscado; evento com estrela de destaque também.
+ */
+export function isMarker(e: EventRow, types: readonly ServiceTypeRow[]): boolean {
+  return e.status !== 'cancelled' && !e.highlighted && (Boolean(e.no_team) || typeNoTeam(types, e.service_type_id));
+}
+
+/** Os eventos do dia com as marcações no fim, mantendo a ordem de cada grupo. */
+export function markersLast(events: readonly EventRow[], types: readonly ServiceTypeRow[]): EventRow[] {
+  return [...events.filter((e) => !isMarker(e, types)), ...events.filter((e) => isMarker(e, types))];
+}
+
+/** Reunião, pelo tipo de serviço (REUNIAO EDICAO, REUNIAO MEDIADORES...): na proposta, preenchida por último. */
+export function isMeetingEvent(e: EventRow, types: readonly ServiceTypeRow[]): boolean {
+  const name = types.find((t) => t.id === e.service_type_id)?.name ?? '';
+  return nameTokens(name)[0] === 'reuniao';
+}
+
 /** Evento que entra na escala: ativo, não ignorado e que exige equipe. */
 export function needsTeam(e: EventRow, types: readonly ServiceTypeRow[]): boolean {
   return e.status !== 'cancelled' && !e.ignored && !e.no_team && !typeNoTeam(types, e.service_type_id);
 }
 
-export function toEventLike(e: EventRow, types: readonly ServiceTypeRow[]): EventLike {
+export function toEventLike(e: EventRow, types: readonly ServiceTypeRow[], bases?: ReadonlyMap<string, Base>, rule?: SeriesRuleRow): EventLike {
+  const type = types.find((t) => t.id === e.service_type_id);
   return {
+    external: Boolean(type?.external),
+    base: bases?.get(eventSeries(e.title)) ?? null,
+    ...(rule?.titulars ? { titulars: rule.titulars } : {}),
+    // Trabalho complexo: tipo marcado como complexo, evento de porte Grande ou com estrela de atividade principal.
+    complex: Boolean(e.highlighted) || Boolean(type?.complex) || Boolean(type?.sized && sizeFor(type, e.size) === 3),
     id: e.id,
     weekStart: e.week_start,
     startsAt: new Date(e.starts_at),
@@ -114,7 +153,39 @@ export function toPersonLike(p: PersonRow, personRoles: readonly PersonRoleRow[]
     active: p.active,
     weeklyLimitHours: Number(p.weekly_limit_hours),
     roleIds: rolesOf(p, personRoles),
+    // A ordem só vale como prioridade quando alguém ordenou; senão é a ordem de cadastro, sem significado.
+    ...(hasRoleOrder(p, personRoles) ? { rolePriority: rolesOf(p, personRoles) } : {}),
+    roleLevels: levelsOf(p, personRoles),
+    base: p.base ?? null,
+    workHours: p.work_hours ?? null,
   };
+}
+
+/** Quantas vezes, no mínimo, a série precisa ter sido feita por gente com sede para a sede dela valer. */
+export const SERIES_BASE_MIN = 3;
+
+/**
+ * Sede de cada série, aprendida de quem costuma fazer: a sede de quem fez a série no histórico, quando pelo menos
+ * 3 vezes foram feitas por gente com sede e 3 em cada 4 delas são da mesma sede. Sem isso, a série fica sem sede.
+ */
+export function seriesBases(facts: readonly HistoryFactRow[] | null, people: readonly PersonRow[]): Map<string, Base> {
+  const baseOf = new Map(people.filter((p) => p.base).map((p) => [p.id, p.base as Base]));
+  const counts = new Map<string, Map<Base, number>>();
+  for (const f of facts ?? []) {
+    const base = f.person_id ? baseOf.get(f.person_id) : undefined;
+    const series = base && f.title ? eventSeries(f.title) : '';
+    if (!base || !series) continue;
+    const c = counts.get(series) ?? new Map<Base, number>();
+    c.set(base, (c.get(base) ?? 0) + 1);
+    counts.set(series, c);
+  }
+  const out = new Map<string, Base>();
+  for (const [series, c] of counts) {
+    const total = [...c.values()].reduce((a, b) => a + b, 0);
+    const [top, n] = [...c].sort((a, b) => b[1] - a[1])[0] ?? [];
+    if (top && n !== undefined && total >= SERIES_BASE_MIN && n >= 0.75 * total) out.set(series, top);
+  }
+  return out;
 }
 
 export function toAbsenceLike(a: AbsenceRow): AbsenceLike {
@@ -129,10 +200,21 @@ export function activeSlots(rows: Pick<WeekRows, 'events' | 'slots'>): SlotRow[]
     .sort((a, b) => (start.get(a.event_id) as string).localeCompare(start.get(b.event_id) as string) || a.id.localeCompare(b.id));
 }
 
-/** Contexto das regras do core (aptidão, carga, ranking) com o que está na cópia local. */
-export function weekContext(rows: WeekRows, now: Date): WeekContext {
-  const events = rows.events.filter((e) => !e.ignored).map((e) => toEventLike(e, rows.types));
-  const slots: SlotLike[] = activeSlots(rows).map((s, i) => ({ id: s.id, code: `V${i + 1}`, eventId: s.event_id, jobRoleId: s.job_role_id }));
+/**
+ * Contexto das regras do core (aptidão, carga, ranking) com o que está na cópia local; `bases` é a sede de cada série,
+ * aprendida do histórico (seriesBases).
+ */
+export function weekContext(rows: WeekRows, now: Date, bases?: ReadonlyMap<string, Base>): WeekContext {
+  const rules = seriesRuleMap(rows.seriesRules);
+  const events = rows.events.filter((e) => !e.ignored).map((e) => toEventLike(e, rows.types, bases, rules.get(eventSeries(e.title))));
+  const noHours = new Set(rows.roles.filter((r) => r.no_hours).map((r) => r.id));
+  const slots: SlotLike[] = activeSlots(rows).map((s, i) => ({
+    id: s.id,
+    code: `V${i + 1}`,
+    eventId: s.event_id,
+    jobRoleId: s.job_role_id,
+    ...(noHours.has(s.job_role_id) ? { noHours: true } : {}),
+  }));
   const slotIds = new Set(slots.map((s) => s.id));
   const assignments: AssignmentLike[] = rows.assignments
     .filter((a) => a.person_id && a.status && slotIds.has(a.slot_id))
@@ -150,37 +232,147 @@ export function weekContext(rows: WeekRows, now: Date): WeekContext {
   };
 }
 
-/** Equipe estimada do evento pelo tipo; vazia sem tipo, para tipo sem equipe ou evento que não exige equipe. */
-export function estimatedCrew(e: EventRow, types: readonly ServiceTypeRow[], crew: readonly CrewRow[]): CrewItem[] {
+/**
+ * Equipe estimada do evento pelo tipo, no porte do evento; vazia sem tipo, para tipo sem equipe ou evento que não
+ * exige equipe.
+ */
+export function estimatedCrew(e: EventRow, types: readonly ServiceTypeRow[], crew: readonly CrewRow[], rule?: SeriesRuleRow): CrewItem[] {
   if (!e.service_type_id || e.no_team || e.status === 'cancelled' || e.ignored) return [];
   const type = types.find((t) => t.id === e.service_type_id);
   if (!type || type.no_team) return [];
-  return crewOf(type, crew);
+  // As vagas aprendidas pela série valem enquanto ela tem o mesmo tipo (create_event_slots, migração 0021).
+  if (rule?.crew && rule.crew_type_id === e.service_type_id) return rule.crew.map((c) => ({ job_role_id: c.job_role_id, quantity: c.quantity }));
+  return crewForSize(type, crew, e.size ?? rule?.size);
+}
+
+/** De onde vêm as vagas do evento sem montagem: da série (aprendidas ou porte dela), do histórico ou do tipo. */
+export type CrewOrigin = 'series' | 'history' | null;
+
+export interface AutoSize {
+  size: EventSize;
+  from: 'series' | 'history';
 }
 
 /**
- * Pedido e oferta de horas por função (US-010 AC-3): na prévia, pela equipe estimada dos tipos; com a
- * semana montada, pelas vagas ativas.
+ * Porte aplicado sozinho em cada evento de tipo com porte ainda sem porte escolhido: o que a série aprendeu, senão o
+ * sugerido pelo histórico da série (quando é outro que o padrão do tipo). Vai na montagem da semana.
  */
-export function roleBalance(rows: WeekRows, mode: 'preview' | 'built'): RoleBalance[] {
-  const events = rows.events.filter((e) => !e.ignored).map((e) => toEventLike(e, rows.types));
-  let demand: { jobRoleId: string; hours: number }[];
-  if (mode === 'built') {
-    demand = demandFromSlots(events, activeSlots(rows).map((s, i) => ({ id: s.id, code: `V${i + 1}`, eventId: s.event_id, jobRoleId: s.job_role_id })));
-  } else {
-    demand = rows.events.flatMap((e) => {
-      const hours = eventHours(toEventLike(e, rows.types));
-      return estimatedCrew(e, rows.types, rows.crew).flatMap((c) => Array.from({ length: c.quantity }, () => ({ jobRoleId: c.job_role_id, hours })));
-    });
+export function autoSizes(rows: WeekRows, seriesSizes: ReadonlyMap<string, readonly SeriesSize[]>): Map<string, AutoSize> {
+  const out = new Map<string, AutoSize>();
+  const rules = seriesRuleMap(rows.seriesRules);
+  for (const e of rows.events) {
+    if (e.ignored || e.status === 'cancelled' || isEventSize(e.size)) continue;
+    const type = sizedType(e, rows.types);
+    if (!type) continue;
+    const learned = rules.get(eventSeries(e.title))?.size;
+    if (isEventSize(learned)) {
+      out.set(e.id, { size: learned, from: 'series' });
+      continue;
+    }
+    const s = suggestSize(e.title, seriesSizes, crewTotals(type, rows.crew), rows.weekStart);
+    if (s && s.size !== sizeFor(type, e.size)) out.set(e.id, { size: s.size, from: 'history' });
   }
-  const balance = roleDemandSupply({
-    weekStart: rows.weekStart,
-    demand,
-    people: rows.people.map((p) => toPersonLike(p, rows.personRoles)),
-    absences: rows.absences.map(toAbsenceLike),
+  return out;
+}
+
+/** Tipo do evento quando ele tem porte (Simples, Médio, Grande). */
+export function sizedType(e: EventRow, types: readonly ServiceTypeRow[]): ServiceTypeRow | undefined {
+  const type = types.find((t) => t.id === e.service_type_id);
+  return type?.sized && !type.no_team && !e.no_team ? type : undefined;
+}
+
+/**
+ * Porte sugerido pelo histórico para cada evento da semana com tipo com porte e ainda sem porte escolhido: o da
+ * série do título, quando ela tem passado e é diferente do padrão do tipo. Sem série, fica no padrão.
+ */
+export function sizeSuggestions(rows: WeekRows, seriesSizes: ReadonlyMap<string, readonly SeriesSize[]>): Map<string, SizeSuggestion> {
+  const out = new Map<string, SizeSuggestion>();
+  for (const e of rows.events) {
+    if (e.ignored || e.status === 'cancelled' || isEventSize(e.size)) continue;
+    const type = sizedType(e, rows.types);
+    if (!type) continue;
+    const s = suggestSize(e.title, seriesSizes, crewTotals(type, rows.crew), rows.weekStart);
+    if (s && s.size !== sizeFor(type, e.size)) out.set(e.id, s);
+  }
+  return out;
+}
+
+/** "Semana atual", "Próxima semana", "Semana passada", "Daqui a 3 semanas", "Há 2 semanas". */
+export function relativeWeekLabel(weekStart: string, currentWeek: string): string {
+  const n = Math.round(diffDays(currentWeek, weekStart) / 7);
+  if (n === 0) return 'Semana atual';
+  if (n === 1) return 'Próxima semana';
+  if (n === -1) return 'Semana passada';
+  return n > 1 ? `Daqui a ${n} semanas` : `Há ${-n} semanas`;
+}
+
+export interface TimeOff {
+  key: string;
+  personId: string | null;
+  /** Nome da pessoa; sem pessoa reconhecida, o título do evento da agenda. */
+  name: string;
+  kind: 'ferias' | 'folga' | 'ausencia';
+  from: string;
+  to: string;
+  /** Título do evento, quando veio da agenda. */
+  agendaTitle: string | null;
+}
+
+const TIME_OFF_WORD: [RegExp, TimeOff['kind']][] = [
+  [/\bferias\b/, 'ferias'],
+  [/\bfolgas?\b/, 'folga'],
+  [/\b(ausente|ausencia)\b/, 'ausencia'],
+];
+
+/** Pessoa ativa citada no título: o primeiro nome basta quando é único; senão, precisa de mais um nome. */
+function personInTitle(title: string, people: readonly PersonRow[]): PersonRow | null {
+  const words = new Set(nameTokens(title));
+  const active = people.filter((p) => p.active);
+  const first = (p: PersonRow) => nameTokens(p.name)[0] ?? '';
+  const hits = active.filter((p) => {
+    const tokens = nameTokens(p.name);
+    if (!words.has(first(p))) return false;
+    const sameFirst = active.filter((o) => first(o) === first(p)).length;
+    return sameFirst === 1 || tokens.slice(1).some((t) => t.length > 2 && words.has(t));
   });
-  // Só as funções pedidas na semana; as demais não ajudam a decidir.
-  return balance.filter((b) => b.demandHours > 0);
+  return hits.length === 1 ? (hits[0] ?? null) : null;
+}
+
+/**
+ * Quem está de folga, férias ou ausente na semana: as ausências cadastradas e os eventos da agenda com
+ * "férias", "folga" ou "ausente" no título ou no tipo (com a pessoa reconhecida pelo nome, quando dá).
+ */
+export function weekTimeOff(rows: WeekRows): TimeOff[] {
+  const ws = rows.weekStart;
+  const we = addDays(ws, 6);
+  const clip = (start: string, end: string) => {
+    const from = localDate(new Date(start));
+    const to = localDate(new Date(Math.max(Date.parse(start), Date.parse(end) - 1)));
+    return { from: from < ws ? ws : from, to: to > we ? we : to, inWeek: from <= we && to >= ws };
+  };
+  const names = new Map(rows.people.map((p) => [p.id, p.name]));
+  const out: TimeOff[] = [];
+  for (const a of rows.absences) {
+    if (a.archived_at) continue;
+    const span = clip(a.starts_at, a.ends_at);
+    if (!span.inWeek) continue;
+    out.push({ key: `a:${a.id}`, personId: a.person_id, name: names.get(a.person_id) ?? 'Pessoa', kind: a.kind, from: span.from, to: span.to, agendaTitle: null });
+  }
+  for (const e of rows.events) {
+    if (e.ignored || e.status === 'cancelled') continue;
+    // Pelo título ou pelo tipo do evento (FERIAS, FOLGA).
+    const typeName = rows.types.find((t) => t.id === e.service_type_id)?.name ?? '';
+    const words = nameTokens(`${e.title} ${typeName}`).join(' ');
+    const kind = TIME_OFF_WORD.find(([re]) => re.test(words))?.[1];
+    if (!kind) continue;
+    const span = clip(e.starts_at, e.ends_at);
+    if (!span.inWeek) continue;
+    const person = personInTitle(e.title, rows.people);
+    // A mesma folga cadastrada e na agenda aparece uma vez só.
+    if (person && out.some((o) => o.personId === person.id && o.kind === kind && o.from <= span.to && span.from <= o.to)) continue;
+    out.push({ key: `e:${e.id}`, personId: person?.id ?? null, name: person?.name ?? e.title, kind, from: span.from, to: span.to, agendaTitle: e.title });
+  }
+  return out.sort((a, b) => a.from.localeCompare(b.from) || a.name.localeCompare(b.name, 'pt-BR'));
 }
 
 /** Eventos de cada dia da semana; evento de vários dias aparece em cada dia que ocupa (US-010 EC-4). */
@@ -259,43 +451,17 @@ export function unpublishedChanges(rows: WeekRows): number {
   return n;
 }
 
-export interface PersonLoadRow {
-  personId: string;
-  name: string;
-  hours: number;
-  count: number;
-  limit: number;
-  over: boolean;
-}
-
-/** Carga da semana de cada pessoa ativa (US-014 AC-4), de quem tem mais horas para quem tem menos. */
-export function loadRows(rows: WeekRows, ctx: WeekContext): PersonLoadRow[] {
-  const events = new Map(ctx.events.map((e) => [e.id, e]));
-  const acc = new Map<string, { hours: number; seen: Set<string> }>();
-  for (const a of ctx.assignments) {
-    const e = events.get(a.eventId);
-    if (!e || e.status === 'cancelled' || e.weekStart !== ctx.weekStart) continue;
-    const cur = acc.get(a.personId) ?? { hours: 0, seen: new Set<string>() };
-    if (!cur.seen.has(e.id)) {
-      cur.seen.add(e.id);
-      cur.hours += eventHours(e);
-    }
-    acc.set(a.personId, cur);
-  }
-  return rows.people
-    .filter((p) => p.active)
-    .map((p) => {
-      const cur = acc.get(p.id);
-      const hours = cur?.hours ?? 0;
-      const limit = Number(p.weekly_limit_hours);
-      return { personId: p.id, name: p.name, hours, count: cur?.seen.size ?? 0, limit, over: hours > limit };
-    })
-    .sort((a, b) => b.hours - a.hours || a.name.localeCompare(b.name, 'pt-BR'));
-}
-
 /** Horas em texto: "12 h" ou "2,5 h". */
 export function hoursText(h: number): string {
   return `${Number.isInteger(h) ? h : h.toFixed(1).replace('.', ',')} h`;
+}
+
+/** Quando foi a última vez, contada da semana em escala: "na semana passada", "há 3 semanas", "há 5 meses". */
+export function agoText(lastWeek: string, weekStart: string): string {
+  const weeks = Math.max(1, Math.round(diffDays(lastWeek, weekStart) / 7));
+  if (weeks === 1) return 'na semana passada';
+  if (weeks <= 12) return `há ${weeks} semanas`;
+  return `há ${Math.round(weeks / 4.35)} meses`;
 }
 
 export function activitiesText(n: number): string {
@@ -308,6 +474,8 @@ export const WARNING_LABEL: Record<string, string> = {
   over_limit: 'passa do limite semanal',
   role_not_enabled: 'função não habilitada',
   role_archived: 'função arquivada',
+  off_hours: 'fora do horário de trabalho',
+  other_base: 'outra sede',
 };
 
 export const BLOCKER_LABEL: Record<string, string> = {

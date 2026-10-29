@@ -48,7 +48,8 @@ export class LocalStore extends Dexie {
       const extra = MIRROR_INDEXES[table];
       schema[table] = extra ? `id, updated_at, ${extra}` : 'id, updated_at';
     }
-    this.version(1).stores(schema);
+    // Versão 2: series_rules (migração 0020).
+    this.version(2).stores(schema);
   }
 
   mirror(table: TableName): Table<Row, string> {

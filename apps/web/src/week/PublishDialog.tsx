@@ -12,6 +12,8 @@ const count = (n: number, one: string, many: string) => (n === 1 ? `1 ${one}` : 
 interface PublishDialogProps {
   week: WeekRow;
   summary: PublishSummary;
+  /** Sugestões da grade ainda não confirmadas. */
+  suggested?: number;
   /** Alterações não publicadas, quando a semana já está publicada. */
   changes: number;
   onClose: () => void;
@@ -22,7 +24,7 @@ interface PublishDialogProps {
  * Publicar a semana ou as alterações (US-017, US-018): resumo com vagas abertas, propostas pendentes e
  * alertas; semana sem ninguém escalado pede uma segunda confirmação (US-017 EC-4).
  */
-export function PublishDialog({ week, summary, changes, onClose, onDone }: PublishDialogProps) {
+export function PublishDialog({ week, summary, suggested = 0, changes, onClose, onDone }: PublishDialogProps) {
   const engine = useSyncEngine();
   const first = week.state === 'building';
   const [step, setStep] = useState<'summary' | 'empty'>('summary');
@@ -78,6 +80,11 @@ export function PublishDialog({ week, summary, changes, onClose, onDone }: Publi
         <>
           {!first && <p style={{ marginTop: 0 }}>{count(changes, 'alteração vai para a equipe', 'alterações vão para a equipe')}. Cada pessoa afetada recebe um aviso só.</p>}
           <ul className="plain-list publish-summary" aria-label="Resumo da publicação">
+            {suggested > 0 && (
+              <li role="alert">
+                {count(suggested, 'sugestão não confirmada', 'sugestões não confirmadas')}: não vão para a equipe. Use "Confirmar sugestões" antes, se quiser.
+              </li>
+            )}
             <li>{count(summary.open, 'vaga aberta', 'vagas abertas')}: aparecem para a equipe como a definir.</li>
             <li>{count(summary.proposed, 'proposta pendente', 'propostas pendentes')}: não vão para a equipe, que vê essas vagas como a definir.</li>
             <li>{count(summary.alerts, 'alerta de conflito', 'alertas de conflito')}.</li>

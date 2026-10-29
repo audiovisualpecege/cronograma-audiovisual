@@ -1,4 +1,6 @@
 import type { AbsenceRow, EventRow, JobRoleRow, PublishedRow, SectorRow, ServiceTypeRow, WeekRow } from '../data/catalog';
+import { useMemo } from 'react';
+import { previewCatalog } from '../dev/sizePreview';
 import type { LocalStore } from '../sync/localStore';
 import { useLocalQuery } from '../sync/SyncProvider';
 import type { TableName } from '../sync/types';
@@ -28,5 +30,7 @@ export async function readTeamRows(store: LocalStore, weekStart: string): Promis
 }
 
 export function useTeamRows(weekStart: string): TeamRows | undefined {
-  return useLocalQuery((store) => readTeamRows(store, weekStart), [weekStart]);
+  const rows = useLocalQuery((store) => readTeamRows(store, weekStart), [weekStart]);
+  // No app local, sem a 0019 no banco, as reuniões aparecem como ficariam, ligadas ao setor (dev/sizePreview).
+  return useMemo(() => rows && { ...rows, types: previewCatalog(rows.types, [], rows.roles, rows.sectors).types }, [rows]);
 }

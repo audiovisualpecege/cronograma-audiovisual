@@ -122,6 +122,57 @@ describe('PeoplePage', () => {
     expect(op?.payload).toMatchObject({ name: 'Ana Teste', email: 'ana@exemplo.test', weekly_limit_hours: 44, role_ids: ['r-1'], profile: 'team' });
   });
 
+  it('as funções vão na ordem de prioridade, com o nível de cada uma', async () => {
+    const user = userEvent.setup();
+    const remote = remoteWith([person(1)]);
+    renderWithSync(<PeoplePage />, { remote });
+    await screen.findByText('Pessoa 001');
+    await user.click(screen.getByRole('button', { name: /Nova pessoa/ }));
+    const form = screen.getByRole('form', { name: 'Cadastro de pessoa' });
+    await user.type(within(form).getByLabelText(/^Nome/), 'Bia Teste');
+    await user.type(within(form).getByLabelText(/^E-mail/), 'bia@exemplo.test');
+    await user.click(within(form).getByLabelText('Câmera'));
+    await user.click(within(form).getByLabelText('Áudio'));
+
+    const order = within(form).getByRole('list', { name: 'Funções em ordem de prioridade' });
+    expect(within(order).getAllByRole('listitem').map((li) => li.textContent)).toEqual([expect.stringContaining('Câmera'), expect.stringContaining('Áudio')]);
+    await user.click(within(order).getByRole('button', { name: 'Subir Áudio' }));
+    expect(within(order).getAllByRole('listitem')[0]).toHaveTextContent('Áudio');
+    await user.selectOptions(within(order).getByLabelText('Nível em Câmera'), '3');
+
+    await user.click(within(form).getByRole('button', { name: 'Salvar' }));
+    await waitFor(() =>
+      expect(remote.applyCalls.flat().find((o) => o.kind === 'person.upsert')?.payload).toMatchObject({
+        role_ids: ['r-2', 'r-1'],
+        role_levels: { 'r-1': 3, 'r-2': 2 },
+      }),
+    );
+  });
+
+  it('sede e horário de trabalho vão no cadastro; dia pela metade não salva; "Repetir a segunda" copia para os dias úteis', async () => {
+    const user = userEvent.setup();
+    const remote = remoteWith([person(1, { base: null, work_hours: null })]);
+    renderWithSync(<PeoplePage />, { remote });
+    await user.click(await screen.findByRole('button', { name: 'Abrir Pessoa 001' }));
+    const form = await screen.findByRole('form', { name: 'Cadastro de Pessoa 001' });
+    await user.selectOptions(within(form).getByLabelText(/^Sede/), 'sao_paulo');
+    await user.type(within(form).getByLabelText('Entrada de Seg'), '08:00');
+    await user.click(within(form).getByRole('button', { name: 'Salvar' }));
+    expect(within(form).getByRole('alert')).toHaveTextContent('Confira Seg');
+    expect(remote.applyCalls).toHaveLength(0);
+
+    await user.type(within(form).getByLabelText('Saída de Seg'), '17:00');
+    await user.click(within(form).getByRole('button', { name: 'Repetir a segunda de terça a sexta' }));
+    expect(within(form).getByLabelText('Saída de Sex')).toHaveValue('17:00');
+    await user.click(within(form).getByRole('button', { name: 'Salvar' }));
+    await waitFor(() =>
+      expect(remote.applyCalls.flat().find((o) => o.kind === 'person.upsert')?.payload).toMatchObject({
+        base: 'sao_paulo',
+        work_hours: { '1': ['08:00', '17:00'], '2': ['08:00', '17:00'], '3': ['08:00', '17:00'], '4': ['08:00', '17:00'], '5': ['08:00', '17:00'] },
+      }),
+    );
+  });
+
   it('desativar lista as alocações futuras e envia person.deactivate depois de confirmar', async () => {
     const user = userEvent.setup();
     const remote = remoteWith([person(1), person(5, { name: 'Davi Rocha' })], {

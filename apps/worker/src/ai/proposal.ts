@@ -1,4 +1,4 @@
-// Pré-escala (ADR-012): o core calcula os aptos de cada vaga, a IA escolhe entre eles em lotes de até 60 vagas,
+// Pré-escala (ADR-012): o core calcula os aptos de cada vaga, a IA escolhe entre eles em lotes de até 25 vagas,
 // e cada escolha é conferida de novo por checkEligibility antes de virar assignments.status='proposed'.
 // Vaga confirmada ou travada nunca entra; a proposta só vale depois de um administrador aceitar (ADR-001).
 import {
@@ -16,7 +16,14 @@ import { JobFailure, type JobResult } from '../queue.ts';
 import type { ProposalData, ProposalStore, ProposalWrite } from '../store.ts';
 import { AiError, type AiProvider } from './provider.ts';
 
-export const BATCH_SIZE = 60;
+/**
+ * Vagas por chamada. Eram 60; com semanas de centenas de vagas, a resposta grande vinha torta com frequência, e
+ * um modelo pequeno (MiniCPM5) acompanha melhor lotes menores.
+ */
+export const BATCH_SIZE = 25;
+
+/** O motivo da falha da IA, curto, para guardar no pedido e mostrar na tela. */
+const detail = (e: AiError) => e.message.slice(0, 300);
 export const NOTE_NO_FIT = 'a IA não achou alguém apto';
 export const NOTE_NO_PROPOSAL = 'sem proposta';
 export const AI_SILENT = 'A IA não respondeu agora; monte à mão ou tente mais tarde.';
@@ -39,10 +46,12 @@ export function weekContext(data: ProposalData, now: Date, replacePending: boole
       noTeam: e.no_team || (e.service_type_id ? (typeNoTeam.get(e.service_type_id) ?? false) : false),
     }));
   const start = new Map(events.map((e) => [e.id, e.startsAt.getTime()]));
+  // Função que não ocupa horário (Disponibilizador): sem horas na carga e sem bater horário.
+  const noHours = new Set(data.jobRoles.filter((r) => r.no_hours).map((r) => r.id));
   const slots = data.slots
     .filter((s) => start.has(s.event_id))
     .sort((a, b) => (start.get(a.event_id) as number) - (start.get(b.event_id) as number) || a.id.localeCompare(b.id))
-    .map((s, i) => ({ id: s.id, code: `V${i + 1}`, eventId: s.event_id, jobRoleId: s.job_role_id }));
+    .map((s, i) => ({ id: s.id, code: `V${i + 1}`, eventId: s.event_id, jobRoleId: s.job_role_id, ...(noHours.has(s.job_role_id) ? { noHours: true } : {}) }));
   const assignments: AssignmentLike[] = data.assignments
     .filter((a) => a.person_id && a.status)
     .map((a) => ({
@@ -65,7 +74,7 @@ export function weekContext(data: ProposalData, now: Date, replacePending: boole
     slots,
     assignments,
     absences: data.absences.map((a) => ({ personId: a.person_id, startsAt: new Date(a.starts_at), endsAt: new Date(a.ends_at) })),
-    jobRoles: data.jobRoles,
+    jobRoles: data.jobRoles.map((r) => ({ id: r.id, code: r.code })),
     serviceTypes: data.serviceTypes,
   };
 }
@@ -87,6 +96,7 @@ export class ProposalRunner {
     if (isWeekPast(data.week.week_start, now)) throw new JobFailure('Semana passada fica só para consulta.');
     const provider = await this.providerFor();
     if (!provider) throw new JobFailure('Configure a chave da IA antes de pedir a proposta.');
+    const batchSize = provider.batchSize ?? BATCH_SIZE;
 
     const ctx = weekContext(data, now, payload.replace_pending !== false);
     const history = buildHistoryIndex(
@@ -102,7 +112,7 @@ export class ProposalRunner {
 
     const result: JobResult = {
       week_id: weekId,
-      batches_total: buildProposalBatches(ctx, history, { batchSize: BATCH_SIZE }).length,
+      batches_total: buildProposalBatches(ctx, history, { batchSize }).length,
       batches_done: 0,
       slots_open: initialOpen.size,
       proposed: 0,
@@ -116,7 +126,7 @@ export class ProposalRunner {
 
     for (let index = 0; ; index++) {
       const view: WeekContext = { ...ctx, slots: ctx.slots.filter((s) => !skipped.has(s.id)) };
-      const pending = buildProposalBatches(view, history, { batchSize: BATCH_SIZE, prior: picks });
+      const pending = buildProposalBatches(view, history, { batchSize, prior: picks });
       const batch = pending[0];
       if (!batch) break;
       batch.index = index;
@@ -137,13 +147,14 @@ export class ProposalRunner {
           dedupe: `ai_failed:${jobId}`,
         });
         // Nada chegou: nada muda (US-013 EC-2). Parte chegou: fica guardada e o resto fica "sem proposta" (EC-9).
-        if (index === 0) throw new JobFailure(AI_SILENT, { ...result, error_kind: e.kind });
+        if (index === 0) throw new JobFailure(AI_SILENT, { ...result, error_kind: e.kind, error_detail: detail(e) });
         const rest = pending.flatMap((b) => b.slots).map((s) => (slotByCode.get(s.slot) as { id: string }).id);
         await this.store.writeProposals(rest.map((id) => ({ slot_id: id, person_id: null, reason: NOTE_NO_PROPOSAL, keep_person: true })));
         result.without_proposal = rest.length;
         result.without_proposal_slots = rest;
         result.partial = true;
         result.error_kind = e.kind;
+        result.error_detail = detail(e);
         break;
       }
 

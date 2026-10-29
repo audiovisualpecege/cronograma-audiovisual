@@ -7,7 +7,10 @@ import {
   localDate,
   overlaps,
   toLocalIso,
+  zonedTime,
 } from './time.ts';
+import { nameTokens } from './names.ts';
+import { ROLE_LEVELS } from './types.ts';
 import type {
   AssignmentLike,
   Blocker,
@@ -20,6 +23,7 @@ import type {
   SlotLike,
   Warning,
   WeekContext,
+  WorkHours,
 } from './types.ts';
 
 /** Segunda-feira da semana de um instante ou de uma data 'YYYY-MM-DD', em Brasília. */
@@ -69,25 +73,32 @@ function indexBy<T, K>(items: T[], key: (t: T) => K): Map<K, T> {
   return m;
 }
 
+/** Vagas de função que não ocupa horário (Disponibilizador). */
+function freeSlots(ctx: WeekContext): Set<string> {
+  return new Set(ctx.slots.filter((s) => s.noHours).map((s) => s.id));
+}
+
 function personAssignments(personId: string, ctx: WeekContext, exceptSlotId?: string) {
   const events = indexBy(ctx.events, (e) => e.id);
-  const out: { a: AssignmentLike; e: EventLike }[] = [];
+  const free = freeSlots(ctx);
+  const out: { a: AssignmentLike; e: EventLike; noHours: boolean }[] = [];
   for (const a of ctx.assignments) {
     if (a.personId !== personId || a.slotId === exceptSlotId) continue;
     const e = events.get(a.eventId);
     if (!e || e.status === 'cancelled') continue;
-    out.push({ a, e });
+    out.push({ a, e, noHours: free.has(a.slotId) });
   }
   return out;
 }
 
+/** Horas e atividades da semana; a vaga de função que não ocupa horário conta a atividade, mas não as horas. */
 function loadOf(personId: string, ctx: WeekContext, exceptSlotId?: string) {
   const seen = new Set<string>();
   let hours = 0;
-  for (const { e } of personAssignments(personId, ctx, exceptSlotId)) {
+  for (const { e, noHours } of personAssignments(personId, ctx, exceptSlotId)) {
     if (e.weekStart !== ctx.weekStart || seen.has(e.id)) continue;
     seen.add(e.id);
-    hours += eventHours(e);
+    if (!noHours) hours += eventHours(e);
   }
   return { hours, count: seen.size };
 }
@@ -95,6 +106,30 @@ function loadOf(personId: string, ctx: WeekContext, exceptSlotId?: string) {
 /** Carga da semana: horas e atividades de alocações propostas e confirmadas, sem eventos cancelados. */
 export function personLoad(personId: string, ctx: WeekContext): { hours: number; count: number } {
   return loadOf(personId, ctx);
+}
+
+/**
+ * O evento sai do horário de trabalho: em algum dia dele a pessoa não trabalha, ou o trecho do dia começa antes da
+ * entrada ou acaba depois da saída. Dia inteiro sem período não conta. Espelha public.outside_work_hours (0022).
+ */
+export function outsideWorkHours(hours: WorkHours, e: EventLike): boolean {
+  const iv = eventInterval(e);
+  if (!iv) return false;
+  for (const d of daysOf({ startsAt: iv.start, endsAt: iv.end })) {
+    const w = hours[String(isoWeekday(d))];
+    if (!w) return true;
+    const from = Math.max(iv.start.getTime(), zonedTime(d).getTime());
+    const to = Math.min(iv.end.getTime(), zonedTime(addDays(d, 1)).getTime());
+    if (from < zonedTime(d, w[0]).getTime() || to > zonedTime(d, w[1]).getTime()) return true;
+  }
+  return false;
+}
+
+/** A pessoa é de outra sede: evento externo é só de Piracicaba; o resto segue a sede da série. Sem sede, não pesa. */
+export function otherBase(person: PersonLike, e: EventLike): boolean {
+  if (!person.base) return false;
+  if (e.external) return person.base !== 'piracicaba';
+  return Boolean(e.base && e.base !== person.base);
 }
 
 function find<T extends { id: string }>(items: T[], id: string, what: string): T {
@@ -124,7 +159,8 @@ export function checkEligibility(personId: string, slotId: string, ctx: WeekCont
 
   const busy = busyInterval(event);
   const others = personAssignments(personId, ctx, slotId).filter(({ e }) => e.id !== event.id);
-  if (others.some(({ e }) => overlaps(busyInterval(e), busy))) warnings.push('overlap');
+  // Função que não ocupa horário não bate horário, nem nesta vaga nem nas outras da pessoa.
+  if (!slot.noHours && others.some(({ e, noHours }) => !noHours && overlaps(busyInterval(e), busy))) warnings.push('overlap');
 
   if (
     ctx.absences.some(
@@ -139,10 +175,13 @@ export function checkEligibility(personId: string, slotId: string, ctx: WeekCont
 
   const load = loadOf(personId, { ...ctx, weekStart: event.weekStart }, slotId);
   const alreadyCounted = others.some(({ e }) => e.id === event.id);
-  const extra = alreadyCounted ? 0 : eventHours(event);
+  const extra = alreadyCounted || slot.noHours ? 0 : eventHours(event);
   if (load.hours + extra > person.weeklyLimitHours) warnings.push('over_limit');
 
   if (!person.roleIds.includes(slot.jobRoleId)) warnings.push('role_not_enabled');
+  // Função que não ocupa horário (subir vídeo) se faz a qualquer hora.
+  if (!slot.noHours && person.workHours && outsideWorkHours(person.workHours, event)) warnings.push('off_hours');
+  if (otherBase(person, event)) warnings.push('other_base');
 
   return { ok: blockers.length === 0 && warnings.length === 0, blockers, warnings };
 }
@@ -153,19 +192,101 @@ export function checkEligibility(personId: string, slotId: string, ctx: WeekCont
 export interface HistoryIndex {
   /** Vezes que a pessoa fez a função naquele tipo de serviço. */
   hist(personId: string, jobRoleId: string, serviceTypeId: string | null | undefined): number;
+  /**
+   * Histórico na função e no tipo com o recente pesando mais (meia-vida de 26 semanas), só o que veio antes da
+   * semana. Só existe quando os fatos trazem a semana.
+   */
+  recent?(personId: string, jobRoleId: string, serviceTypeId: string | null | undefined, weekStart: string): number;
+  /** Vezes que a pessoa fez a função neste mesmo evento (série pelo título) nas 8 semanas antes da semana. */
+  series?(personId: string, jobRoleId: string, title: string, weekStart: string): number;
+  /** Semana da última vez que a pessoa fez a função no tipo, antes da semana; nula quando nunca fez. */
+  lastWeek?(personId: string, jobRoleId: string, serviceTypeId: string | null | undefined, weekStart: string): string | null;
+  /** Semana da última vez que a pessoa fez a função neste mesmo evento (série pelo título), antes da semana. */
+  lastSeriesWeek?(personId: string, jobRoleId: string, title: string, weekStart: string): string | null;
 }
 
-export function buildHistoryIndex(facts: Pick<HistoryFact, 'personId' | 'jobRoleId' | 'serviceTypeId'>[]): HistoryIndex {
+/** A semana mais recente da lista antes de `weekStart`. */
+function latestBefore(weeks: readonly string[] | undefined, weekStart: string): string | null {
+  let best: string | null = null;
+  for (const w of weeks ?? []) if (w < weekStart && (!best || w > best)) best = w;
+  return best;
+}
+
+/** Meia-vida do peso do histórico, em semanas. */
+export const HISTORY_HALF_LIFE_WEEKS = 26;
+/** Janela da turma fixa: quem fez o mesmo evento nestas semanas antes vai na frente. */
+export const SERIES_WINDOW_WEEKS = 8;
+
+/** Palavras que mudam de uma semana para outra na mesma turma: ficam fora da série. */
+const SERIES_NOISE = new Set(['aula', 'aulas', 'modulo', 'parte', 'encontro', 'turma', 'dia', 'semana', 'disciplina', 'professor', 'professora', 'prof', 'id']);
+
+/**
+ * Série do evento pelo título, para achar a turma fixa: a primeira linha do título sem números e sem as
+ * palavras que mudam de semana para semana (aula, módulo, parte...). Um rótulo curto antes de ":" ("GRAVAÇÃO:",
+ * "*DISPONIBILIZAR:", "Curso:") sai, para "GRAVAÇÃO: Virada Empresarial" e "GRAVAÇÃO: Reels" não virarem a mesma
+ * série. "MBA em Gestão de Projetos - Aula 3" e "MBA em Gestão de Projetos - Aula 4" são a mesma série.
+ */
+export function eventSeries(title: string): string {
+  // Só a primeira linha: nas planilhas e agendas, as linhas de baixo trazem a disciplina e o professor da semana.
+  const first = title.split(/\r?\n/)[0] ?? title;
+  const colon = first.indexOf(': ');
+  const label = colon > 0 ? nameTokens(first.slice(0, colon)) : [];
+  const body = label.length > 0 && label.length <= 2 ? first.slice(colon + 2) : first;
+  return nameTokens(body)
+    .filter((t) => !/^[0-9]+$/.test(t) && !SERIES_NOISE.has(t))
+    .join(' ');
+}
+
+const WEEK_MS = 7 * 86_400_000;
+const weeksBetween = (from: string, to: string) => (Date.parse(to) - Date.parse(from)) / WEEK_MS;
+
+export function buildHistoryIndex(
+  facts: (Pick<HistoryFact, 'personId' | 'jobRoleId' | 'serviceTypeId'> & Partial<Pick<HistoryFact, 'weekStart' | 'title'>>)[],
+): HistoryIndex {
   const counts = new Map<string, number>();
+  const dated = new Map<string, string[]>();
+  const bySeries = new Map<string, string[]>();
+  let hasDates = false;
   for (const f of facts) {
-    if (!f.personId || !f.jobRoleId || !f.serviceTypeId) continue;
+    if (!f.personId || !f.jobRoleId) continue;
+    if (f.weekStart && f.title) {
+      const s = `${f.personId}|${f.jobRoleId}|${eventSeries(f.title)}`;
+      bySeries.set(s, [...(bySeries.get(s) ?? []), f.weekStart]);
+    }
+    if (!f.serviceTypeId) continue;
     const k = `${f.personId}|${f.jobRoleId}|${f.serviceTypeId}`;
     counts.set(k, (counts.get(k) ?? 0) + 1);
+    if (f.weekStart) {
+      hasDates = true;
+      dated.set(k, [...(dated.get(k) ?? []), f.weekStart]);
+    }
   }
-  return {
+  const index: HistoryIndex = {
     hist: (personId, jobRoleId, serviceTypeId) =>
       serviceTypeId ? (counts.get(`${personId}|${jobRoleId}|${serviceTypeId}`) ?? 0) : 0,
   };
+  if (!hasDates) return index;
+  index.recent = (personId, jobRoleId, serviceTypeId, weekStart) => {
+    if (!serviceTypeId) return 0;
+    let sum = 0;
+    for (const w of dated.get(`${personId}|${jobRoleId}|${serviceTypeId}`) ?? []) {
+      const age = weeksBetween(w, weekStart);
+      if (age > 0) sum += 0.5 ** (age / HISTORY_HALF_LIFE_WEEKS);
+    }
+    return sum;
+  };
+  index.series = (personId, jobRoleId, title, weekStart) => {
+    let n = 0;
+    for (const w of bySeries.get(`${personId}|${jobRoleId}|${eventSeries(title)}`) ?? []) {
+      const age = weeksBetween(w, weekStart);
+      if (age > 0 && age <= SERIES_WINDOW_WEEKS) n++;
+    }
+    return n;
+  };
+  index.lastWeek = (personId, jobRoleId, serviceTypeId, weekStart) =>
+    serviceTypeId ? latestBefore(dated.get(`${personId}|${jobRoleId}|${serviceTypeId}`), weekStart) : null;
+  index.lastSeriesWeek = (personId, jobRoleId, title, weekStart) => latestBefore(bySeries.get(`${personId}|${jobRoleId}|${eventSeries(title)}`), weekStart);
+  return index;
 }
 
 /** Fração do maior histórico que ainda conta como empate próximo. */
@@ -175,34 +296,134 @@ const byCode = (a: { code: string }, b: { code: string }) =>
   a.code.localeCompare(b.code, 'en', { numeric: true });
 
 /**
- * Aptos da vaga em ordem: o grupo de empate (hist >= 0,8 x maior hist, ou todos quando o maior é 0)
- * por menor carga em horas e depois em atividades; os demais por histórico. Só entra quem não tem
- * bloqueio nem alerta.
+ * Aptos da vaga em ordem (só entra quem não tem bloqueio nem alerta, menos o "fora do horário"):
+ *   0. a turma fixa gravada da série (titular, depois reserva), quando alguém respondeu "virou o titular?";
+ *   1. a turma fixa: quem fez a função neste mesmo evento nas 8 semanas antes, mais vezes primeiro, no horário ou
+ *      fora dele;
+ *   2. dentro do horário, o grupo de empate do histórico (>= 0,8 x o maior, ou todos quando o maior é 0), pela
+ *      prioridade da função na lista da pessoa, depois menor carga em horas e em atividades;
+ *   3. dentro do horário, os demais pelo histórico;
+ *   4. fora do horário, pelo histórico (pedido do Raoni em 27/10/2026: pode ser sugerido, com o aviso).
+ * O histórico é o recente pesando mais quando o índice tem as datas; senão, a contagem de sempre. Sem datas
+ * nem prioridade definida, a ordem é a mesma de antes (só grupo de empate e carga).
  */
 export function rankCandidates(slotId: string, ctx: WeekContext, history: HistoryIndex): Candidate[] {
   const slot = find(ctx.slots, slotId, 'vaga');
   const event = find(ctx.events, slot.eventId, 'evento');
   const weekCtx = { ...ctx, weekStart: event.weekStart };
-  const apt: Candidate[] = [];
+  const apt: (Candidate & { score: number })[] = [];
   for (const p of ctx.people) {
-    if (!checkEligibility(p.id, slotId, ctx).ok) continue;
+    const elig = checkEligibility(p.id, slotId, ctx);
+    if (elig.blockers.length > 0 || elig.warnings.some((w) => w !== 'off_hours')) continue;
+    const offHours = elig.warnings.includes('off_hours');
+    const pinned = event.titulars?.[slot.jobRoleId]?.indexOf(p.id) ?? -1;
     const load = loadOf(p.id, weekCtx, slotId);
+    const hist = history.hist(p.id, slot.jobRoleId, event.serviceTypeId);
+    const pos = p.rolePriority?.indexOf(slot.jobRoleId) ?? -1;
+    const series = event.title && history.series ? history.series(p.id, slot.jobRoleId, event.title, event.weekStart) : 0;
+    const level = p.roleLevels?.[slot.jobRoleId];
     apt.push({
       personId: p.id,
       code: p.code,
-      hist: history.hist(p.id, slot.jobRoleId, event.serviceTypeId),
+      hist,
       loadHours: load.hours,
       loadCount: load.count,
       inTieGroup: false,
+      ...(series > 0 ? { series } : {}),
+      ...(pos >= 0 ? { priority: pos } : {}),
+      ...(level !== undefined ? { level } : {}),
+      ...(offHours ? { offHours } : {}),
+      ...(pinned >= 0 ? { pinned } : {}),
+      score: history.recent ? history.recent(p.id, slot.jobRoleId, event.serviceTypeId, event.weekStart) : hist,
     });
   }
-  const maxHist = apt.reduce((m, c) => Math.max(m, c.hist), 0);
-  for (const c of apt) c.inTieGroup = maxHist === 0 || c.hist >= TIE_RATIO * maxHist;
-  const byLoad = (a: Candidate, b: Candidate) =>
-    a.loadHours - b.loadHours || a.loadCount - b.loadCount || b.hist - a.hist || byCode(a, b);
-  const byHist = (a: Candidate, b: Candidate) =>
-    b.hist - a.hist || a.loadHours - b.loadHours || a.loadCount - b.loadCount || byCode(a, b);
-  return [...apt.filter((c) => c.inTieGroup).sort(byLoad), ...apt.filter((c) => !c.inTieGroup).sort(byHist)];
+  const prio = (c: Candidate) => c.priority ?? 0;
+  // Nível: no trabalho complexo, Referência primeiro; no simples, a Referência vai por último (fica livre para
+  // os complexos) e Apoio e Titular empatam.
+  const lvl = (c: Candidate) => {
+    const l = c.level ?? ROLE_LEVELS.titular;
+    return event.complex ? -l : l === ROLE_LEVELS.referencia ? 1 : 0;
+  };
+  const pinnedFirst = apt.filter((c) => c.pinned !== undefined).sort((a, b) => (a.pinned ?? 0) - (b.pinned ?? 0));
+  const free = apt.filter((c) => c.pinned === undefined);
+  const fixed = free.filter((c) => (c.series ?? 0) > 0);
+  const rest = free.filter((c) => !c.series && !c.offHours);
+  const late = free.filter((c) => !c.series && c.offHours);
+  const maxScore = rest.reduce((m, c) => Math.max(m, c.score), 0);
+  for (const c of apt) c.inTieGroup = (c.series ?? 0) > 0 || (!c.offHours && (maxScore === 0 || c.score >= TIE_RATIO * maxScore));
+  const bySeries = (a: (typeof apt)[number], b: (typeof apt)[number]) =>
+    (b.series ?? 0) - (a.series ?? 0) || lvl(a) - lvl(b) || prio(a) - prio(b) || a.loadHours - b.loadHours || b.score - a.score || byCode(a, b);
+  const byLoad = (a: (typeof apt)[number], b: (typeof apt)[number]) =>
+    lvl(a) - lvl(b) || prio(a) - prio(b) || a.loadHours - b.loadHours || a.loadCount - b.loadCount || b.score - a.score || byCode(a, b);
+  const byHist = (a: (typeof apt)[number], b: (typeof apt)[number]) =>
+    b.score - a.score || lvl(a) - lvl(b) || prio(a) - prio(b) || a.loadHours - b.loadHours || a.loadCount - b.loadCount || byCode(a, b);
+  const ordered = [
+    ...pinnedFirst,
+    ...fixed.sort(bySeries),
+    ...rest.filter((c) => c.inTieGroup).sort(byLoad),
+    ...rest.filter((c) => !c.inTieGroup).sort(byHist),
+    ...late.sort(byHist),
+  ];
+  // O score (histórico ponderado) é só para ordenar; quem chama recebe os campos de Candidate.
+  return ordered.map((c) => {
+    const out: Candidate = { personId: c.personId, code: c.code, hist: c.hist, loadHours: c.loadHours, loadCount: c.loadCount, inTieGroup: c.inTieGroup };
+    if (c.series) out.series = c.series;
+    if (c.priority !== undefined) out.priority = c.priority;
+    if (c.level !== undefined) out.level = c.level;
+    if (c.offHours) out.offHours = true;
+    if (c.pinned !== undefined) out.pinned = c.pinned;
+    return out;
+  });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Escala sugerida pelo histórico (sem IA), a semana inteira de uma vez.
+
+/**
+ * Ordem de preenchimento: 1) uma pessoa em cada evento (a primeira vaga aberta de cada um), para nenhuma demanda
+ * ficar sem ninguém; 2) as outras vagas dos eventos que não são reunião; 3) por último, as reuniões. Dentro de
+ * cada passo, em ordem de horário.
+ */
+export function fillOrder<S extends { id: string; eventId: string }>(slots: readonly S[], isMeeting: (eventId: string) => boolean): S[] {
+  const first: S[] = [];
+  const seen = new Set<string>();
+  for (const s of slots) {
+    if (isMeeting(s.eventId) || seen.has(s.eventId)) continue;
+    seen.add(s.eventId);
+    first.push(s);
+  }
+  const picked = new Set(first.map((s) => s.id));
+  const rest = slots.filter((s) => !picked.has(s.id) && !isMeeting(s.eventId));
+  const meetings = slots.filter((s) => isMeeting(s.eventId));
+  return [...first, ...rest, ...meetings];
+}
+
+/**
+ * A escala da semana pelo ranking, vaga por vaga, cada escolha contando na carga da seguinte:
+ *   1. primeiro as turmas fixas da semana toda: quem fez o mesmo evento nas 8 semanas antes fica com a vaga,
+ *      antes que um evento no mesmo horário o ocupe;
+ *   2. depois o resto, pela fillOrder (uma pessoa por evento, as demais vagas, reuniões por último).
+ * Devolve o candidato escolhido de cada vaga (com o histórico, a turma fixa e o nível, para o motivo).
+ */
+export function proposeWeek(ctx: WeekContext, history: HistoryIndex, isMeeting: (eventId: string) => boolean = () => false): Map<string, Candidate> {
+  const work: WeekContext = { ...ctx, assignments: ctx.assignments.filter((a) => a.status === 'confirmed' || a.locked) };
+  const out = new Map<string, Candidate>();
+  const take = (slot: SlotLike, c: Candidate) => {
+    work.assignments.push({ slotId: slot.id, eventId: slot.eventId, personId: c.personId, status: 'proposed', locked: false });
+    out.set(slot.id, c);
+  };
+  const order = fillOrder(openSlots(work), isMeeting);
+  for (const slot of order) {
+    if (isMeeting(slot.eventId)) continue;
+    const best = rankCandidates(slot.id, work, history)[0];
+    if (best?.series || best?.pinned !== undefined) take(slot, best);
+  }
+  for (const slot of order) {
+    if (out.has(slot.id)) continue;
+    const best = rankCandidates(slot.id, work, history)[0];
+    if (best) take(slot, best);
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -302,7 +523,7 @@ export function buildProposalBatches(
         type: codeOf(ctx.serviceTypes, e.serviceTypeId),
         start: toLocalIso(iv.start),
         end: toLocalIso(iv.end),
-        hours: eventHours(e),
+        hours: s.noHours ? 0 : eventHours(e),
         candidates: ranked.map((c) => {
           loadFor(c.personId);
           return { person: c.code, hist: c.hist, loadHours: c.loadHours, loadCount: c.loadCount, inTieGroup: c.inTieGroup };

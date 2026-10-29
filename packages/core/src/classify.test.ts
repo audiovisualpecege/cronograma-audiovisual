@@ -46,6 +46,37 @@ describe('classificação por palavra-chave e histórico', () => {
   });
 });
 
+describe('começo do título e série', () => {
+  const rules = [
+    { id: 'mba', code: 'T1', keywords: ['^mba', '^poli'] },
+    { id: 'interna', code: 'T2', keywords: ['^reuniao'] },
+    { id: 'mediadores', code: 'T3', keywords: ['^reuniao mediadores'] },
+  ];
+  // A planilha antiga marcou o título igual como aula.
+  const dirty: TitleIndex = [{ title: 'Reunião Mediadores POLI USP PRO', serviceTypeId: 'mba' }];
+
+  it('"Reunião Mediadores POLI USP PRO" é reunião, mesmo com o histórico dizendo aula', () => {
+    expect(classifyTitle('Reunião Mediadores POLI USP PRO', rules, dirty)).toMatchObject({ typeId: 'mediadores', certainty: 'alta', source: 'keyword' });
+  });
+
+  it('"Reunião" sozinha vai para a reunião geral; a palavra de começo não vale no meio do título', () => {
+    expect(classifyTitle('Reunião com a coordenação Unesp', rules, [])).toMatchObject({ typeId: 'interna' });
+    expect(classifyTitle('Aula MBA depois da reunião', rules, []).typeId).toBeNull();
+    expect(classifyTitle('POLI USP: Indústria 4.0', rules, [])).toMatchObject({ typeId: 'mba' });
+  });
+
+  it('empate entre dois tipos com o mesmo começo fica para as outras regras', () => {
+    const tie = [...rules, { id: 'outro', code: 'T4', keywords: ['^mba'] }];
+    expect(classifyTitle('MBA Gestão', tie, []).typeId).toBeNull();
+  });
+
+  it('o tipo aprendido pela série vence o começo do título', () => {
+    const series = new Map([['reuniao mediadores poli usp pro', 'mba']]);
+    expect(classifyTitle('Reunião Mediadores POLI USP PRO', rules, [], series)).toMatchObject({ typeId: 'mba', certainty: 'alta', source: 'series' });
+    expect(classifyTitle('Reunião Mediadores POLI USP PRO', rules, [], new Map([['reuniao mediadores poli usp pro', 'arquivado']]))).toMatchObject({ typeId: 'mediadores' });
+  });
+});
+
 const at = (h: string) => zonedTime('2026-10-21', h);
 const dup = (id: string, origin: 'calendar' | 'internal', source: string | null, title: string, start: string, end: string): DuplicateCandidate => ({
   id,

@@ -7,7 +7,7 @@ import { FakeStore } from '../test/fakeStore.ts';
 import { GeminiFake, chooseFirstFree, fakeClock } from '../test/mocks.ts';
 import { silentLogger } from '../log.ts';
 import { GeminiProvider } from './gemini.ts';
-import { NOTE_NO_FIT, NOTE_NO_PROPOSAL, ProposalRunner } from './proposal.ts';
+import { BATCH_SIZE, NOTE_NO_FIT, NOTE_NO_PROPOSAL, ProposalRunner } from './proposal.ts';
 import { AiError, CallSpacer, paced, type AiProvider, type ProposalAnswer } from './provider.ts';
 
 const WEEK = '2026-10-26';
@@ -103,13 +103,14 @@ describe('ProposalRunner', () => {
       if (call === 2) throw new AiError('quota', 'limite');
       return firstCandidate(b);
     });
-    const { store, run } = runner(week(61), provider);
+    // Lotes de 25 (BATCH_SIZE): 26 vagas dão 2 lotes.
+    const { store, run } = runner(week(BATCH_SIZE + 1), provider);
     const res = await run.run('job-1', { week_id: 'week-b' }, progress);
     expect(store.writes).toHaveLength(2);
-    expect(store.writes[0]).toHaveLength(60);
+    expect(store.writes[0]).toHaveLength(BATCH_SIZE);
     expect(store.writes[0]?.every((w) => w.person_id !== null)).toBe(true);
-    expect(store.writes[1]).toEqual([{ slot_id: 's061', person_id: null, reason: NOTE_NO_PROPOSAL, keep_person: true }]);
-    expect(res).toMatchObject({ batches_total: 2, batches_done: 1, proposed: 60, without_proposal: 1, partial: true, ai_quota_hits: 1 });
+    expect(store.writes[1]).toEqual([{ slot_id: 's026', person_id: null, reason: NOTE_NO_PROPOSAL, keep_person: true }]);
+    expect(res).toMatchObject({ batches_total: 2, batches_done: 1, proposed: BATCH_SIZE, without_proposal: 1, partial: true, ai_quota_hits: 1, error_detail: 'limite' });
     expect(store.notices).toEqual([expect.objectContaining({ kind: 'ai_failed', title: 'IA sem resposta' })]);
   });
 
@@ -154,7 +155,8 @@ describe('ProposalRunner', () => {
       times.push(clock.now().getTime());
       return firstCandidate(b);
     });
-    const { run } = runner(week(121), paced(provider, new CallSpacer(clock)), clock);
+    // Três lotes: 2 cheios e mais 1 vaga.
+    const { run } = runner(week(2 * BATCH_SIZE + 1), paced(provider, new CallSpacer(clock)), clock);
     const res = await run.run('job-1', { week_id: 'week-b' }, progress);
     expect(times).toHaveLength(3);
     expect(times[1]! - times[0]!).toBeGreaterThanOrEqual(12_000);
