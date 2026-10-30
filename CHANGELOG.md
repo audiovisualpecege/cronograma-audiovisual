@@ -3,6 +3,32 @@
 Cada versão nova entra no topo, com a data e o que mudou para quem usa.
 PATCH para um conserto, MINOR para algo novo, MAJOR quando o jeito de usar muda.
 
+## 1.1.2 (29/10/2026)
+
+- Semana mais enxuta: a situação (Em montagem, Publicada) fica ao lado do título, sem os nomes das semanas
+  vizinhas e sem as frases de explicação. Visualização, placar, filtro e ações numa linha só; o placar mostra só o
+  que não é zero, e "Identificar tipos (12)" virou um botão com a contagem.
+- Fichas das vagas alinhadas: o "!" ou o "✓" e a lixeira ficam sempre na mesma coluna, à direita.
+- O que não pede equipe (reuniões, NAO ESCALAR) entra na ordem do horário, como as outras atividades, sem ficar
+  apagado no fim do dia. Só os cancelados vão para o fim, apagados.
+- O que não pede equipe tem o mesmo cartão das outras atividades, só sem as vagas. "NÃO MARCAR NADA" (NAO ESCALAR)
+  leva listras leves, para quem monta a agenda ver de longe.
+- Linha do tempo como no Google Agenda: cada atividade mostra o título, a hora e quantas vagas faltam; as vagas se
+  escolhem no painel que abre com um clique. O dia cabe na largura da tela, e o cartão estreito vem para a frente
+  em tamanho normal ao passar o mouse.
+- Trocar de semana esmaece o conteúdo todo de uma vez, sem piscar.
+- Na grade, segurar o clique fora dos cartões e arrastar rola os dias para os lados.
+- "+ vaga" mostra primeiro as funções que a atividade já tem e depois os setores; o setor abre as funções dele.
+- Na linha do tempo, − e + no canto de cima à direita mudam a altura das horas (a escolha fica lembrada).
+- "Apagar atividade" no painel do evento: ela sai do cronograma e as pessoas ficam livres. Como o app só lê o
+  Google Agenda, o evento da agenda continua lá; depois de "Reler agora", o app mostra o que foi apagado aqui e
+  segue na agenda (manter fora ou trazer de volta) e as atividades que só existem no cronograma (manter ou apagar).
+  Precisa da migração 0025.
+- Edição do tipo de serviço mais limpa: o banco de ícones ocupa a largura toda (era uma coluna estreita e comprida),
+  a equipe mostra "Função" e "Qtd." uma vez só, com a quantidade estreita, e as opções e explicações ficaram curtas.
+- Painel do evento sem o título cortado atrás da barra do topo, e sem "Tipo" repetido nem a certeza do tipo.
+- Os cartões da coluna de hoje não repetem o selo "hoje".
+
 ## 1.1.1 (29/10/2026)
 
 - Na Semana, o que não pede equipe (NAO ESCALAR, reuniões, folgas) mostra o nome do tipo junto do título. Antes

@@ -153,7 +153,11 @@ describe('PeoplePage', () => {
     const user = userEvent.setup();
     const remote = remoteWith([person(1, { base: null, work_hours: null })]);
     renderWithSync(<PeoplePage />, { remote });
-    await user.click(await screen.findByRole('button', { name: 'Abrir Pessoa 001' }));
+    // Abre o cadastro só com as funções já lidas: antes delas, salvar acusa também "escolha uma função" (no CI, mais
+    // lento, isso acontecia e o teste achava dois avisos).
+    const open = await screen.findByRole('button', { name: 'Abrir Pessoa 001' });
+    await waitFor(() => expect(open).toHaveTextContent('Câmera'));
+    await user.click(open);
     const form = await screen.findByRole('form', { name: 'Cadastro de Pessoa 001' });
     await user.selectOptions(within(form).getByLabelText(/^Sede/), 'sao_paulo');
     await user.type(within(form).getByLabelText('Entrada de Seg'), '08:00');

@@ -1,8 +1,8 @@
 import { DangerTriangleIcon } from '@solar-icons/react/bold-duotone';
-import { buildSeriesSizes, localDate, personLoad, SIZE_LABEL, weekStartOf, zonedTime, type EventSize, type SizeSuggestion, type WeekContext } from '@cronograma/core';
-import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { buildSeriesSizes, personLoad, SIZE_LABEL, weekStartOf, zonedTime, type EventSize, type SizeSuggestion, type WeekContext } from '@cronograma/core';
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { googleColor, useLocalGoogleColors } from './googleColors';
-import { sizeFor, toFact, type AssignmentRow, type EventRow, type HistoryFactRow, type ServiceTypeRow, type SlotRow } from '../data/catalog';
+import { sizeFor, toFact, useTable, type AssignmentRow, type EventRow, type HistoryFactRow, type JobRoleRow, type SectorRow, type ServiceTypeRow, type SlotRow } from '../data/catalog';
 import { useSyncEngine, useSyncState } from '../sync/SyncProvider';
 import { AppIcon } from '../ui/AppIcon';
 import { Button } from '../ui/chiaro';
@@ -16,6 +16,7 @@ import {
   crewOrigin,
   eventAlerts,
   isPlanned,
+  isReserved,
   knownSeries,
   plannedRows,
   reviewReasons,
@@ -106,8 +107,8 @@ interface BoardProps {
   /** Evento aberto no painel da direita; o painel recebe as vagas dele, editáveis como na grade. */
   viewing?: string | null;
   renderPanel?: (event: EventRow, crew: ReactNode) => ReactNode;
-  /** A barra do topo (placar e "Confirmar sugestões") fica na página; a grade passa o que ela mostra. */
-  renderBar: (state: BoardState, scrollTo: (what: BoardTarget) => void) => ReactNode;
+  /** A barra do topo (placar e "Confirmar sugestões") fica na página; a grade passa o que ela mostra e a troca de visualização. */
+  renderBar: (state: BoardState, scrollTo: (what: BoardTarget) => void, viewSwitch: ReactNode) => ReactNode;
 }
 
 /**
@@ -405,26 +406,56 @@ export function WeekBoard({ rows, now, today, historyRows, historyLoading, onOpe
     onlyReview,
     colorOf,
   };
+  // Na grade, segurar o clique fora dos cartões e arrastar rola os dias para os lados (só com o mouse; o toque já rola).
+  const drag = useRef<{ x: number; left: number } | null>(null);
+  const [dragging, setDragging] = useState(false);
+  function startDrag(ev: ReactPointerEvent<HTMLDivElement>) {
+    if (ev.pointerType !== 'mouse' || ev.button !== 0) return;
+    if ((ev.target as HTMLElement).closest('.board-card, button, a, input, select, textarea, [role="menu"]')) return;
+    drag.current = { x: ev.clientX, left: ev.currentTarget.scrollLeft };
+    ev.currentTarget.setPointerCapture(ev.pointerId);
+    setDragging(true);
+  }
+  function moveDrag(ev: ReactPointerEvent<HTMLDivElement>) {
+    if (drag.current) ev.currentTarget.scrollLeft = drag.current.left - (ev.clientX - drag.current.x);
+  }
+  function endDrag(ev: ReactPointerEvent<HTMLDivElement>) {
+    drag.current = null;
+    if (ev.currentTarget.hasPointerCapture(ev.pointerId)) ev.currentTarget.releasePointerCapture(ev.pointerId);
+    setDragging(false);
+  }
+
+  const viewSwitch = (
+    <span className="board-view-switch" role="group" aria-label="Visualização">
+      {(['grid', 'timeline'] as const).map((v) => (
+        <button key={v} type="button" className={view === v ? 'is-on' : undefined} aria-pressed={view === v} onClick={() => chooseView(v)}>
+          {v === 'grid' ? 'Grade' : 'Linha do tempo'}
+        </button>
+      ))}
+    </span>
+  );
   return (
     <>
-      {renderBar(state, scrollTo)}
+      {renderBar(state, scrollTo, viewSwitch)}
       {lit && litLoad && (
         <p className="board-lit" role="status">
           {model.personName(lit)}: {hoursText(litLoad.hours)} e {activitiesText(litLoad.count)} na semana
         </p>
       )}
       <TypeIconSprite types={cardTypes} />
-      <div className="board-views">
-        <span className="board-view-switch" role="group" aria-label="Visualização">
-          {(['grid', 'timeline'] as const).map((v) => (
-            <button key={v} type="button" className={view === v ? 'is-on' : undefined} aria-pressed={view === v} onClick={() => chooseView(v)}>
-              {v === 'grid' ? 'Grade' : 'Linha do tempo'}
-            </button>
-          ))}
-        </span>
-        {view === 'timeline' && <DayNav days={days} at={dayAt} today={today} onGo={setDayAt} />}
-      </div>
-      <div id={boardId} className={`board${view === 'timeline' ? ' board--timeline' : ''}${lit ? ' is-lighting' : ''}`}>
+      {view === 'timeline' && (
+        <div className="board-views">
+          <DayNav days={days} at={dayAt} today={today} onGo={setDayAt} />
+        </div>
+      )}
+      <div
+        id={boardId}
+        className={`board${view === 'timeline' ? ' board--timeline' : ' is-draggable'}${dragging ? ' is-dragging' : ''}${lit ? ' is-lighting' : ''}`}
+        onPointerDown={view === 'grid' ? startDrag : undefined}
+        onPointerMove={dragging ? moveDrag : undefined}
+        onPointerUp={dragging ? endDrag : undefined}
+        onPointerCancel={dragging ? endDrag : undefined}
+      >
         {(view === 'timeline' ? days.slice(dayAt, dayAt + 1) : days).map((day) => {
           const props = {
             day,
@@ -519,7 +550,7 @@ function DayColumn({
   sizeHints: ReadonlyMap<string, SizeSuggestion>;
   chip: ChipProps;
 }) {
-  const empty = day.cards.length === 0 && day.lines.length === 0;
+  const empty = day.cards.length === 0;
   return (
     <section className={`board-day${empty ? ' is-empty' : ''}${day.date === today ? ' is-today' : ''}`} aria-label={day.label}>
       <header className="board-day-head">
@@ -531,6 +562,7 @@ function DayColumn({
         <p className="board-day-empty">sem atividades</p>
       ) : (
         <div className="board-day-body">
+          {/* O mesmo cartão para tudo: o que não pede equipe só não tem as vagas. */}
           {day.cards.map((e) => (
             <EventCard
               key={e.id}
@@ -545,9 +577,6 @@ function DayColumn({
               sizeHint={sizeHints.get(e.id)}
               chip={chip}
             />
-          ))}
-          {day.lines.map((e) => (
-            <MarkerLine key={e.id} event={e} types={rows.types} color={chip.colorOf(e)} onOpen={onOpenEvent} />
           ))}
         </div>
       )}
@@ -579,7 +608,7 @@ function saveView(v: BoardView) {
 function firstDay(days: readonly BoardDay[], today: string): number {
   const at = days.findIndex((d) => d.date === today);
   if (at >= 0) return at;
-  return Math.max(0, days.findIndex((d) => d.cards.length + d.lines.length > 0));
+  return Math.max(0, days.findIndex((d) => d.cards.length > 0));
 }
 
 /** Setas e os sete dias da semana, com quantas atividades cada um tem. */
@@ -590,7 +619,7 @@ function DayNav({ days, at, today, onGo }: { days: readonly BoardDay[]; at: numb
         ‹
       </button>
       {days.map((d, i) => {
-        const n = d.cards.length + d.lines.length;
+        const n = d.cards.length;
         return (
           <button
             key={d.date}
@@ -612,8 +641,27 @@ function DayNav({ days, at, today, onGo }: { days: readonly BoardDay[]; at: numb
   );
 }
 
-/** Altura de uma hora na linha do tempo, em pixels. */
+/** Alturas de uma hora na linha do tempo, em pixels: o − e o + passam de uma para outra; 96 é a padrão. */
+const HOUR_STEPS = [40, 56, 72, 96, 128, 160] as const;
 const HOUR_PX = 96;
+const ZOOM_KEY = 'semana.hora';
+
+function readHourPx(): number {
+  try {
+    const v = Number(localStorage.getItem(ZOOM_KEY));
+    return (HOUR_STEPS as readonly number[]).includes(v) ? v : HOUR_PX;
+  } catch {
+    return HOUR_PX;
+  }
+}
+
+function saveHourPx(v: number) {
+  try {
+    localStorage.setItem(ZOOM_KEY, String(v));
+  } catch {
+    // Sem armazenamento, a altura vale só até recarregar.
+  }
+}
 
 /**
  * Um dia como no Google Agenda: as horas de cima para baixo, cada atividade na altura do horário e as que se cruzam
@@ -621,40 +669,35 @@ const HOUR_PX = 96;
  * teclado. Dia inteiro e as folgas ficam no topo.
  */
 function DayTimeline({ now, ...props }: Parameters<typeof DayColumn>[0] & { now: Date }) {
-  const { day, today, rows, built, readOnly, dropped, onToggleOff, onOpenEvent, typeHints, sizeHints, chip } = props;
-  // Marcações (não escalar, folga) ficam numa faixa à direita, sem apertar os cartões; os cancelados ficam com os
-  // cartões, nas colunas da direita de cada grupo.
-  const layout = useMemo(() => timelineLayout(day.date, [...day.cards, ...day.lines]), [day]);
-  const cardItems = useMemo(() => timelineLayout(day.date, day.cards).items, [day]);
-  const markItems = useMemo(() => timelineLayout(day.date, day.lines).items, [day]);
-  const markers = useMemo(() => new Set(day.lines.map((e) => e.id)), [day.lines]);
+  const { day, today, rows, built, readOnly, dropped, onToggleOff, onOpenEvent, chip } = props;
+  // Todas as atividades no mesmo trilho, na ordem do horário; os cancelados ficam nas colunas da direita de cada grupo.
+  const layout = useMemo(() => timelineLayout(day.date, day.cards), [day]);
+  const [hourPx, setHourPx] = useState(readHourPx);
+  const at = HOUR_STEPS.indexOf(hourPx as (typeof HOUR_STEPS)[number]);
+  const zoom = (dir: -1 | 1) => {
+    const next = HOUR_STEPS[at + dir];
+    if (next === undefined) return;
+    setHourPx(next);
+    saveHourPx(next);
+  };
   const hours = [];
   for (let m = layout.from; m < layout.to; m += 60) hours.push(m);
-  const y = (min: number) => ((min - layout.from) / 60) * HOUR_PX;
+  const y = (min: number) => ((min - layout.from) / 60) * hourPx;
   const midnight = zonedTime(day.date, '00:00').getTime();
   const nowMin = day.date === today ? Math.round((now.getTime() - midnight) / 60_000) : null;
-  const card = (e: EventRow) =>
-    markers.has(e.id) ? (
-      <MarkerLine event={e} types={rows.types} color={chip.colorOf(e)} onOpen={onOpenEvent} />
-    ) : (
-      <EventCard
-        event={e}
-        rows={rows}
-        built={built}
-        today={today}
-        readOnly={readOnly}
-        slots={chip.model.slotsByEvent.get(e.id) ?? []}
-        onOpen={onOpenEvent}
-        typeHint={typeHints.get(e.id)}
-        sizeHint={sizeHints.get(e.id)}
-        chip={chip}
-      />
-    );
   return (
     <section className={`board-timeline${day.date === today ? ' is-today' : ''}`} aria-label={day.label}>
       <header className="board-day-head">
         <h3 className="board-day-title">{day.label}</h3>
         {day.date === today && <Seal kind="hoje">hoje</Seal>}
+        <span className="board-zoom" role="group" aria-label="Altura das horas">
+          <button type="button" aria-label="Diminuir a altura" disabled={at <= 0} onClick={() => zoom(-1)}>
+            −
+          </button>
+          <button type="button" aria-label="Aumentar a altura" disabled={at >= HOUR_STEPS.length - 1} onClick={() => zoom(1)}>
+            +
+          </button>
+        </span>
       </header>
       {day.off.length > 0 && <OffStrip items={day.off} dropped={dropped} readOnly={readOnly} onToggle={onToggleOff} />}
       {layout.allDay.length > 0 && (
@@ -672,31 +715,29 @@ function DayTimeline({ now, ...props }: Parameters<typeof DayColumn>[0] & { now:
           </span>
         ))}
         {nowMin !== null && nowMin >= layout.from && nowMin <= layout.to && <span className="board-timeline-now" style={{ top: y(nowMin) }} aria-hidden="true" />}
-        {[
-          { key: 'cards', items: cardItems, className: `board-timeline-track${markItems.length > 0 ? ' has-marks' : ''}` },
-          { key: 'marks', items: markItems, className: 'board-timeline-marks' },
-        ].map(
-          (col) =>
-            col.items.length > 0 && (
-              <div key={col.key} className={col.className} aria-label={col.key === 'marks' ? 'Marcações do dia' : undefined}>
-                {col.items.map((it) => (
-                  <div
-                    key={it.event.id}
-                    className={`board-timeline-item${markers.has(it.event.id) ? ' is-marker' : ''}`}
-                    style={
-                      {
-                        top: y(it.start),
-                        left: `calc(${(it.lane / it.lanes) * 100}% + 2px)`,
-                        width: `calc(${100 / it.lanes}% - 4px)`,
-                        '--h': `${Math.max(((it.end - it.start) / 60) * HOUR_PX - 4, 22)}px`,
-                      } as CSSProperties
-                    }
-                  >
-                    {card(it.event)}
-                  </div>
-                ))}
+        {layout.items.length > 0 && (
+          <div className="board-timeline-track">
+            {layout.items.map((it) => (
+              // O dia cabe na largura da tela; o cartão estreito abre por cima ao passar o mouse, crescendo para dentro
+              // do dia (os da metade direita crescem para a esquerda).
+              <div
+                key={it.event.id}
+                className="board-timeline-item"
+                style={
+                  {
+                    top: y(it.start),
+                    ...((it.lane >= it.lanes / 2 && it.lanes > 1
+                      ? { right: `calc(${((it.lanes - it.lane - 1) / it.lanes) * 100}% + 2px)` }
+                      : { left: `calc(${(it.lane / it.lanes) * 100}% + 2px)` }) as CSSProperties),
+                    width: `calc(${100 / it.lanes}% - 4px)`,
+                    '--h': `${Math.max(((it.end - it.start) / 60) * hourPx - 4, 22)}px`,
+                  } as CSSProperties
+                }
+              >
+                <TimelineCard event={it.event} rows={rows} built={built} slots={chip.model.slotsByEvent.get(it.event.id) ?? []} chip={chip} onOpen={onOpenEvent} />
               </div>
-            ),
+            ))}
+          </div>
         )}
       </div>
     </section>
@@ -724,6 +765,59 @@ function AllDayBar({ event, slots, chip, onOpen }: { event: EventRow; slots: rea
     >
       <span className="board-allday-title">{title}</span>
       {vagas && <span className="board-allday-slots">{vagas}</span>}
+    </button>
+  );
+}
+
+/**
+ * Cartão da linha do tempo, como no Google Agenda: título, hora e quantas vagas faltam. As fichas ficam no painel
+ * da direita, que abre no clique: lado a lado, num horário cheio, elas viravam "C.. v..".
+ */
+function TimelineCard({ event, rows, built, slots, chip, onOpen }: { event: EventRow; rows: WeekRows; built: boolean; slots: readonly SlotRow[]; chip: ChipProps; onOpen: (eventId: string) => void }) {
+  const type = rows.types.find((t) => t.id === event.service_type_id);
+  const color = chip.colorOf(event);
+  const title = shortTitle(event.title);
+  const cancelled = event.status === 'cancelled';
+  const states = slots.map((s) => chipState(chip.model.bySlot.get(s.id), chip.drafts.get(s.id)));
+  const open = states.filter((s) => s === 'open').length;
+  const suggested = states.filter((s) => s === 'suggested').length;
+  const alerts = eventAlerts(event, slots.length, built, rows.types);
+  const review = chip.reviews.get(event.id);
+  const status = cancelled
+    ? 'cancelado'
+    : !needsTeam(event, rows.types)
+      ? (type?.name ?? '')
+      : !type
+        ? 'tipo a definir'
+        : slots.length === 0
+          ? 'sem vagas'
+          : open > 0
+            ? `${open} de ${slots.length} ${slots.length === 1 ? 'vaga aberta' : 'abertas'}`
+            : suggested > 0
+              ? `${suggested} a confirmar`
+              : `${slots.length} ${slots.length === 1 ? 'vaga preenchida' : 'preenchidas'}`;
+  const worst = open > 0 ? 'open' : suggested > 0 ? 'suggested' : states.length > 0 ? 'confirmed' : undefined;
+  return (
+    <button
+      type="button"
+      className={`board-tl-card board-kind--${activityKind(event, rows.types)}${color ? ' has-google-color' : ''}${isReserved(event, rows.types) ? ' is-reserved' : ''}${cancelled ? ' is-cancelled' : ''}${open > 0 ? ' has-open' : ''}${chip.onlyReview && !review ? ' is-dim' : ''}`}
+      style={color ? ({ '--kind-color': color } as CSSProperties) : undefined}
+      data-review={review ? '' : undefined}
+      data-alert={alerts.length > 0 ? '' : undefined}
+      data-chip={worst}
+      aria-label={`${title}, ${eventSpan(event)}${status ? `, ${status}` : ''}`}
+      title={[title, eventSpan(event), status, ...alerts].filter(Boolean).join(' · ')}
+      onClick={() => onOpen(event.id)}
+    >
+      <span className="board-tl-title">
+        {event.highlighted && <span className="mask-icon mask-icon--sm mask-star-on" aria-hidden="true" />}
+        {title}
+      </span>
+      <span className="board-tl-meta">
+        {eventSpan(event).split(' às ')[0]}
+        {status && ` · ${status}`}
+        {alerts.length > 0 && !cancelled && <span className="board-tl-alert"> !</span>}
+      </span>
     </button>
   );
 }
@@ -793,7 +887,7 @@ function EventCard({
   const color = chip.colorOf(event);
   return (
     <article
-      className={`board-card board-kind--${kind}${color ? ' has-google-color' : ''}${event.highlighted ? ' is-highlighted' : ''}${cancelled ? ' board-card--cancelled' : ''}${chip.onlyReview && !review ? ' is-dim' : ''}`}
+      className={`board-card board-kind--${kind}${color ? ' has-google-color' : ''}${isReserved(event, rows.types) ? ' is-reserved' : ''}${event.highlighted ? ' is-highlighted' : ''}${cancelled ? ' board-card--cancelled' : ''}${chip.onlyReview && !review ? ' is-dim' : ''}`}
       style={color ? ({ '--kind-color': color } as CSSProperties) : undefined}
       data-color={color ?? undefined}
       aria-label={title}
@@ -833,9 +927,10 @@ function EventCard({
         {eventSpan(event)}
         {event.location ? ` · ${event.location}` : ''}
       </span>
-      {hasSeals(event, today) && (
+      {/* Sem o "hoje": a coluna do dia já diz. */}
+      {hasSeals(event) && (
         <span className="list-row-tags">
-          <EventSeals event={event} today={today} />
+          <EventSeals event={event} today={today} noToday />
         </span>
       )}
       {!readOnly && !cancelled && (typeHint || (sizeHint && sized)) && (
@@ -926,35 +1021,79 @@ function PanelCrew({ event, rows, readOnly, slots, chip }: { event: EventRow; ro
   );
 }
 
-/** "+ vaga": a lista de funções para pôr mais uma vaga no evento (as que o evento já tem primeiro). */
+/**
+ * "+ vaga": primeiro as funções que o evento já tem (o atalho mais comum), depois os setores; o setor abre as
+ * funções dele. Com um setor só (ou nenhum), a lista de funções vem direto.
+ */
 function AddSlot({ event, rows, slots, onAdd }: { event: EventRow; rows: WeekRows; slots: readonly SlotRow[]; onAdd: (e: EventRow, roleId: string) => void }) {
   const [open, setOpen] = useState(false);
+  const [sector, setSector] = useState<string | null>(null);
+  const sectors = useTable<SectorRow>('sectors') ?? [];
   const title = shortTitle(event.title);
   const has = new Set(slots.map((s) => s.job_role_id));
-  const roles = rows.roles
-    .filter((r) => !r.archived_at)
-    .sort((a, b) => Number(has.has(b.id)) - Number(has.has(a.id)) || a.name.localeCompare(b.name, 'pt-BR'));
+  const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name, 'pt-BR');
+  const roles = rows.roles.filter((r) => !r.archived_at);
+  const current = roles.filter((r) => has.has(r.id)).sort(byName);
+  const NONE = '';
+  const groups = [...new Set(roles.map((r) => r.sector_id ?? NONE))]
+    .map((id) => ({ id, name: sectors.find((s) => s.id === id)?.name ?? 'Sem setor' }))
+    .sort((a, b) => Number(a.id === NONE) - Number(b.id === NONE) || byName(a, b));
+  const flat = groups.length < 2;
+  const close = () => {
+    setOpen(false);
+    setSector(null);
+  };
+  const roleItem = (r: JobRoleRow) => (
+    <button
+      key={r.id}
+      type="button"
+      role="menuitem"
+      className="board-menu-item"
+      onClick={() => {
+        close();
+        onAdd(event, r.id);
+      }}
+    >
+      {r.name}
+    </button>
+  );
   return (
     <li className="board-chip board-chip--add">
-      <button type="button" className="board-chip-add" aria-haspopup="menu" aria-expanded={open} aria-label={`Pôr mais uma vaga em ${title}`} title="Pôr mais uma vaga (vale para as próximas semanas da série)" onClick={() => setOpen((o) => !o)}>
+      <button
+        type="button"
+        className="board-chip-add"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`Pôr mais uma vaga em ${title}`}
+        title="Pôr mais uma vaga (vale para as próximas semanas da série)"
+        onClick={() => (open ? close() : setOpen(true))}
+      >
         + vaga
       </button>
       {open && (
-        <ChipMenu onClose={() => setOpen(false)} label={`Função da vaga a mais em ${title}`}>
-          {roles.map((r) => (
-            <button
-              key={r.id}
-              type="button"
-              role="menuitem"
-              className="board-menu-item"
-              onClick={() => {
-                setOpen(false);
-                onAdd(event, r.id);
-              }}
-            >
-              {r.name}
-            </button>
-          ))}
+        <ChipMenu key={sector ?? 'top'} onClose={close} label={`Função da vaga a mais em ${title}`}>
+          {flat ? (
+            [...current, ...roles.filter((r) => !has.has(r.id)).sort(byName)].map(roleItem)
+          ) : sector === null ? (
+            <>
+              {current.length > 0 && <span className="board-menu-head">No evento</span>}
+              {current.map(roleItem)}
+              <span className="board-menu-head">Setores</span>
+              {groups.map((g) => (
+                <button key={g.id} type="button" role="menuitem" aria-haspopup="menu" className="board-menu-item board-menu-item--sub" onClick={() => setSector(g.id)}>
+                  {g.name}
+                </button>
+              ))}
+            </>
+          ) : (
+            <>
+              <button type="button" role="menuitem" className="board-menu-item board-menu-item--back" onClick={() => setSector(null)}>
+                Setores
+              </button>
+              <span className="board-menu-head">{groups.find((g) => g.id === sector)?.name}</span>
+              {roles.filter((r) => (r.sector_id ?? NONE) === sector).sort(byName).map(roleItem)}
+            </>
+          )}
         </ChipMenu>
       )}
     </li>
@@ -982,38 +1121,13 @@ function TypeIconSprite({ types }: { types: readonly (ServiceTypeRow | undefined
   );
 }
 
-/** O evento tem algum selo (hoje, interna, mudou...)? Sem selo, o cartão não leva a linha vazia. */
-function hasSeals(e: EventRow, today: string): boolean {
-  const first = localDate(new Date(e.starts_at));
-  const last = localDate(new Date(Math.max(Date.parse(e.starts_at), Date.parse(e.ends_at) - 1)));
+/** O evento tem algum selo (interna, mudou...)? Sem selo, o cartão não leva a linha vazia. */
+function hasSeals(e: EventRow): boolean {
   return (
-    (first <= today && today <= last) ||
     e.origin === 'internal' ||
     e.status === 'changed' ||
     e.status === 'cancelled' ||
     Boolean(e.restored || e.duplicate_group || e.review_pending)
-  );
-}
-
-/** Reunião, folga, lembrete: uma linha fina e cinza, só para contexto. */
-function MarkerLine({ event, types, color, onOpen }: { event: EventRow; types: readonly ServiceTypeRow[]; color: string | null; onOpen: (eventId: string) => void }) {
-  const type = types.find((t) => t.id === event.service_type_id);
-  return (
-    <button
-      type="button"
-      className={`board-line${color ? ' has-google-color' : ''}`}
-      style={color ? ({ '--kind-color': color } as CSSProperties) : undefined}
-      onClick={() => onOpen(event.id)}
-      aria-label={`${shortTitle(event.title)}, ${eventSpan(event)}`}
-    >
-      <AppIcon icon={typeIcon(type).icon} size={14} />
-      <span className="board-line-time">{event.all_day ? 'dia todo' : eventSpan(event).split(' às ')[0]}</span>
-      {/* O tipo vem antes do título: "NÃO MARCAR NADA" sozinho não diz que é NAO ESCALAR. */}
-      <span className="board-line-text">
-        {type && <span className="board-line-type">{type.name}</span>}
-        <span className="board-line-title">{shortTitle(event.title)}</span>
-      </span>
-    </button>
   );
 }
 
@@ -1127,11 +1241,13 @@ function ChipMenu({ children, onClose, label }: { children: ReactNode; onClose: 
 
 /** Placar e ações da escala, na barra da semana. */
 export function BoardScore({ counts, onGo }: { counts: BoardCounts; onGo: (what: BoardTarget) => void }) {
-  const item = (what: BoardTarget, n: number, one: string, many: string) => (
-    <button type="button" className={`board-score-item is-${what}`} disabled={n === 0} onClick={() => onGo(what)}>
-      <strong>{n}</strong> {n === 1 ? one : many}
-    </button>
-  );
+  // Só o que tem: "0 sugestões" é ruído.
+  const item = (what: BoardTarget, n: number, one: string, many: string) =>
+    n > 0 && (
+      <button type="button" className={`board-score-item is-${what}`} onClick={() => onGo(what)}>
+        <strong>{n}</strong> {n === 1 ? one : many}
+      </button>
+    );
   return (
     <span className="board-score" aria-label="Placar da semana">
       {item('confirmed', counts.confirmed, 'confirmada', 'confirmadas')}
@@ -1142,20 +1258,25 @@ export function BoardScore({ counts, onGo }: { counts: BoardCounts; onGo: (what:
   );
 }
 
-/** "Só o que precisa de olho", com quantos cartões e o "Próximo" que pula de um em um. */
+/** "Precisa de olho (n)": o filtro com quantos cartões; ligado, o "Próximo" pula de um em um. */
 export function BoardReview({ state, onGo }: { state: BoardState; onGo: (what: BoardTarget) => void }) {
   const n = state.counts.review ?? 0;
   return (
     <span className="board-review" role="group" aria-label="Revisão">
-      <button type="button" className={`board-review-toggle${state.onlyReview ? ' is-on' : ''}`} aria-pressed={state.onlyReview} onClick={state.toggleReview}>
-        Só o que precisa de olho
+      <button
+        type="button"
+        className={`board-review-toggle${state.onlyReview ? ' is-on' : ''}`}
+        aria-pressed={state.onlyReview}
+        title="Apaga os cartões que já estão resolvidos"
+        onClick={state.toggleReview}
+      >
+        Precisa de olho <strong>{n}</strong>
       </button>
-      <span className="board-review-count">
-        <strong>{n}</strong> para revisar
-      </span>
-      <button type="button" className="text-button" disabled={n === 0} onClick={() => onGo('review')}>
-        Próximo
-      </button>
+      {state.onlyReview && (
+        <button type="button" className="text-button" disabled={n === 0} onClick={() => onGo('review')}>
+          Próximo
+        </button>
+      )}
     </span>
   );
 }

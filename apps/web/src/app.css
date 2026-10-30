@@ -791,16 +791,34 @@ body {
   width: 100%;
 }
 
-.crew-row {
+/* Equipe do tipo: os títulos uma vez só, e cada função numa linha (função, quantidade estreita, lixeira). */
+.crew-group {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--space-3);
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.crew-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 84px 40px;
+  align-items: center;
+  gap: var(--space-2);
   width: 100%;
 }
 
-.crew-row > label:first-child {
-  flex: 1 1 220px;
+.crew-row--head {
+  color: var(--text-muted);
+  font: var(--weight-bold) 11px var(--font-display);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.crew-group > button {
+  align-self: flex-start;
 }
 
 .person-status {
@@ -1017,12 +1035,31 @@ body {
   gap: var(--space-4);
 }
 
-/* Topo da semana: "< Semana de 19/10 >" no centro, vizinhas esmaecidas e o "Reler agora" à direita. */
+/* Topo da semana: a situação à esquerda, "< Semana de 19/10 >" no centro e o "Reler agora" à direita. */
 .week-head {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  justify-items: center;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   gap: var(--space-3);
+}
+
+/* No celular: a semana em cima, a situação e o "Reler agora" na mesma linha embaixo. */
+.week-head .week-switcher {
+  order: -1;
+  grid-column: 1 / -1;
+  justify-self: center;
+}
+
+.week-state {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.week-state-note {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
 }
 
 .week-switcher {
@@ -1037,32 +1074,6 @@ body {
   margin: 0;
   text-align: center;
   white-space: nowrap;
-}
-
-.week-switcher-side {
-  display: none;
-  padding: 0 var(--space-2);
-  border: 0;
-  background: none;
-  color: var(--text-muted);
-  font: var(--weight-bold) var(--text-body) var(--font-display);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wide);
-  white-space: nowrap;
-  cursor: pointer;
-  opacity: 0.45;
-  transition: opacity 0.2s var(--ease-cine);
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 70%);
-  mask-image: linear-gradient(to right, transparent, #000 70%);
-}
-
-.week-switcher-side:last-child {
-  -webkit-mask-image: linear-gradient(to left, transparent, #000 70%);
-  mask-image: linear-gradient(to left, transparent, #000 70%);
-}
-
-.week-switcher-side:hover {
-  opacity: 0.8;
 }
 
 .week-toolbar {
@@ -1103,7 +1114,12 @@ body {
   color: var(--chiaro-pessego);
 }
 
-/* Troca de semana: a nova entra deslizando pelo lado da seta clicada. */
+/* Conteúdo da semana: esmaece de uma vez ao trocar, sem deslizar. */
+.week-fade {
+  animation: week-fade 0.32s var(--ease-cine) both;
+}
+
+/* Título da semana: entra deslizando pelo lado da seta clicada. */
 .week-slide {
   animation: week-fade 0.28s var(--ease-cine) both;
 }
@@ -1137,7 +1153,8 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .week-slide {
+  .week-slide,
+  .week-fade {
     animation: none;
   }
 }
@@ -1152,17 +1169,19 @@ body {
     grid-template-columns: 1fr auto 1fr;
   }
 
-  .week-switcher {
+  .week-head .week-switcher {
+    order: 0;
     grid-column: 2;
+  }
+
+  .week-head .week-state {
+    grid-column: 1;
+    justify-self: start;
   }
 
   .week-head .reread {
     grid-column: 3;
     justify-self: end;
-  }
-
-  .week-switcher-side {
-    display: inline-block;
   }
 }
 
@@ -1560,10 +1579,12 @@ body {
 }
 
 /* Banco de ícones do cadastro de tipos. */
+/* O banco ocupa a largura toda (dentro do grupo flexível ele encolhia numa coluna de dois ícones). */
 .icon-bank {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
-  gap: var(--space-2);
+  grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+  gap: 6px;
+  width: 100%;
 }
 
 .icon-choice {
@@ -1572,8 +1593,8 @@ body {
   align-items: center;
   justify-content: center;
   gap: 2px;
-  min-height: 48px;
-  padding: var(--space-2);
+  min-height: 40px;
+  padding: 6px;
   border: 1.5px solid var(--border-subtle);
   border-radius: var(--radius-card);
   background: var(--surface-raised);
@@ -2109,6 +2130,13 @@ body {
   row-gap: var(--space-3);
 }
 
+.board-bar-left {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
 .board-score {
   display: inline-flex;
   flex-wrap: wrap;
@@ -2141,9 +2169,10 @@ body {
   color: var(--text-primary);
 }
 
-.board-review-count strong {
-  color: var(--text-primary);
-  font: var(--weight-bold) 16px/1 var(--font-display);
+.board-review-toggle strong {
+  margin-left: 4px;
+  color: var(--warning);
+  font-weight: var(--weight-bold);
 }
 
 /* Com o filtro, o cartão sem pendência apaga (continua lá, para dar contexto). */
@@ -2214,7 +2243,21 @@ body {
   align-items: stretch;
   overflow-x: auto;
   padding-bottom: var(--space-2);
-  height: max(460px, calc(100dvh - 300px));
+  height: max(460px, calc(100dvh - 220px));
+}
+
+/* Arrastar a grade para os lados pelo espaço fora dos cartões. */
+.board.is-draggable {
+  cursor: grab;
+}
+
+.board.is-draggable .board-card {
+  cursor: auto;
+}
+
+.board.is-dragging {
+  cursor: grabbing;
+  user-select: none;
 }
 
 /* Grade ou linha do tempo, e os dias da linha do tempo. */
@@ -2302,6 +2345,41 @@ body {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-card);
   background: color-mix(in srgb, var(--surface-raised) 55%, transparent);
+}
+
+/* − e + no canto de cima à direita do dia: a altura de cada hora. */
+.board-zoom {
+  display: inline-flex;
+  margin-left: auto;
+  padding: 2px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+}
+
+.board-zoom button {
+  width: 28px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.board-zoom button:hover:not(:disabled),
+.board-zoom button:focus-visible {
+  outline: none;
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--text-primary);
+}
+
+.board-zoom button:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 .board-timeline.is-today {
@@ -2418,57 +2496,99 @@ body {
   inset: 0 0 0 52px;
 }
 
-.board-timeline-track.has-marks {
-  right: 156px;
-}
-
-/* Faixa das marcações (não escalar, folga), à direita: hachurada, sem apertar os cartões. */
-.board-timeline-marks {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 148px;
-}
-
-.board-timeline-marks .board-line {
-  background: repeating-linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--kind-color, var(--neutral-600)) 14%, var(--surface-page)) 0 6px,
-    var(--surface-page) 6px 12px
-  ) !important;
-}
-
 .board-timeline-item {
   position: absolute;
   height: var(--h);
-  overflow: hidden;
-  border-radius: var(--radius-card);
 }
 
-/* O que não coube na altura aparece ao passar o mouse ou entrar com o teclado, por cima dos vizinhos. */
+/* Cartão estreito: ao passar o mouse (ou com o foco), vem para a frente em tamanho normal, com tudo à vista. */
 .board-timeline-item:hover,
 .board-timeline-item:focus-within {
-  z-index: 3;
+  z-index: 5;
+  min-width: 240px;
   height: auto;
   min-height: var(--h);
-  overflow: visible;
-  box-shadow: 0 8px 24px rgb(0 0 0 / 45%);
 }
 
-.board-timeline-item > .board-card {
-  min-height: 100%;
-  padding: var(--space-2) var(--space-3);
+.board-timeline-item:hover .board-tl-card,
+.board-timeline-item:focus-within .board-tl-card {
+  height: auto;
+  min-height: var(--h);
+  background: color-mix(in srgb, var(--kind-color, var(--neutral-500)) 34%, var(--surface-card));
+  box-shadow: 0 8px 24px rgb(0 0 0 / 55%);
 }
 
-.board-timeline-item.is-marker > .board-line {
+/* Cartão da linha do tempo: a cor do tipo à esquerda, título e "hora · vagas"; o resto no painel. */
+.board-tl-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
   height: 100%;
-  align-items: flex-start;
-  background: var(--surface-page);
+  padding: 4px 8px;
+  overflow: hidden;
+  border: 0;
+  border-left: 3px solid var(--kind-color, var(--neutral-500));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--kind-color, var(--neutral-500)) 22%, var(--surface-card));
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-sizing: border-box;
 }
 
-.board-timeline-item.is-marker > .board-line.has-google-color {
-  background: color-mix(in srgb, var(--kind-color) 14%, var(--surface-page));
+.board-tl-card:hover,
+.board-tl-card:focus-visible {
+  outline: none;
+  background: color-mix(in srgb, var(--kind-color, var(--neutral-500)) 34%, var(--surface-card));
+}
+
+.board-tl-title {
+  display: flex;
+  gap: 4px;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: var(--weight-bold);
+  line-height: 1.25;
+  overflow-wrap: break-word;
+  flex: none;
+}
+
+.board-tl-meta {
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.board-tl-card.has-open .board-tl-meta {
+  color: var(--danger);
+}
+
+.board-tl-alert {
+  color: var(--warning);
+  font-weight: var(--weight-bold);
+}
+
+/* "NÃO MARCAR NADA" (NAO ESCALAR): listras leves por cima da cor, na grade e na linha do tempo. */
+.board .board-card.is-reserved,
+.board .board-tl-card.is-reserved,
+.board .board-timeline-item:hover .board-tl-card.is-reserved {
+  background-image: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--kind-color, var(--neutral-500)) 16%, transparent) 0 8px,
+    transparent 8px 16px
+  );
+}
+
+.board-tl-card.is-cancelled {
+  opacity: 0.4;
+  filter: grayscale(1);
+  text-decoration: line-through;
+}
+
+.board-tl-card.is-dim {
+  opacity: 0.28;
 }
 
 .board-day {
@@ -2560,11 +2680,6 @@ button.board-off-item {
 /* Com a cor do Google Agenda (do evento ou da agenda), o cartão inteiro leva um toque dela, como na agenda. */
 .board-card.has-google-color {
   background: color-mix(in srgb, var(--kind-color) 16%, var(--surface-raised));
-}
-
-.board-line.has-google-color {
-  border-left: 3px solid var(--kind-color);
-  background: color-mix(in srgb, var(--kind-color) 10%, transparent);
 }
 
 .board-kind--aula { --kind-color: var(--chiaro-lavanda); }
@@ -2667,16 +2782,19 @@ button.board-off-item {
 }
 
 /* Fichas das vagas */
+/* Uma vaga por linha, todas da mesma largura: a marca (! ou ✓) e a lixeira sempre na mesma coluna, à direita. */
 .board-chips {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 6px;
 }
 
 .board-chip {
   position: relative;
-  display: inline-flex;
-  max-width: 100%;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-pill);
   background: var(--surface-card);
@@ -2690,7 +2808,8 @@ button.board-off-item {
 /* Ficha em duas linhas: a função em letra pequena e a pessoa embaixo; a marca da situação no canto. */
 .board-chip-main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr) 12px;
   align-items: center;
   column-gap: 6px;
   min-width: 0;
@@ -2710,6 +2829,7 @@ button.board-off-item {
   grid-row: 1 / span 2;
   font-size: 12px;
   font-weight: var(--weight-bold);
+  text-align: center;
 }
 
 .board-chip.is-confirmed .board-chip-main::after {
@@ -2805,7 +2925,8 @@ button.board-off-item {
 /* Lixeira que tira a vaga: sempre à vista na vaga aberta; nas outras, só com o mouse ou o foco na ficha.
    O ícone (Solar, lixeira linear) vem por máscara de CSS: uma regra só, sem um SVG por ficha, que deixava a grade lenta. */
 .board-chip-drop {
-  display: none;
+  display: block;
+  visibility: hidden;
   flex: none;
   align-self: center;
   width: 24px;
@@ -2831,10 +2952,11 @@ button.board-off-item {
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23000' stroke-width='1.8' stroke-linecap='round'%3E%3Cpath d='M9.17 4a3 3 0 0 1 5.66 0M20.5 6h-17M18.83 8.5l-.46 6.9c-.18 2.65-.27 3.98-1.13 4.79-.86.81-2.2.81-4.86.81h-.77c-2.66 0-4 0-4.86-.81-.86-.81-.95-2.14-1.13-4.79l-.46-6.9M9.5 11l.5 5M14.5 11l-.5 5'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
+/* Escondida, a lixeira guarda o lugar: a ficha não muda de largura ao passar o mouse. */
 .board-chip.is-open .board-chip-drop,
 .board-chip:hover .board-chip-drop,
 .board-chip:focus-within .board-chip-drop {
-  display: block;
+  visibility: visible;
 }
 
 .board-chip-drop:hover,
@@ -2851,7 +2973,9 @@ button.board-off-item {
 }
 
 .board-chip-add {
+  width: 100%;
   padding: 4px 10px 5px;
+  text-align: left;
   border: 0;
   background: none;
   color: var(--text-muted);
@@ -2922,62 +3046,27 @@ button.board-off-item {
   outline: none;
 }
 
-/* Reunião, folga e lembrete: uma linha fina e cinza. */
-.board-line {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  padding: 4px 8px;
-  border: 1px dashed var(--border-subtle);
-  border-radius: 8px;
-  background: none;
+/* "+ vaga": títulos dos grupos, o setor com a seta de que abre as funções e o "‹ Setores" para voltar. */
+.board-menu-head {
+  padding: 8px 12px 2px;
   color: var(--text-muted);
-  font: inherit;
-  font-size: 12px;
-  text-align: left;
-  cursor: pointer;
+  font: var(--weight-bold) 10px var(--font-display);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
 }
 
-.board-line:hover,
-.board-line:focus-visible {
+.board-menu-item--sub::after {
+  content: '›';
+  float: right;
+  color: var(--text-muted);
+}
+
+.board-menu-item--back {
   color: var(--text-secondary);
-  outline: none;
 }
 
-.board-line-time {
-  flex: none;
-}
-
-.board-line-text {
-  display: flex;
-  gap: 6px;
-  min-width: 0;
-}
-
-.board-line-type {
-  flex: none;
-  color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.board-line-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Na faixa estreita da linha do tempo, o tipo fica em cima do título. */
-.board-timeline-item.is-marker .board-line-text {
-  flex-direction: column;
-  gap: 2px;
-}
-
-.board-timeline-item.is-marker .board-line-type {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.board-menu-item--back::before {
+  content: '‹ ';
 }
 
 /* Painel do evento, à direita, sem cobrir a grade inteira. */
@@ -3014,8 +3103,33 @@ button.board-off-item {
   text-transform: uppercase;
 }
 
-.event-panel > button:last-child {
-  align-self: flex-start;
+/* Diferenças com a agenda, depois da releitura: o evento à esquerda, as duas escolhas à direita. */
+.reread-review {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.reread-review li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.reread-review-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.event-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
 .picker-search {

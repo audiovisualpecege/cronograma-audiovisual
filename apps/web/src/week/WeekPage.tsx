@@ -1,6 +1,6 @@
 import { addDays, isWeekPast, localDate, weekStartOf } from '@cronograma/core';
 import { AltArrowLeftIcon, AltArrowRightIcon } from '@solar-icons/react/linear';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useTable, type CalendarSourceRow } from '../data/catalog';
 import { useHistory } from '../data/history';
 import { navigate, type RouteProps } from '../router';
@@ -16,6 +16,7 @@ import { dayMonth, publishSummary, relativeWeekLabel, unpublishedChanges, type W
 import { NO_EVENTS, SourceAlerts } from './PreviewPage';
 import { PublishDialog } from './PublishDialog';
 import { RereadButton } from './RereadButton';
+import { RereadReview } from './RereadReview';
 import { UnpublishedBanner } from './UnpublishedBanner';
 import { untyped, useIdentifyTypes } from './useIdentifyTypes';
 import { BoardReview, BoardScore, WeekBoard } from './WeekBoard';
@@ -44,16 +45,13 @@ function go(base: string, weekStart: string, dir: 'next' | 'prev') {
   navigate(`${base}/${weekStart}`);
 }
 
-/** "< Semana de 19/10 >" no centro, com a anterior e a seguinte esmaecidas dos lados e "Semana atual" embaixo. */
+/** "< Semana de 19/10 >" com "Semana atual" embaixo. */
 export function WeekSwitcher({ weekStart, currentWeek, base = '/semana' }: { weekStart: string; currentWeek: string; base?: string }) {
   const prev = addDays(weekStart, -7);
   const next = addDays(weekStart, 7);
   const relative = relativeWeekLabel(weekStart, currentWeek);
   return (
     <nav className="week-switcher" aria-label="Trocar de semana">
-      <button type="button" className="week-switcher-side" onClick={() => go(base, prev, 'prev')} tabIndex={-1} aria-hidden="true">
-        Semana de {dayMonth(prev)}
-      </button>
       <IconButton icon={AltArrowLeftIcon} label="Semana anterior" onClick={() => go(base, prev, 'prev')} />
       <span key={weekStart} className={`week-switcher-center week-slide week-slide--${slideFrom ?? 'fade'}`}>
         <h1 className="screen-title page-title week-switcher-title">
@@ -62,10 +60,24 @@ export function WeekSwitcher({ weekStart, currentWeek, base = '/semana' }: { wee
         <span className={`week-relative${weekStart === currentWeek ? ' is-current' : ''}`}>{relative}</span>
       </span>
       <IconButton icon={AltArrowRightIcon} label="Próxima semana" onClick={() => go(base, next, 'next')} />
-      <button type="button" className="week-switcher-side" onClick={() => go(base, next, 'next')} tabIndex={-1} aria-hidden="true">
-        Semana de {dayMonth(next)}
-      </button>
     </nav>
+  );
+}
+
+/** Situação da semana no topo: o selo e, só quando informa algo, uma linha curta (publicada quando, só consulta). */
+function WeekState({ rows, now }: { rows: WeekRows; now: Date }) {
+  const week = rows.week;
+  const publishedBy = rows.people.find((p) => p.id === week?.published_by)?.name;
+  const note = isWeekPast(rows.weekStart, now)
+    ? 'Só para consulta'
+    : week?.state === 'published' && week.published_at
+      ? `Publicada em ${formatStamp(week.published_at)}${publishedBy ? ` por ${publishedBy}` : ''}`
+      : null;
+  return (
+    <span className="week-state">
+      <Badge tone={week?.state === 'published' ? 'success' : week ? 'brand' : 'soft'}>{stateLabel(rows)}</Badge>
+      {note && <span className="week-state-note">{note}</span>}
+    </span>
   );
 }
 
@@ -77,17 +89,26 @@ export function WeekPage({ params }: RouteProps) {
   const rows = useWeekRows(weekStart);
   const sources = useTable<CalendarSourceRow>('calendar_sources') ?? [];
   const { lastSyncAt } = useSyncState();
+  // O selo da situação fica com a semana anterior enquanto a nova abre, em vez de sumir e voltar.
+  const [last, setLast] = useState(rows);
+  if (rows && rows !== last) setLast(rows);
+  const shown = rows ?? last;
+  // Depois da releitura: o que ficou diferente da agenda.
+  const [reviewing, setReviewing] = useState(false);
+  const closeReview = useCallback(() => setReviewing(false), []);
 
   return (
     <section className="page week-page">
       <div className="week-head">
+        {shown ? <WeekState rows={shown} now={now} /> : <span />}
         <WeekSwitcher weekStart={weekStart} currentWeek={weekStartOf(today)} />
-        <RereadButton />
+        <RereadButton onRead={() => setReviewing(true)} />
       </div>
-      <div key={weekStart} className={`week-slide week-slide--${slideFrom ?? 'fade'}`}>
-        {!rows ? (
-          <p className="form-text">Abrindo a semana.</p>
-        ) : rows.events.length === 0 && !rows.week && !lastSyncAt ? (
+      {reviewing && <RereadReview fromWeek={weekStartOf(today)} onClose={closeReview} />}
+      {/* Troca de semana: o conteúdo todo esmaece de uma vez, só quando a semana nova já está pronta (sem piscar o
+          "abrindo" no meio). */}
+      <div key={`${weekStart}:${Boolean(rows)}`} className="week-fade">
+        {!rows ? null : rows.events.length === 0 && !rows.week && !lastSyncAt ? (
           <p className="form-text">Buscando os eventos da semana.</p>
         ) : (
           <WeekBody rows={rows} sources={sources} now={now} today={today} />
@@ -113,21 +134,13 @@ function WeekBody({ rows, sources, now, today }: BodyProps) {
   const past = isWeekPast(rows.weekStart, now);
   const week = rows.week;
   const changes = unpublishedChanges(rows);
-  const publishedBy = rows.people.find((p) => p.id === week?.published_by)?.name;
   const historyLoading = history.rows === null && history.status === 'loading';
   const identify = useIdentifyTypes(rows, false);
   const missingType = untyped(rows).length;
 
-  const note = past
-    ? 'Semana passada fica só para consulta.'
-    : !week
-      ? 'Escolha as pessoas: a semana é montada sozinha na primeira confirmação.'
-      : week.state === 'published' && week.published_at
-        ? `Publicada em ${formatStamp(week.published_at)}${publishedBy ? ` por ${publishedBy}` : ''}.`
-        : 'Em montagem: a equipe ainda não vê esta semana.';
   const newActivity = !past && (
-    <Button variant="secondary" size="sm" onClick={() => setCreating(true)}>
-      Nova atividade interna
+    <Button variant="ghost" size="sm" onClick={() => setCreating(true)} title="Nova atividade interna">
+      Nova atividade
     </Button>
   );
 
@@ -138,9 +151,6 @@ function WeekBody({ rows, sources, now, today }: BodyProps) {
       {rows.events.filter((e) => !e.ignored).length === 0 ? (
         <>
           <div className="week-toolbar">
-            <span className="week-status">
-              <Badge tone="soft">{stateLabel(rows)}</Badge>
-            </span>
             <span className="week-actions-buttons">{newActivity}</span>
           </div>
           <Card variant="raised" padding={24}>
@@ -161,40 +171,45 @@ function WeekBody({ rows, sources, now, today }: BodyProps) {
           renderPanel={(event, crew) => (
             <EventPanel event={event} rows={rows} sources={sources} today={today} readOnly={past} crew={crew} onClose={() => setViewing(null)} />
           )}
-          renderBar={(board, scrollTo) => (
+          renderBar={(board, scrollTo, viewSwitch) => (
             <>
+              {/* Uma linha só: visualização, placar e filtro à esquerda; ações à direita. */}
               <div className="week-toolbar board-bar">
-                <span className="week-status">
-                  <Badge tone={week?.state === 'published' ? 'success' : week ? 'brand' : 'soft'}>{stateLabel(rows)}</Badge>
-                  <span className="form-text">{note}</span>
+                <span className="board-bar-left">
+                  {viewSwitch}
+                  <BoardScore counts={board.counts} onGo={scrollTo} />
+                  {!past && <BoardReview state={board} onGo={scrollTo} />}
                 </span>
-                <BoardScore counts={board.counts} onGo={scrollTo} />
-                {!past && <BoardReview state={board} onGo={scrollTo} />}
                 {!past && (
                   <span className="week-actions-buttons">
+                    {missingType > 0 && (
+                      <OnlineButton
+                        variant="ghost"
+                        size="sm"
+                        disabled={identify.running}
+                        title={`${plural(missingType, 'atividade está', 'atividades estão')} sem tipo de serviço: sem tipo, não há vagas.`}
+                        onClick={() => void identify.identify()}
+                      >
+                        {identify.running ? 'Identificando' : `Identificar tipos (${missingType})`}
+                      </OnlineButton>
+                    )}
+                    {newActivity}
                     {board.toConfirm > 0 && (
                       <Button size="sm" onClick={board.confirmAll}>
                         Confirmar sugestões ({board.toConfirm})
                       </Button>
                     )}
-                    {newActivity}
                     {week?.state === 'building' && (
-                      <OnlineButton variant="secondary" size="sm" onClick={() => setPublishing(true)}>
+                      <OnlineButton size="sm" variant={board.toConfirm > 0 ? 'secondary' : 'primary'} onClick={() => setPublishing(true)}>
                         Publicar
                       </OnlineButton>
                     )}
                   </span>
                 )}
               </div>
-              {!past && (missingType > 0 || board.historyLoading) && (
+              {!past && board.historyLoading && (
                 <p className="form-text board-note" role="status">
-                  {board.historyLoading && 'Lendo o histórico da equipe para sugerir as pessoas. '}
-                  {missingType > 0 && `${plural(missingType, 'atividade está', 'atividades estão')} sem tipo de serviço: sem tipo, não há vagas. `}
-                  {missingType > 0 && (
-                    <OnlineButton variant="ghost" size="sm" disabled={identify.running} onClick={() => void identify.identify()}>
-                      {identify.running ? 'Identificando' : 'Identificar os tipos'}
-                    </OnlineButton>
-                  )}
+                  Lendo o histórico da equipe para sugerir as pessoas.
                 </p>
               )}
               {identify.error && (

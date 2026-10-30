@@ -67,25 +67,27 @@ function CrewRows({
   onRemove: (key: string) => void;
   onAdd: () => void;
 }) {
+  // Uma linha por função, com os títulos "Função" e "Qtd." uma vez só no topo.
   return (
-    <fieldset className="check-group">
+    <fieldset className="crew-group">
       <legend className="field-label">{label}</legend>
+      {rows.length > 0 && (
+        <div className="crew-row crew-row--head" aria-hidden="true">
+          <span>Função</span>
+          <span>Qtd.</span>
+          <span />
+        </div>
+      )}
       {rows.map((r) => (
         <div key={r.key} className="crew-row">
           <Select
-            label="Função"
+            aria-label="Função"
             value={r.jobRoleId}
             onChange={(e) => onChange(r.key, { jobRoleId: e.target.value })}
             placeholder="Escolha a função"
             options={roles.filter((x) => !x.archived_at || x.id === r.jobRoleId).map((x) => ({ value: x.id, label: x.name }))}
           />
-          <Input
-            label="Quantidade"
-            inputMode="numeric"
-            value={r.quantity}
-            onChange={(e) => onChange(r.key, { quantity: e.target.value })}
-            style={{ maxWidth: 140 }}
-          />
+          <Input aria-label="Quantidade" inputMode="numeric" value={r.quantity} onChange={(e) => onChange(r.key, { quantity: e.target.value })} />
           <IconButton icon={TrashBinMinimalisticIcon} label="Tirar esta função" onClick={() => onRemove(r.key)} />
         </div>
       ))}
@@ -237,10 +239,11 @@ function ServiceTypeForm({
           label="Palavras-chave"
           value={keywords}
           onChange={(e) => setKeywords(e.target.value)}
-          hint='Separadas por vírgula. Um título com a palavra recebe este tipo com certeza alta. Com "^" ("^reuniao"), só vale quando o título começa com ela e vem antes das outras e do histórico; a mais longa ganha. Com asterisco ("*disponibilizar"), vale quando o título começa com "*" e a palavra, e ganha de todas.'
+          hint='Separadas por vírgula. "^reuniao" vale só no começo do título; "*disponibilizar", para títulos que começam com asterisco.'
+          title='Um título com a palavra recebe este tipo. Com "^", só vale quando o título começa com ela e vem antes das outras e do histórico (a mais longa ganha). Com asterisco, vale quando o título começa com "*" e a palavra, e ganha de todas.'
         />
         <IconPicker name={name} value={icon} onChange={setIcon} />
-        <Checkbox label="Não exige equipe (não gera vagas; só os setores marcados abaixo veem na agenda)" checked={noTeam} onChange={setNoTeam} />
+        <Checkbox label="Não exige equipe (sem vagas)" checked={noTeam} onChange={setNoTeam} />
         {noTeam && (
           <fieldset className="check-group">
             <legend className="field-label">Setores que veem na agenda</legend>
@@ -256,31 +259,19 @@ function ServiceTypeForm({
           </fieldset>
         )}
         {!noTeam && (
-          <Checkbox
-            label="Trabalho complexo (a escala sugerida chama primeiro quem é Referência na função)"
-            checked={complex}
-            onChange={setComplex}
-          />
-        )}
-
-        {!noTeam && (
-          <Checkbox
-            label={`Externo (cobertura fora do estúdio: só a equipe de Piracicaba é sugerida)${simulated ? '. No app local, vale já, só neste navegador' : ''}`}
-            checked={external}
-            onChange={(on) => {
-              setExternal(on);
-              // Sem a 0022 no banco, a marca fica no navegador, valendo na sugestão da semana.
-              if (simulated && type) setPreviewExternal(type.id, on);
-            }}
-          />
-        )}
-
-        {!noTeam && (
-          <Checkbox
-            label="Tem porte (Simples, Médio e Grande, com equipe diferente; quem monta a escala escolhe o porte de cada evento)"
-            checked={sized}
-            onChange={toggleSized}
-          />
+          <div className="check-group">
+            <Checkbox label="Trabalho complexo (chama primeiro quem é Referência)" checked={complex} onChange={setComplex} />
+            <Checkbox
+              label="Externo (só a equipe de Piracicaba)"
+              checked={external}
+              onChange={(on) => {
+                setExternal(on);
+                // Sem a 0022 no banco, a marca fica no navegador, valendo na sugestão da semana.
+                if (simulated && type) setPreviewExternal(type.id, on);
+              }}
+            />
+            <Checkbox label="Tem porte (Simples, Médio e Grande)" checked={sized} onChange={toggleSized} />
+          </div>
         )}
 
         {!noTeam && (
@@ -306,9 +297,7 @@ function ServiceTypeForm({
               />
             )}
             {sized && (
-              <p className="form-text">
-                O padrão vale para o evento sem porte escolhido e sem série no histórico. O porte Grande também chama primeiro quem é Referência na função.
-              </p>
+              <p className="form-text">Vale para o evento sem porte escolhido. O Grande chama primeiro quem é Referência.</p>
             )}
             {errors.includes('invalid_quantity') && (
               <span className="field-error" role="alert">
@@ -341,7 +330,7 @@ function ServiceTypeForm({
             </Button>
           </div>
         )}
-        {type && <p className="form-text">Mudar a equipe vale para os eventos ainda sem escala; os já escalados mantêm as vagas e mostram "equipe típica mudou".</p>}
+        {type && <p className="form-text">A equipe nova vale para os eventos ainda sem ninguém escalado.</p>}
 
         {simulated && (
           <p className="form-message" role="note">

@@ -6,11 +6,11 @@ repositório; a forja do Task Forge não mexe mais nele. O guia de como trabalha
 e o guia técnico (configuração, publicação, problemas) em `docs/como-usar.md`.
 
 ## Publicação pendente
-A 1.1.0 (PR #2, branch `ajuste/painel-e-semana`) tem migrações ainda não aplicadas (0012 a 0024), mais os dados iniciais de prioridade
-(`..\dados-iniciais\aplicar-prioridades.mjs`, fora do repositório), muda o
-serviço de fundo (IA local) e ainda não teve merge.
-Antes de publicar, ou se for preciso desfazer, siga `docs/publicar-1.1.0.md`. Apague esta seção quando a 1.1.0
-estiver no ar e firme.
+A 1.1.0 está no ar desde 29/10/2026: migrações 0012 a 0024 aplicadas, dados de prioridade gravados, PR #2 com
+merge e o serviço de fundo novo no NAS. Falta só apagar as cópias `_backup_*` depois de alguns dias sem problema
+(passo 7 de `docs/publicar-1.1.0.md`, que também diz como desfazer). A 0025 (apagar atividade pelo painel) entra com
+a 1.1.2: `npx supabase db push` antes do merge do PR dela; desfazer em `supabase/rollback/0025_down.sql`. Apague esta
+seção quando tudo estiver firme.
 
 ## Como trabalhar
 - Quem pede os ajustes conversa com você: pergunte no chat quando faltar uma decisão, mostre o resultado e itere.

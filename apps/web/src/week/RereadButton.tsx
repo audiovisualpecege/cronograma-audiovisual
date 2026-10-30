@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { isFinished, useJob, useRefreshWhenFinished } from '../settings/jobs';
 import { OnlineButton } from '../sync/OnlineButton';
 import { useSyncEngine } from '../sync/SyncProvider';
@@ -11,7 +11,7 @@ export const REREAD_CONFIRM = 'Existe um limite de sincronizações diárias. Te
  * "Reler agora" (US-011 AC-1): pede a leitura das agendas ao serviço de fundo e lê de novo os eventos.
  * Pede confirmação antes, porque há um limite de sincronizações por dia.
  */
-export function RereadButton() {
+export function RereadButton({ onRead }: { onRead?: () => void } = {}) {
   const engine = useSyncEngine();
   const [confirming, setConfirming] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -19,6 +19,13 @@ export function RereadButton() {
   const job = useJob(jobId);
   useRefreshWhenFinished(job, ['events', 'slots', 'assignments', 'calendar_sources']);
   const reading = jobId !== null && !isFinished(job);
+  // Releitura concluída: a página mostra o que ficou diferente da agenda (apagados aqui, só no cronograma).
+  const done = job?.status === 'done' ? jobId : null;
+  useEffect(() => {
+    if (done) onRead?.();
+    // Uma vez por releitura.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [done]);
 
   async function read() {
     setConfirming(false);

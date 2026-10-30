@@ -168,6 +168,8 @@ export interface EventRow extends Row {
   restored?: boolean;
   duplicate_group?: string | null;
   ignored?: boolean;
+  /** Apagado pelo painel da Semana (migração 0025): some da grade e a releitura não o traz de volta. */
+  hidden_at?: string | null;
   service_type_id?: string | null;
   type_certainty?: 'alta' | 'media' | 'baixa' | null;
   type_source?: string | null;
