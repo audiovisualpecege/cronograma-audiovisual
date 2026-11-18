@@ -345,6 +345,8 @@ export interface TimeOff {
   /** Horário exato do evento da agenda com hora marcada ("Médico Ana - tarde"): só ele fica fora, não o dia todo. */
   startsAt?: string;
   endsAt?: string;
+  /** Evento da agenda sem pessoa reconhecida: o horário inteiro, para a ausência de quem for escolhido. */
+  agenda?: { startsAt: string; endsAt: string; allDay: boolean };
 }
 
 const TIME_OFF_WORD: [RegExp, TimeOff['kind']][] = [
@@ -373,6 +375,29 @@ function peopleInTitle(title: string, people: readonly PersonRow[]): PersonRow[]
   return hits;
 }
 
+/** Folga, férias ou ausência pela agenda: pelo título, pelo tipo (FERIAS, FOLGA) ou pelo compromisso pessoal na frente. */
+function agendaTimeOffKind(e: EventRow, types: readonly ServiceTypeRow[]): TimeOff['kind'] | undefined {
+  if (e.ignored || e.status === 'cancelled') return undefined;
+  const typeName = types.find((t) => t.id === e.service_type_id)?.name ?? '';
+  const words = nameTokens(`${e.title} ${typeName}`).join(' ');
+  return TIME_OFF_WORD.find(([re]) => re.test(words))?.[1] ?? (PERSONAL_OPENING.test(nameTokens(e.title).join(' ')) ? 'ausencia' : undefined);
+}
+
+/** A ausência cadastrada pela faixa do dia para um evento da agenda sem pessoa reconhecida: mesma nota e horário. */
+function chosenAbsence(e: EventRow, absences: readonly AbsenceRow[]): AbsenceRow | undefined {
+  return absences.find((a) => !a.archived_at && a.note === e.title && a.starts_at < e.ends_at && e.starts_at < a.ends_at);
+}
+
+/**
+ * Eventos da agenda que só dizem quem está fora ("Ausência Fe Gomes", "Férias Ana"): não viram cartão, porque a faixa
+ * "Fora" do dia já mostra a pessoa (pedido do Raoni em 18/11/2026). Sem pessoa reconhecida nem escolhida, o cartão
+ * some do mesmo jeito e a faixa pede a pessoa. Evento com vagas continua como cartão.
+ */
+export function timeOffEventIds(rows: Pick<WeekRows, 'events' | 'types' | 'slots'>): Set<string> {
+  const withSlots = new Set(rows.slots.filter((s) => !s.archived_at).map((s) => s.event_id));
+  return new Set(rows.events.filter((e) => !withSlots.has(e.id) && agendaTimeOffKind(e, rows.types)).map((e) => e.id));
+}
+
 /**
  * Quem está de folga, férias ou ausente na semana: as ausências cadastradas e os eventos da agenda com
  * "férias", "folga" ou "ausente" no título ou no tipo, ou que abrem com médico, exame, consulta, licença ou atestado
@@ -395,18 +420,21 @@ export function weekTimeOff(rows: WeekRows): TimeOff[] {
     out.push({ key: `a:${a.id}`, personId: a.person_id, name: names.get(a.person_id) ?? 'Pessoa', kind: a.kind, from: span.from, to: span.to, agendaTitle: null });
   }
   for (const e of rows.events) {
-    if (e.ignored || e.status === 'cancelled') continue;
-    // Pelo título ou pelo tipo do evento (FERIAS, FOLGA).
-    const typeName = rows.types.find((t) => t.id === e.service_type_id)?.name ?? '';
-    const words = nameTokens(`${e.title} ${typeName}`).join(' ');
-    const kind = TIME_OFF_WORD.find(([re]) => re.test(words))?.[1] ?? (PERSONAL_OPENING.test(nameTokens(e.title).join(' ')) ? 'ausencia' : undefined);
+    const kind = agendaTimeOffKind(e, rows.types);
     if (!kind) continue;
     const span = clip(e.starts_at, e.ends_at);
     if (!span.inWeek) continue;
     const hours = e.all_day ? {} : { startsAt: e.starts_at, endsAt: e.ends_at };
     // "Médico Amanda e Fernanda": uma linha por pessoa. A primeira guarda a chave de antes, que o "não vale" usa.
     const cited = peopleInTitle(e.title, rows.people);
-    if (cited.length === 0) out.push({ key: `e:${e.id}`, personId: null, name: e.title, kind, from: span.from, to: span.to, agendaTitle: e.title, ...hours });
+    if (cited.length === 0) {
+      // Já escolheram a pessoa na faixa do dia: vale a ausência cadastrada.
+      if (!chosenAbsence(e, rows.absences)) {
+        const agenda = { startsAt: e.starts_at, endsAt: e.ends_at, allDay: Boolean(e.all_day) };
+        out.push({ key: `e:${e.id}`, personId: null, name: e.title, kind, from: span.from, to: span.to, agendaTitle: e.title, ...hours, agenda });
+      }
+      continue;
+    }
     cited.forEach((person, i) => {
       // A mesma folga cadastrada e na agenda aparece uma vez só.
       if (out.some((o) => o.personId === person.id && o.kind === kind && o.from <= span.to && span.from <= o.to)) return;

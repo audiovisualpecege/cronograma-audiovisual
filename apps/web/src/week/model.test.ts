@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { row } from '../../test/catalogRows';
-import type { AbsenceRow, EventRow, HistoryFactRow, JobRoleRow, PersonRoleRow, PersonRow } from '../data/catalog';
+import type { AbsenceRow, EventRow, HistoryFactRow, JobRoleRow, PersonRoleRow, PersonRow, SlotRow } from '../data/catalog';
 import { timeOffAbsences } from './board';
-import { agoText, relativeWeekLabel, seriesBases, weekTimeOff, type WeekRows } from './model';
+import { agoText, relativeWeekLabel, seriesBases, timeOffEventIds, weekTimeOff, type WeekRows } from './model';
 
 const WEEK = '2026-10-26';
 const role = (id: string, code: string, name: string) => row(id, { code, name, sector_id: null, archived_at: null }) as unknown as JobRoleRow;
@@ -105,5 +105,32 @@ describe('textos da semana', () => {
     const blocked = timeOffAbsences(off, new Set());
     expect(blocked[0]).toMatchObject({ personId: 'p1', startsAt: new Date('2026-10-27T13:00:00-03:00'), endsAt: new Date('2026-10-27T18:00:00-03:00') });
     expect(blocked[2]).toMatchObject({ personId: 'p3', startsAt: new Date('2026-10-28T00:00:00-03:00'), endsAt: new Date('2026-10-29T00:00:00-03:00') });
+  });
+
+  it('folga da agenda não vira cartão; sem pessoa reconhecida, a escolhida na faixa vale como ausência cadastrada', () => {
+    const people = [person('p1', { name: 'Fernanda Gomes' })];
+    const ev = (id: string, title: string, start: string, end: string) =>
+      row(id, { title, week_start: WEEK, starts_at: start, ends_at: end, all_day: false, status: 'active', ignored: false }) as unknown as EventRow;
+    const events = [
+      ev('e1', 'Ausência Fe Gomes', '2026-10-27T09:00:00-03:00', '2026-10-27T18:00:00-03:00'),
+      ev('e2', 'Gravação aula', '2026-10-27T09:00:00-03:00', '2026-10-27T12:00:00-03:00'),
+      ev('e3', 'Folga Fernanda', '2026-10-28T09:00:00-03:00', '2026-10-28T18:00:00-03:00'),
+    ];
+    const slot = row('s1', { event_id: 'e3', job_role_id: 'r1', archived_at: null }) as unknown as SlotRow;
+    // Com vaga, o evento continua como cartão.
+    expect([...timeOffEventIds({ events, types: [], slots: [slot] })]).toEqual(['e1']);
+    expect([...timeOffEventIds({ events, types: [], slots: [] })]).toEqual(['e1', 'e3']);
+    const before = weekTimeOff(rows({ people, events: [events[0]!] }));
+    expect(before).toMatchObject([{ personId: null, agenda: { startsAt: '2026-10-27T09:00:00-03:00', endsAt: '2026-10-27T18:00:00-03:00', allDay: false } }]);
+    const chosen = row('a1', {
+      person_id: 'p1',
+      kind: 'ausencia',
+      starts_at: '2026-10-27T09:00:00-03:00',
+      ends_at: '2026-10-27T18:00:00-03:00',
+      all_day: false,
+      note: 'Ausência Fe Gomes',
+      archived_at: null,
+    }) as unknown as AbsenceRow;
+    expect(weekTimeOff(rows({ people, absences: [chosen], events: [events[0]!] })).map((t) => [t.name, t.personId, t.agendaTitle])).toEqual([['Fernanda Gomes', 'p1', null]]);
   });
 });

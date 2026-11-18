@@ -3,6 +3,13 @@
 Cada versão nova entra no topo, com a data e o que mudou para quem usa.
 PATCH para um conserto, MINOR para algo novo, MAJOR quando o jeito de usar muda.
 
+## 1.2.1 (18/11/2026)
+
+- Folga, férias e ausência da agenda não aparecem mais como cartão na grade: a faixa "Fora" do dia já mostra quem
+  não vai estar. Evento com vaga de equipe continua como cartão.
+- Quando o app não reconhece a pessoa no título ("Ausência Fe Gomes"), a faixa "Fora" mostra uma caixa para escolher
+  quem é. A escolha vira uma ausência cadastrada da pessoa no horário do evento, e ela deixa de ser sugerida.
+
 ## 1.2.0 (18/11/2026)
 
 - Os eventos sem tipo passam pelas regras de novo a cada leitura da agenda. Antes, o tipo só era procurado quando o

@@ -319,11 +319,30 @@ describe('Semana: grade', () => {
     const day = await screen.findByRole('region', { name: 'segunda, 26/10' });
     const off = within(day).getByLabelText('Fora no dia');
     expect(off).toHaveTextContent('Fora:Carla Mendes (férias)');
+    // A folga não repete como cartão.
+    expect(within(day).queryByRole('button', { name: /Férias Carla/ })).toBeNull();
     const aula = await card('Gravação aula Biologia');
     expect(within(aula).queryByRole('button', { name: /Carla Mendes/ })).toBeNull();
 
     await user.click(within(off).getByRole('button', { name: 'Carla Mendes (férias)' }));
     expect(await within(aula).findByRole('button', { name: 'Câmera: Carla Mendes (sugestão)' })).toBeInTheDocument();
+  });
+
+  it('ausência da agenda sem pessoa reconhecida: a faixa pede a pessoa e a escolhida sai da sugestão', async () => {
+    const user = userEvent.setup();
+    const fora = eventRow('ef', { title: 'Ausência Ca Mendes', all_day: true, starts_at: '2026-10-26T00:00:00-03:00', ends_at: '2026-10-27T00:00:00-03:00' });
+    const remote = weekRemote({ events: [AULA, fora], slots: [slotWith('ea', 'r1')], people: peopleRows(4, { p3: { active: false }, p4: { name: 'Carla Mendes' } }), personRoles: personRoleRows(4) });
+    await page(remote);
+    const day = await screen.findByRole('region', { name: 'segunda, 26/10' });
+    const off = within(day).getByLabelText('Fora no dia');
+    expect(off).toHaveTextContent('Ausência Ca Mendes (ausência)');
+    const aula = await card('Gravação aula Biologia');
+    expect(await within(aula).findByRole('button', { name: 'Câmera: Carla Mendes (sugestão)' })).toBeInTheDocument();
+
+    await user.selectOptions(within(off).getByRole('combobox', { name: 'Quem: Ausência Ca Mendes' }), 'Carla Mendes');
+    expect(await within(off).findByText('Carla Mendes (ausência)')).toBeInTheDocument();
+    expect(within(off).queryByRole('combobox')).toBeNull();
+    await waitFor(() => expect(within(aula).queryByRole('button', { name: /Carla Mendes/ })).toBeNull());
   });
 
   it('passar o mouse numa ficha acende a mesma pessoa na semana e mostra as horas dela', async () => {
