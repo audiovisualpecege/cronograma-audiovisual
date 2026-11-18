@@ -1,6 +1,6 @@
 // Tipo de serviço sugerido para os eventos ainda sem tipo: o tipo aprendido pela série e o começo do título,
 // depois a palavra-chave do cadastro e, por fim, o título mais parecido do histórico.
-import { classifyTitle, jaccard, JACCARD_MIN, titleWords } from '@cronograma/core';
+import { classifyEvent, jaccard, JACCARD_MIN, titleWords } from '@cronograma/core';
 import { seriesTypesOf, type HistoryFactRow, type ServiceTypeRow } from '../data/catalog';
 import type { WeekRows } from './model';
 
@@ -36,7 +36,7 @@ export function typeSuggestions(rows: WeekRows, index: readonly TitleWords[]): M
   const like = types.map((t) => ({ id: t.id, code: t.code, keywords: t.keywords ?? [] }));
   const series = seriesTypesOf(rows.seriesRules);
   for (const e of missing) {
-    const c = classifyTitle(e.title, like, [], series);
+    const c = classifyEvent(e, like, [], series);
     let typeId = c.typeId;
     if (!typeId) {
       const target = titleWords(e.title);

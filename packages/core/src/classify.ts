@@ -85,6 +85,45 @@ function prefixMatch(words: string[], types: ServiceTypeLike[]): ServiceTypeLike
 }
 
 /**
+ * Título sem o número do pedido do outro sistema na frente ("ID 20260911 - Gravação: ..." vira "Gravação: ...";
+ * pedido do Raoni em 18/11/2026): o número não diz o tipo e escondia o começo do título das regras. Símbolos antes
+ * do "ID" saem junto; o asterisco que abre o resto ("*DISPONIBILIZAR") fica.
+ */
+export function withoutRequestId(title: string): string {
+  return title.replace(/^[^\p{L}\p{N}*]*ID\s*\d{6,}\s*[-–—:.]?\s*/iu, '');
+}
+
+/** Título que só reserva o horário ("NÃO MARCAR NADA"): o que é a atividade vem na descrição. */
+export function isReservedTitle(title: string): boolean {
+  return nameTokens(title).join(' ') === 'nao marcar nada';
+}
+
+/** Primeira linha com texto da descrição da agenda, sem as marcas de HTML. */
+export function descriptionLine(description: string | null | undefined): string {
+  const text = (description ?? '').replace(/<br\s*\/?>|<\/p>|<\/div>/gi, '\n').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ');
+  return text.split('\n').map((l) => l.trim()).find(Boolean) ?? '';
+}
+
+/**
+ * Tipo do evento da agenda: pelo título e, quando o título só reserva o horário ("NÃO MARCAR NADA"), pela primeira
+ * linha da descrição ("Montagem cenário ELG" é montagem de cenário; pedido do Raoni em 18/11/2026). Sem tipo pela
+ * descrição, vale o do título.
+ */
+export function classifyEvent(
+  e: { title: string; description?: string | null },
+  types: ServiceTypeLike[],
+  history: TitleIndex,
+  seriesTypes?: SeriesTypes,
+): Classification {
+  if (isReservedTitle(e.title)) {
+    const line = descriptionLine(e.description);
+    const byDescription = line ? classifyTitle(line, types, history, seriesTypes) : null;
+    if (byDescription?.typeId) return byDescription;
+  }
+  return classifyTitle(e.title, types, history, seriesTypes);
+}
+
+/**
  * Tipo do evento pelo título, nesta ordem (pedido do Raoni em 27/10/2026, depois de "Reunião Mediadores POLI USP
  * PRO" virar AULA MBA pelo histórico):
  *   1. a série aprendeu o tipo com a correção de alguém (certeza alta);
@@ -95,11 +134,12 @@ function prefixMatch(words: string[], types: ServiceTypeLike[]): ServiceTypeLike
  *   5. o título mais parecido do histórico (Jaccard >= 0,6) (média);
  * senão fica "a definir" com certeza baixa, para a IA ou o administrador.
  */
-export function classifyTitle(title: string, types: ServiceTypeLike[], history: TitleIndex, seriesTypes?: SeriesTypes): Classification {
+export function classifyTitle(rawTitle: string, types: ServiceTypeLike[], history: TitleIndex, seriesTypes?: SeriesTypes): Classification {
   const active = types.filter((t) => !t.archived);
+  const title = withoutRequestId(rawTitle);
   const words = nameTokens(title);
 
-  const learned = seriesTypes?.get(eventSeries(title));
+  const learned = seriesTypes?.get(eventSeries(rawTitle));
   const fromSeries = learned ? active.find((t) => t.id === learned) : undefined;
   if (fromSeries) return { typeId: fromSeries.id, type: fromSeries.code, certainty: 'alta', source: 'series' };
 

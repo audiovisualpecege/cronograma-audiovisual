@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSeriesSizes, effectiveSize, suggestSize } from './eventSize.ts';
+import { buildSeriesSizes, effectiveSize, sizeSignals, suggestSize } from './eventSize.ts';
 import { validateServiceType } from './validate.ts';
 
 const fact = (eventId: string, eventDate: string, title: string, personId: string | null) => ({ eventId, eventDate, title, personId });
@@ -56,5 +56,21 @@ describe('porte do evento', () => {
     expect(validateServiceType({ name: 'EVENTO', crew, noTeam: false, sized: true }).errors).toEqual(['size_without_crew']);
     expect(validateServiceType({ name: 'EVENTO', crew: [...crew, { jobRoleId: 'r1', quantity: 8, size: 3 }], noTeam: false, sized: true }).ok).toBe(true);
     expect(validateServiceType({ name: 'EVENTO', crew, noTeam: false }).ok).toBe(true);
+  });
+});
+
+describe('porte pela duração e pelas palavras', () => {
+  it('até 2h Simples, até 5h Médio, acima Grande; dia inteiro sem horário não conta', () => {
+    expect(sizeSignals({ title: 'Gravação: Reels', hours: 2 })).toEqual({ size: 1, reasons: ['2h'] });
+    expect(sizeSignals({ title: 'Gravação: Reels', hours: 4.5 })).toEqual({ size: 2, reasons: ['4,5h'] });
+    expect(sizeSignals({ title: 'Gravação: Reels', hours: 6 })).toEqual({ size: 3, reasons: ['6h'] });
+    expect(sizeSignals({ title: 'Gravação: Reels', hours: null })).toBeNull();
+  });
+
+  it('formatura vai ao Grande; transmissão, lançamento e lugar grande sobem um porte', () => {
+    expect(sizeSignals({ title: 'Formatura Fadelito', hours: 1 })).toMatchObject({ size: 3 });
+    expect(sizeSignals({ title: 'Gravação + TRANSMISSÃO: aula', hours: 2 })).toEqual({ size: 2, reasons: ['2h', 'transmissão'] });
+    expect(sizeSignals({ title: 'Evento IFSP', location: 'Teatro', hours: 4 })).toEqual({ size: 3, reasons: ['4h', 'local grande'] });
+    expect(sizeSignals({ title: 'Lançamento da biografia', hours: null })).toEqual({ size: 2, reasons: ['lançamento ou cobertura'] });
   });
 });

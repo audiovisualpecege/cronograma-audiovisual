@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SEED } from './cases/seed.ts';
-import { classifyTitle, detectDuplicates, type DuplicateCandidate, type TitleIndex } from './classify.ts';
+import { classifyEvent, classifyTitle, descriptionLine, detectDuplicates, withoutRequestId, type DuplicateCandidate, type TitleIndex } from './classify.ts';
 import { zonedTime } from './time.ts';
 
 const types = SEED.serviceTypes.map((t) => ({ id: t.id, code: t.code, keywords: t.keywords }));
@@ -74,6 +74,32 @@ describe('começo do título e série', () => {
     const series = new Map([['reuniao mediadores poli usp pro', 'mba']]);
     expect(classifyTitle('Reunião Mediadores POLI USP PRO', rules, [], series)).toMatchObject({ typeId: 'mba', certainty: 'alta', source: 'series' });
     expect(classifyTitle('Reunião Mediadores POLI USP PRO', rules, [], new Map([['reuniao mediadores poli usp pro', 'arquivado']]))).toMatchObject({ typeId: 'mediadores' });
+  });
+});
+
+describe('número do pedido e "Não marcar nada"', () => {
+  const rules = [
+    { id: 'montagem', code: 'T1', keywords: ['^montagem de cenario'] },
+    { id: 'gravacao', code: 'T2', keywords: ['^gravacao'] },
+    { id: 'reserva', code: 'T3', keywords: ['nao marcar nada'] },
+    { id: 'disp', code: 'T4', keywords: ['*disponibilizar'] },
+  ];
+
+  it('o "ID 2026xxxx" na frente sai antes das regras de começo', () => {
+    expect(withoutRequestId('ID 20260911 Gravação: Cursos Solution 2026')).toBe('Gravação: Cursos Solution 2026');
+    expect(withoutRequestId('ID 20260829 - MONTAGEM DE CENÁRIO: Reels')).toBe('MONTAGEM DE CENÁRIO: Reels');
+    expect(withoutRequestId('Ideias de pauta')).toBe('Ideias de pauta');
+    expect(classifyTitle('ID 20260911 Gravação: Cursos Solution 2026', rules, [])).toMatchObject({ typeId: 'gravacao', source: 'keyword' });
+    expect(classifyTitle('ID 20260829 - MONTAGEM DE CENÁRIO: Reels', rules, [])).toMatchObject({ typeId: 'montagem' });
+    expect(classifyTitle('ID 20260900 - *DISPONIBILIZAR: aula 3', rules, [])).toMatchObject({ typeId: 'disp' });
+  });
+
+  it('"NÃO MARCAR NADA" usa a primeira linha da descrição; sem tipo nela, vale o título', () => {
+    const e = { title: 'NÃO MARCAR NADA', description: '<p>Montagem de cenário ELG</p><p>Sala 3</p>' };
+    expect(descriptionLine(e.description)).toBe('Montagem de cenário ELG');
+    expect(classifyEvent(e, rules, [])).toMatchObject({ typeId: 'montagem' });
+    expect(classifyEvent({ title: 'Não marcar nada', description: 'Combinado com a diretoria' }, rules, [])).toMatchObject({ typeId: 'reserva' });
+    expect(classifyEvent({ title: 'Gravação: Reels', description: 'Montagem de cenário' }, rules, [])).toMatchObject({ typeId: 'gravacao' });
   });
 });
 

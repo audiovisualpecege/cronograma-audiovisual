@@ -1,6 +1,7 @@
 // Porte do evento (Simples, Médio, Grande): cada tipo com porte tem uma equipe típica por porte. Espelha
 // public.event_crew_size (migração 0017). O porte sugerido vem da série do evento no histórico: quantas pessoas
 // foram nas últimas vezes, e o porte cuja equipe chega mais perto disso.
+import { nameTokens } from './names.ts';
 import { eventSeries } from './scheduling.ts';
 import type { HistoryFact } from './types.ts';
 
@@ -45,6 +46,46 @@ export function buildSeriesSizes(facts: readonly Pick<HistoryFact, 'eventId' | '
     out.set(e.series, list);
   }
   return out;
+}
+
+/** Até estas horas, Simples; até as do Médio, Médio; acima, Grande (pedido do Raoni em 18/11/2026). */
+export const SIZE_HOURS: Readonly<Record<1 | 2, number>> = { 1: 2, 2: 5 };
+
+/** Palavras que levam direto ao Grande. */
+const GRANDE_WORDS = /\b(formatura|formaturas|cerimonia|cerimonias|colacao)\b/;
+/** Palavras que sobem um porte: transmissão junto, lançamento, cobertura e lugares grandes. */
+const RAISE_WORDS: [RegExp, string][] = [
+  [/\b(transmissao|ao vivo|live)\b/, 'transmissão'],
+  [/\b(lancamento|cobertura)\b/, 'lançamento ou cobertura'],
+  [/\b(auditorio|arena|teatro)\b/, 'local grande'],
+];
+
+export interface SizeSignals {
+  size: EventSize;
+  /** Os motivos, para o selo do cartão: "6h", "transmissão", "formatura". */
+  reasons: string[];
+}
+
+/**
+ * Porte pelo próprio evento: a duração (até 2h Simples, até 5h Médio, acima Grande) e as palavras do título, da
+ * descrição e do local (formatura ou cerimônia vão ao Grande; transmissão, lançamento, cobertura, auditório, arena
+ * ou teatro sobem um porte). Dia inteiro sem horário não conta pela duração. Nulo sem nenhum sinal.
+ */
+export function sizeSignals(e: { title: string; description?: string | null; location?: string | null; hours: number | null }): SizeSignals | null {
+  const reasons: string[] = [];
+  let size: EventSize | null = null;
+  if (e.hours !== null && e.hours > 0) {
+    size = e.hours <= SIZE_HOURS[1] ? 1 : e.hours <= SIZE_HOURS[2] ? 2 : 3;
+    reasons.push(`${Number.isInteger(e.hours) ? e.hours : e.hours.toFixed(1).replace('.', ',')}h`);
+  }
+  const words = nameTokens(`${e.title} ${e.description ?? ''} ${e.location ?? ''}`).join(' ');
+  if (GRANDE_WORDS.test(words)) return { size: 3, reasons: [...reasons, 'formatura ou cerimônia'] };
+  const raises = RAISE_WORDS.filter(([re]) => re.test(words)).map(([, why]) => why);
+  if (raises.length > 0) {
+    size = Math.min(3, (size ?? 1) + 1) as EventSize;
+    reasons.push(...raises);
+  }
+  return size === null ? null : { size, reasons };
 }
 
 export interface SizeSuggestion {

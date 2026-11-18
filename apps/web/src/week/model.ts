@@ -9,6 +9,8 @@ import {
   localDate,
   localTime,
   nameTokens,
+  SIZE_LABEL,
+  sizeSignals,
   suggestSize,
   type AbsenceLike,
   type AssignmentLike,
@@ -125,10 +127,12 @@ export function needsTeam(e: EventRow, types: readonly ServiceTypeRow[]): boolea
 
 export function toEventLike(e: EventRow, types: readonly ServiceTypeRow[], bases?: ReadonlyMap<string, Base>, rule?: SeriesRuleRow): EventLike {
   const type = types.find((t) => t.id === e.service_type_id);
+  // O titular do tipo vale para todos os eventos dele; o da série, quando há, vence na mesma função.
+  const titulars = type?.titulars || rule?.titulars ? { ...type?.titulars, ...rule?.titulars } : null;
   return {
     external: Boolean(type?.external),
     base: bases?.get(eventSeries(e.title)) ?? null,
-    ...(rule?.titulars ? { titulars: rule.titulars } : {}),
+    ...(titulars ? { titulars } : {}),
     // Trabalho complexo: tipo marcado como complexo, evento de porte Grande ou com estrela de atividade principal.
     complex: Boolean(e.highlighted) || Boolean(type?.complex) || Boolean(type?.sized && sizeFor(type, e.size) === 3),
     id: e.id,
@@ -246,16 +250,43 @@ export function estimatedCrew(e: EventRow, types: readonly ServiceTypeRow[], cre
 }
 
 /** De onde vêm as vagas do evento sem montagem: da série (aprendidas ou porte dela), do histórico ou do tipo. */
-export type CrewOrigin = 'series' | 'history' | null;
+export type CrewOrigin = 'series' | 'history' | 'signals' | null;
 
 export interface AutoSize {
   size: EventSize;
-  from: 'series' | 'history';
+  from: 'series' | 'history' | 'signals';
+  /** Por que esse porte, para o selo do cartão: "série: Médio; 6h; transmissão". */
+  reason: string;
+}
+
+/** Horas do evento para o porte; dia inteiro sem horário não conta. */
+function hoursOf(e: EventRow): number | null {
+  if (e.all_day && !(e.period_start && e.period_end)) return null;
+  const start = Date.parse(e.all_day ? (e.period_start as string) : e.starts_at);
+  const end = Date.parse(e.all_day ? (e.period_end as string) : e.ends_at);
+  return end > start ? (end - start) / 3_600_000 : null;
 }
 
 /**
- * Porte aplicado sozinho em cada evento de tipo com porte ainda sem porte escolhido: o que a série aprendeu, senão o
- * sugerido pelo histórico da série (quando é outro que o padrão do tipo). Vai na montagem da semana.
+ * Porte que o app escolheria sozinho para o evento de tipo com porte (pedido do Raoni em 18/11/2026): o maior entre o
+ * da série (aprendido, senão o das últimas vezes no histórico), o da duração e o das palavras. Errar para mais deixa
+ * uma vaga a tirar; para menos, gente faltando no dia. Nulo sem nenhum sinal (fica o padrão do tipo).
+ */
+export function chosenSize(e: EventRow, type: ServiceTypeRow, rows: WeekRows, seriesSizes: ReadonlyMap<string, readonly SeriesSize[]>, rule?: SeriesRuleRow): AutoSize | null {
+  const learned = isEventSize(rule?.size) ? rule.size : null;
+  const history = learned ? null : suggestSize(e.title, seriesSizes, crewTotals(type, rows.crew), rows.weekStart);
+  const series = learned ?? history?.size ?? null;
+  const signals = sizeSignals({ title: e.title, description: e.description, location: e.location, hours: hoursOf(e) });
+  if (series === null && !signals) return null;
+  const size = Math.max(series ?? 1, signals?.size ?? 1) as EventSize;
+  const reasons = [...(series !== null ? [`série: ${SIZE_LABEL[series]}`] : []), ...(signals?.reasons ?? [])];
+  const from = signals && signals.size > (series ?? 0) ? 'signals' : learned ? 'series' : 'history';
+  return { size, from, reason: reasons.join('; ') };
+}
+
+/**
+ * Porte aplicado sozinho em cada evento de tipo com porte ainda sem porte escolhido (chosenSize), quando é outro que
+ * o padrão do tipo. Vai na montagem da semana.
  */
 export function autoSizes(rows: WeekRows, seriesSizes: ReadonlyMap<string, readonly SeriesSize[]>): Map<string, AutoSize> {
   const out = new Map<string, AutoSize>();
@@ -264,13 +295,8 @@ export function autoSizes(rows: WeekRows, seriesSizes: ReadonlyMap<string, reado
     if (e.ignored || e.status === 'cancelled' || isEventSize(e.size)) continue;
     const type = sizedType(e, rows.types);
     if (!type) continue;
-    const learned = rules.get(eventSeries(e.title))?.size;
-    if (isEventSize(learned)) {
-      out.set(e.id, { size: learned, from: 'series' });
-      continue;
-    }
-    const s = suggestSize(e.title, seriesSizes, crewTotals(type, rows.crew), rows.weekStart);
-    if (s && s.size !== sizeFor(type, e.size)) out.set(e.id, { size: s.size, from: 'history' });
+    const s = chosenSize(e, type, rows, seriesSizes, rules.get(eventSeries(e.title)));
+    if (s && (s.from === 'series' || s.size !== sizeFor(type, e.size))) out.set(e.id, s);
   }
   return out;
 }
@@ -316,6 +342,9 @@ export interface TimeOff {
   to: string;
   /** Título do evento, quando veio da agenda. */
   agendaTitle: string | null;
+  /** Horário exato do evento da agenda com hora marcada ("Médico Ana - tarde"): só ele fica fora, não o dia todo. */
+  startsAt?: string;
+  endsAt?: string;
 }
 
 const TIME_OFF_WORD: [RegExp, TimeOff['kind']][] = [
@@ -324,8 +353,14 @@ const TIME_OFF_WORD: [RegExp, TimeOff['kind']][] = [
   [/\b(ausente|ausencia)\b/, 'ausencia'],
 ];
 
-/** Pessoa ativa citada no título: o primeiro nome basta quando é único; senão, precisa de mais um nome. */
-function personInTitle(title: string, people: readonly PersonRow[]): PersonRow | null {
+/**
+ * Compromisso pessoal que abre o título ("Médico Matheus - tarde", "Exame Pedro", "Licença Marcus"): conta como
+ * ausência (pedido do Raoni em 18/11/2026). Só no começo, para "Gravação: Dia do Médico" não virar ausência.
+ */
+const PERSONAL_OPENING = /^(medic[oa]|exames?|consultas?|licenca|atestado)\b/;
+
+/** Pessoas ativas citadas no título: o primeiro nome basta quando é único; senão, precisa de mais um nome. */
+function peopleInTitle(title: string, people: readonly PersonRow[]): PersonRow[] {
   const words = new Set(nameTokens(title));
   const active = people.filter((p) => p.active);
   const first = (p: PersonRow) => nameTokens(p.name)[0] ?? '';
@@ -335,12 +370,13 @@ function personInTitle(title: string, people: readonly PersonRow[]): PersonRow |
     const sameFirst = active.filter((o) => first(o) === first(p)).length;
     return sameFirst === 1 || tokens.slice(1).some((t) => t.length > 2 && words.has(t));
   });
-  return hits.length === 1 ? (hits[0] ?? null) : null;
+  return hits;
 }
 
 /**
  * Quem está de folga, férias ou ausente na semana: as ausências cadastradas e os eventos da agenda com
- * "férias", "folga" ou "ausente" no título ou no tipo (com a pessoa reconhecida pelo nome, quando dá).
+ * "férias", "folga" ou "ausente" no título ou no tipo, ou que abrem com médico, exame, consulta, licença ou atestado
+ * (com as pessoas reconhecidas pelo nome, quando dá).
  */
 export function weekTimeOff(rows: WeekRows): TimeOff[] {
   const ws = rows.weekStart;
@@ -363,14 +399,19 @@ export function weekTimeOff(rows: WeekRows): TimeOff[] {
     // Pelo título ou pelo tipo do evento (FERIAS, FOLGA).
     const typeName = rows.types.find((t) => t.id === e.service_type_id)?.name ?? '';
     const words = nameTokens(`${e.title} ${typeName}`).join(' ');
-    const kind = TIME_OFF_WORD.find(([re]) => re.test(words))?.[1];
+    const kind = TIME_OFF_WORD.find(([re]) => re.test(words))?.[1] ?? (PERSONAL_OPENING.test(nameTokens(e.title).join(' ')) ? 'ausencia' : undefined);
     if (!kind) continue;
     const span = clip(e.starts_at, e.ends_at);
     if (!span.inWeek) continue;
-    const person = personInTitle(e.title, rows.people);
-    // A mesma folga cadastrada e na agenda aparece uma vez só.
-    if (person && out.some((o) => o.personId === person.id && o.kind === kind && o.from <= span.to && span.from <= o.to)) continue;
-    out.push({ key: `e:${e.id}`, personId: person?.id ?? null, name: person?.name ?? e.title, kind, from: span.from, to: span.to, agendaTitle: e.title });
+    const hours = e.all_day ? {} : { startsAt: e.starts_at, endsAt: e.ends_at };
+    // "Médico Amanda e Fernanda": uma linha por pessoa. A primeira guarda a chave de antes, que o "não vale" usa.
+    const cited = peopleInTitle(e.title, rows.people);
+    if (cited.length === 0) out.push({ key: `e:${e.id}`, personId: null, name: e.title, kind, from: span.from, to: span.to, agendaTitle: e.title, ...hours });
+    cited.forEach((person, i) => {
+      // A mesma folga cadastrada e na agenda aparece uma vez só.
+      if (out.some((o) => o.personId === person.id && o.kind === kind && o.from <= span.to && span.from <= o.to)) return;
+      out.push({ key: i === 0 ? `e:${e.id}` : `e:${e.id}:${person.id}`, personId: person.id, name: person.name, kind, from: span.from, to: span.to, agendaTitle: e.title, ...hours });
+    });
   }
   return out.sort((a, b) => a.from.localeCompare(b.from) || a.name.localeCompare(b.name, 'pt-BR'));
 }

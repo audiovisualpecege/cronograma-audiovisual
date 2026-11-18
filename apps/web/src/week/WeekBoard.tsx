@@ -1,5 +1,5 @@
 import { DangerTriangleIcon } from '@solar-icons/react/bold-duotone';
-import { buildSeriesSizes, personLoad, SIZE_LABEL, weekStartOf, zonedTime, type EventSize, type SizeSuggestion, type WeekContext } from '@cronograma/core';
+import { buildSeriesSizes, isEventSize, personLoad, SIZE_LABEL, weekStartOf, zonedTime, type EventSize, type SizeSuggestion, type WeekContext } from '@cronograma/core';
 import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { googleColor, useLocalGoogleColors } from './googleColors';
 import { sizeFor, toFact, useTable, type AssignmentRow, type EventRow, type HistoryFactRow, type JobRoleRow, type SectorRow, type ServiceTypeRow, type SlotRow } from '../data/catalog';
@@ -14,6 +14,7 @@ import {
   boardDays,
   chipState,
   crewOrigin,
+  sizeReason,
   eventAlerts,
   isPlanned,
   isReserved,
@@ -852,6 +853,40 @@ function OffStrip({ items, dropped, readOnly, onToggle }: { items: TimeOff[]; dr
   );
 }
 
+const SIZE_LETTER: Record<EventSize, string> = { 1: 'S', 2: 'M', 3: 'G' };
+
+/**
+ * Selo do porte no cartão (S, M, G). Pontilhado quando foi o app que escolheu, com o motivo na dica; um clique passa
+ * para o próximo porte e as vagas se refazem (pedido do Raoni em 18/11/2026).
+ */
+function SizeSeal({ event, type, title, readOnly }: { event: EventRow; type: ServiceTypeRow; title: string; readOnly: boolean }) {
+  const engine = useSyncEngine();
+  const size = sizeFor(type, event.size);
+  const reason = sizeReason(event);
+  const auto = Boolean(reason) || !isEventSize(event.size);
+  const why = reason ? `Porte pelo app: ${reason}` : isEventSize(event.size) ? `Porte ${SIZE_LABEL[size]}` : `Padrão do tipo: ${SIZE_LABEL[size]}`;
+  const next = ((size % 3) + 1) as EventSize;
+  if (readOnly) {
+    return (
+      <span className="board-size" data-auto={auto ? '' : undefined} title={why} role="img" aria-label={`Porte ${SIZE_LABEL[size]}`}>
+        {SIZE_LETTER[size]}
+      </span>
+    );
+  }
+  return (
+    <button
+      type="button"
+      className="board-size"
+      data-auto={auto ? '' : undefined}
+      title={`${why}. Clique para ${SIZE_LABEL[next]}.`}
+      aria-label={`Porte ${SIZE_LABEL[size]} em ${title}. Trocar para ${SIZE_LABEL[next]}`}
+      onClick={() => void changeSize(engine, event, next)}
+    >
+      {SIZE_LETTER[size]}
+    </button>
+  );
+}
+
 function EventCard({
   event,
   rows,
@@ -904,14 +939,14 @@ function EventCard({
         </span>
         <span className="board-card-type">
           {type ? type.name : 'Tipo a definir'}
-          {sized && ` · ${SIZE_LABEL[sizeFor(sized, event.size)]}`}
-          {crewOrigin(event) && (
-            <span className="board-card-origin" title={crewOrigin(event) === 'series' ? 'Vagas como a série aprendeu nas últimas semanas' : 'Porte pelas últimas vezes da série no histórico'}>
+          {crewOrigin(event) === 'series' && !sized && (
+            <span className="board-card-origin" title="Vagas como a série aprendeu nas últimas semanas">
               {' '}
               · pela série
             </span>
           )}
         </span>
+        {sized && <SizeSeal event={event} type={sized} title={title} readOnly={readOnly || cancelled} />}
         {alerts.length > 0 && (
           <span className="board-alert" data-alert title={alerts.join('; ')} role="img" aria-label={`Avisos: ${alerts.join('; ')}`}>
             <AppIcon icon={DangerTriangleIcon} size={16} />

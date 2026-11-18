@@ -12,7 +12,7 @@ import {
 } from '@cronograma/core';
 import { AddCircleIcon, TrashBinMinimalisticIcon } from '@solar-icons/react/linear';
 import { useMemo, useState, type FormEvent } from 'react';
-import { byName, crewOf, toFact, useTable, type CrewItem, type CrewRow, type JobRoleRow, type SectorRow, type ServiceTypeRow } from '../../data/catalog';
+import { byName, crewOf, toFact, useTable, type CrewItem, type CrewRow, type JobRoleRow, type PersonRoleRow, type PersonRow, type SectorRow, type ServiceTypeRow } from '../../data/catalog';
 import { firstError } from '../../data/messages';
 import { previewActive, previewCatalog, setPreviewExternal, usePreviewExternal } from '../../dev/sizePreview';
 import { PageTitle } from '../../layout/PageTitle';
@@ -98,6 +98,61 @@ function CrewRows({
   );
 }
 
+/**
+ * Pessoa fixa do tipo, por função: titular e reserva, sugeridos antes de todo mundo em qualquer evento do tipo
+ * (migração 0026). Só quem tem a função habilitada aparece.
+ */
+function TitularFields({
+  roleIds,
+  roleName,
+  value,
+  onChange,
+}: {
+  roleIds: string[];
+  roleName: Map<string, string>;
+  value: Record<string, string[]>;
+  onChange: (roleId: string, people: string[]) => void;
+}) {
+  const people = useTable<PersonRow>('people');
+  const personRoles = useTable<PersonRoleRow>('person_roles');
+  if (roleIds.length === 0) return null;
+  const able = (roleId: string) =>
+    [...(people ?? [])]
+      .filter((p) => p.active && (personRoles ?? []).some((pr) => pr.person_id === p.id && pr.job_role_id === roleId && !pr.archived_at))
+      .sort(byName)
+      .map((p) => ({ value: p.id, label: p.name }));
+  return (
+    <fieldset className="crew-group">
+      <legend className="field-label">Pessoa fixa</legend>
+      <div className="crew-row crew-row--head titular-row" aria-hidden="true">
+        <span>Função</span>
+        <span>Titular</span>
+        <span>Reserva</span>
+      </div>
+      {roleIds.map((roleId) => {
+        const [titular = '', reserva = ''] = value[roleId] ?? [];
+        const options = able(roleId);
+        const set = (t: string, r: string) => onChange(roleId, [t, r].filter(Boolean).filter((x, i, a) => a.indexOf(x) === i));
+        return (
+          <div key={roleId} className="crew-row titular-row">
+            <span className="titular-role">{roleName.get(roleId) ?? 'Função'}</span>
+            <Select aria-label={`Titular de ${roleName.get(roleId) ?? 'função'}`} value={titular} onChange={(e) => set(e.target.value, e.target.value ? reserva : '')} placeholder="Ninguém" options={options} />
+            <Select
+              aria-label={`Reserva de ${roleName.get(roleId) ?? 'função'}`}
+              value={reserva}
+              disabled={!titular}
+              onChange={(e) => set(titular, e.target.value)}
+              placeholder="Ninguém"
+              options={options.filter((o) => o.value !== titular)}
+            />
+          </div>
+        );
+      })}
+      <span className="form-text">Sugeridos antes de todo mundo nos eventos deste tipo. A pessoa fixa de uma série, quando houver, vale mais.</span>
+    </fieldset>
+  );
+}
+
 /** Banco de ícones do tipo; "Automático" deixa o app escolher pelo nome. */
 function IconPicker({ name, value, onChange }: { name: string; value: string; onChange: (key: string) => void }) {
   const auto = typeIcon({ name });
@@ -171,6 +226,8 @@ function ServiceTypeForm({
   const [rows, setRows] = useState<CrewDraft[]>(() =>
     (type ? crewOf(type, crew) : []).filter((c) => type?.sized || c.size === SINGLE_CREW_SIZE).map((c) => draftRow(c, isEventSize(c.size) ? c.size : SINGLE_CREW_SIZE)),
   );
+  const [titulars, setTitulars] = useState<Record<string, string[]>>(() => ({ ...type?.titulars }));
+  const [titularError, setTitularError] = useState<string | null>(null);
   const [tried, setTried] = useState(false);
   const roleName = new Map(roles.map((r) => [r.id, r.name]));
   // Sem porte, só vale a equipe única (as linhas dos outros portes ficam guardadas até salvar, caso volte).
@@ -222,6 +279,17 @@ function ServiceTypeForm({
       crew: crewPayload,
     };
     await engine.enqueue('service_type.upsert', { id, ...fields }, { target: { table: 'service_types', id, changes: { ...fields, code: type?.code ?? '' } } });
+    // A pessoa fixa grava direto no servidor (precisa de internet), só nas funções que mudaram.
+    const changed = Object.keys({ ...type?.titulars, ...titulars }).filter((r) => (type?.titulars?.[r] ?? []).join() !== (titulars[r] ?? []).join());
+    if (type && changed.length > 0) {
+      try {
+        for (const roleId of changed) await engine.runOnline((remote) => remote.rpc('set_type_titular', { p_type: type.id, p_role: roleId, p_people: titulars[roleId] ?? [] }));
+        await engine.pull('service_types').catch(() => 0);
+      } catch {
+        setTitularError('O tipo foi salvo, mas a pessoa fixa precisa de internet. Tente de novo quando estiver conectado.');
+        return;
+      }
+    }
     onClose();
   }
 
@@ -315,6 +383,20 @@ function ServiceTypeForm({
               </span>
             )}
           </div>
+        )}
+
+        {type && !noTeam && (
+          <TitularFields
+            roleIds={[...new Set(picked.map((r) => r.jobRoleId))]}
+            roleName={roleName}
+            value={titulars}
+            onChange={(roleId, people) => setTitulars((t) => ({ ...t, [roleId]: people }))}
+          />
+        )}
+        {titularError && (
+          <span className="field-error" role="alert">
+            {titularError}
+          </span>
         )}
 
         {type && suggested.length > 0 && !noTeam && (

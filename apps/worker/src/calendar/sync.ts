@@ -146,7 +146,7 @@ export class CalendarSync {
 
     const fresh = changes.filter((c) => c.change.kind === 'new');
     const classified = await this.classifier.classify(
-      fresh.map((c) => ({ id: c.googleId, title: c.change.kind === 'new' ? c.change.after.title : '' })),
+      fresh.map((c) => (c.change.kind === 'new' ? { id: c.googleId, title: c.change.after.title, description: c.change.after.description } : { id: c.googleId, title: '' })),
     );
     const outcome: SourceOutcome = {
       source_id: src.id, label: src.label, status: 'connected',
