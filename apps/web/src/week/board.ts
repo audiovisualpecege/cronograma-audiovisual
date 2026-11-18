@@ -1,7 +1,7 @@
 // Regras da grade da semana, puras: as vagas previstas da semana ainda não montada (para sugerir e escolher antes
 // da montagem), a chave estável de cada vaga, os dias em colunas com as folgas, a família de cada atividade (cor
 // do cartão), os avisos do evento e o placar.
-import { addDays, eventSeries, nameTokens, zonedTime, type AbsenceLike } from '@cronograma/core';
+import { addDays, eventSeries, nameTokens, withoutRequestId, zonedTime, type AbsenceLike } from '@cronograma/core';
 import { seriesRuleMap, type AssignmentRow, type EventRow, type HistoryFactRow, type ServiceTypeRow, type SlotRow } from '../data/catalog';
 import type { Draft } from './historyProposal';
 import { estimatedCrew, eventsByDay, isMarker, isMeetingEvent, needsTeam, slotState, weekDays, type AutoSize, type CrewOrigin, type TimeOff, type WeekRows } from './model';
@@ -14,6 +14,8 @@ export const isPlanned = (slotId: string) => slotId.startsWith(PLAN);
 
 /** De onde vieram as vagas previstas do evento (marca "pela série" no cartão). */
 export const crewOrigin = (e: EventRow): CrewOrigin => (e.crew_origin as CrewOrigin | undefined) ?? null;
+/** Por que o porte aplicado sozinho (semana sem montagem): "série: Médio; 6h; transmissão". */
+export const sizeReason = (e: EventRow): string | null => (typeof e.size_reason === 'string' ? e.size_reason : null);
 
 /**
  * A semana como ficaria montada: sem montagem, cada evento que pede equipe ganha as vagas que a montagem criaria,
@@ -31,7 +33,7 @@ export function plannedRows(rows: WeekRows, auto: ReadonlyMap<string, AutoSize> 
     const learned = Boolean(rule?.crew && rule.crew_type_id === e.service_type_id);
     const size = auto.get(e.id);
     if (!learned && !size) return e;
-    return { ...e, ...(size && !learned ? { size: size.size } : {}), crew_origin: learned ? 'series' : size?.from };
+    return { ...e, ...(size && !learned ? { size: size.size, size_reason: size.reason } : {}), crew_origin: learned ? 'series' : size?.from };
   });
   for (const e of events) {
     if (!needsTeam(e, rows.types)) continue;
@@ -92,8 +94,10 @@ export function activityKind(e: EventRow, types: readonly ServiceTypeRow[]): Act
 }
 
 /** Primeira linha do título: as de baixo trazem disciplina e professor, que poluem o cartão. */
+/** Primeira linha do título, sem o número do pedido na frente ("ID 20260911 - "); o painel mostra o título inteiro. */
 export function shortTitle(title: string): string {
-  return (title.split(/\r?\n/)[0] ?? title).trim() || 'Sem título';
+  const first = (title.split(/\r?\n/)[0] ?? title).trim();
+  return withoutRequestId(first).trim() || first || 'Sem título';
 }
 
 export interface BoardDay {
@@ -198,7 +202,11 @@ export function timelineLayout(date: string, events: readonly EventRow[]): Timel
 export function timeOffAbsences(items: readonly TimeOff[], dropped: ReadonlySet<string>): AbsenceLike[] {
   return items
     .filter((t) => t.agendaTitle && t.personId && !dropped.has(t.key))
-    .map((t) => ({ personId: t.personId as string, startsAt: zonedTime(t.from, '00:00'), endsAt: zonedTime(addDays(t.to, 1), '00:00') }));
+    .map((t) => ({
+      personId: t.personId as string,
+      startsAt: t.startsAt ? new Date(t.startsAt) : zonedTime(t.from, '00:00'),
+      endsAt: t.endsAt ? new Date(t.endsAt) : zonedTime(addDays(t.to, 1), '00:00'),
+    }));
 }
 
 export type ChipState = 'confirmed' | 'suggested' | 'open';

@@ -36,7 +36,7 @@ export class FakeStore {
   series = new Map<string, string>();
   secrets = new Map<string, string>();
   typed = new Map<string, EventType>();
-  unclassified: { id: string; title: string }[] = [];
+  unclassified: { id: string; title: string; description?: string | null }[] = [];
   promoted: (string | null)[] = [];
 
   proposal: ProposalData | null = null;
@@ -155,7 +155,7 @@ export class FakeStore {
     this.secrets.delete('ai_key_pending');
   }
   async unclassifiedEvents() {
-    return this.unclassified;
+    return this.unclassified.map((e) => ({ description: null, ...e }));
   }
   async setEventType(id: string, type: EventType) {
     this.typed.set(id, type);

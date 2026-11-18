@@ -52,4 +52,14 @@ describe('Classifier', () => {
     expect(res.types.get('c')).toEqual({ service_type_id: 't3', certainty: 'media', source: 'ai', no_team: false });
     expect(res.aiCalls).toBe(1);
   });
+
+  it('"NÃO MARCAR NADA" usa a descrição, e o número do pedido na frente do título não atrapalha', async () => {
+    const { classifier } = setup(false);
+    const res = await classifier.classify([
+      { id: 'd', title: 'NÃO MARCAR NADA', description: 'Gravação aula ELG' },
+      { id: 'e', title: 'ID 20260911 - Aula aberta' },
+    ]);
+    expect(res.types.get('d')).toMatchObject({ service_type_id: 't1', source: 'keyword' });
+    expect(res.types.get('e')).toMatchObject({ service_type_id: 't1', source: 'keyword' });
+  });
 });

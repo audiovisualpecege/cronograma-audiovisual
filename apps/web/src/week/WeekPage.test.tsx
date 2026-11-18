@@ -462,16 +462,45 @@ describe('Semana sem montagem', () => {
       row('t1:s2', { service_type_id: 't1', job_role_id: 'r1', quantity: 2, size: 2, archived_at: null }),
       row('t1:s3', { service_type_id: 't1', job_role_id: 'r1', quantity: 4, size: 3, archived_at: null }),
     ];
-    const remote = weekRemote({ week: null, events: [eventRow('b1', { title: 'Gravação aula Biologia' })], extra: { service_types: types, service_type_crew: crew } });
+    // Uma hora só: nenhum sinal pede porte maior.
+    const remote = weekRemote({
+      week: null,
+      events: [eventRow('b1', { title: 'Gravação aula Biologia', ends_at: '2026-10-26T10:00:00-03:00' })],
+      extra: { service_types: types, service_type_crew: crew },
+    });
     await page(remote);
     const aula = await card('Gravação aula Biologia');
-    expect(aula).toHaveTextContent('· Simples');
+    expect(within(aula).getByRole('button', { name: /^Porte Simples em Gravação aula Biologia/ })).toHaveTextContent('S');
     await waitFor(() => expect(chips(aula)).toHaveLength(1));
     await user.click(within(aula).getByRole('button', { name: 'Gravação aula Biologia' }));
     const panel = await screen.findByRole('complementary');
     await user.click(within(panel).getByRole('button', { name: 'Grande' }));
     await waitFor(() => expect(chips(aula)).toHaveLength(4));
     await waitFor(() => expect(ops(remote).find((o) => o.kind === 'event.update_extras')).toMatchObject({ payload: { id: 'b1', size: 3 } }));
+  });
+
+  it('porte pela duração e pelas palavras: 6h com transmissão vai a Grande, e o selo troca o porte com um clique', async () => {
+    const user = userEvent.setup();
+    const types = TYPE_ROWS.map((t) => (t.id === 't1' ? { ...t, sized: true } : t));
+    const crew = [
+      ...CREW_ROWS.filter((c) => c.service_type_id !== 't1'),
+      row('t1:s1', { service_type_id: 't1', job_role_id: 'r1', quantity: 1, size: 1, archived_at: null }),
+      row('t1:s2', { service_type_id: 't1', job_role_id: 'r1', quantity: 2, size: 2, archived_at: null }),
+      row('t1:s3', { service_type_id: 't1', job_role_id: 'r1', quantity: 4, size: 3, archived_at: null }),
+    ];
+    const remote = weekRemote({
+      week: null,
+      events: [eventRow('b1', { title: 'Gravação aula + TRANSMISSÃO', ends_at: '2026-10-26T15:00:00-03:00' })],
+      extra: { service_types: types, service_type_crew: crew },
+    });
+    await page(remote);
+    const aula = await card('Gravação aula + TRANSMISSÃO');
+    const seal = await within(aula).findByRole('button', { name: /^Porte Grande em/ });
+    expect(seal.getAttribute('title')).toMatch(/6h; transmissão/);
+    await waitFor(() => expect(chips(aula)).toHaveLength(4));
+    await user.click(seal);
+    await waitFor(() => expect(ops(remote).find((o) => o.kind === 'event.update_extras')).toMatchObject({ payload: { id: 'b1', size: 1 } }));
+    await waitFor(() => expect(chips(aula)).toHaveLength(1));
   });
 
   it('semana sem montagem: as vagas que a série aprendeu valem, com "pela série"; tirar uma vaga prevista a some e monta a semana', async () => {
@@ -507,7 +536,9 @@ describe('Semana sem montagem', () => {
     remote.views = { ...remote.views, history_facts: history };
     await page(remote);
     const aula = await card('Gravação aula Biologia');
-    await waitFor(() => expect(aula).toHaveTextContent('· Médio · pela série'));
+    const seal = await within(aula).findByRole('button', { name: /^Porte Médio em Gravação aula Biologia/ });
+    expect(seal).toHaveAttribute('data-auto');
+    expect(seal.getAttribute('title')).toMatch(/^Porte pelo app: série: Médio; 3h/);
     await waitFor(() => expect(chips(aula)).toHaveLength(2));
     await user.click(await screen.findByRole('button', { name: /Confirmar sugestões/ }));
     await waitFor(() => expect(ops(remote).find((o) => o.kind === 'week.build')).toMatchObject({ payload: { sizes: { b1: 2 } } }));

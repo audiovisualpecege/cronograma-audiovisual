@@ -216,7 +216,7 @@ export interface ClassifierStore extends SettingsStore {
   /** Tipo que cada série aprendeu com a correção do administrador (migração 0020). */
   seriesTypes(): Promise<Map<string, string>>;
   secret(name: string): Promise<string | null>;
-  unclassifiedEvents(fromWeek: string): Promise<{ id: string; title: string }[]>;
+  unclassifiedEvents(fromWeek: string): Promise<{ id: string; title: string; description: string | null }[]>;
   setEventType(eventId: string, type: EventType): Promise<void>;
 }
 
@@ -475,10 +475,10 @@ export class SupabaseStore implements Store {
 
   async unclassifiedEvents(fromWeek: string) {
     return check(
-      await this.db.from('events').select('id, title').eq('origin', 'calendar').is('service_type_id', null)
+      await this.db.from('events').select('id, title, description').eq('origin', 'calendar').is('service_type_id', null)
         .is('type_source', null).neq('status', 'cancelled').gte('week_start', fromWeek).limit(500),
       'unclassifiedEvents',
-    ) as { id: string; title: string }[];
+    ) as { id: string; title: string; description: string | null }[];
   }
 
   async setEventType(eventId: string, type: EventType) {

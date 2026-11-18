@@ -76,6 +76,8 @@ export interface ServiceTypeRow extends Row {
   sector_ids?: string[];
   /** Externo (cobertura fora do estúdio): só a equipe de Piracicaba faz (migração 0022). */
   external?: boolean;
+  /** Titular e reserva do tipo inteiro, por função: { id da função: [titular, reserva] } (migração 0026). */
+  titulars?: Record<string, string[]> | null;
   archived_at: string | null;
   crew?: CrewItem[];
 }

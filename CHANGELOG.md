@@ -3,6 +3,27 @@
 Cada versão nova entra no topo, com a data e o que mudou para quem usa.
 PATCH para um conserto, MINOR para algo novo, MAJOR quando o jeito de usar muda.
 
+## 1.2.0 (18/11/2026)
+
+- Os eventos sem tipo passam pelas regras de novo a cada leitura da agenda. Antes, o tipo só era procurado quando o
+  evento aparecia pela primeira vez, e quem chegou antes de uma regra ficava sem tipo até alguém clicar em
+  "Identificar tipos".
+- O número do pedido no começo do título ("ID 20260911 - Gravação: ...") não atrapalha mais: o app procura o tipo
+  pelo resto do título, e o cartão mostra o título sem o número (o painel mostra o título inteiro).
+- "NÃO MARCAR NADA" com o que é a atividade na descrição ("Montagem cenário ELG") ganha o tipo pela descrição e
+  continua listrado.
+- Médico, exame, consulta, licença e atestado no começo do título contam como ausência de cada pessoa citada
+  ("Médico Amanda e Fernanda" vale para as duas), só no horário do evento, e esses eventos não pedem equipe.
+- Tipo novo PLANTÃO ONLINE para os "Plantão de dúvidas" (English@USP), com 1 vaga de Mediação.
+- Pessoa fixa no tipo: a edição do tipo tem titular e reserva para cada função, sugeridos antes de todo mundo nos
+  eventos do tipo. A pessoa fixa de uma série, quando existe, vale mais.
+- O porte (Simples, Médio, Grande) que o app escolhe sozinho olha também a duração (até 2h Simples, até 5h Médio,
+  mais que isso Grande) e as palavras do título, da descrição e do local: formatura e cerimônia vão a Grande;
+  transmissão ou ao vivo, lançamento, cobertura, auditório, arena e teatro sobem um porte. Ganha o maior entre a
+  série, a duração e as palavras.
+- O cartão mostra o porte num selo S, M ou G, pontilhado quando foi o app que escolheu, com o motivo ao passar o
+  mouse. Um clique passa para o próximo porte e refaz as vagas.
+
 ## 1.1.2 (29/10/2026)
 
 - Semana mais enxuta: a situação (Em montagem, Publicada) fica ao lado do título, sem os nomes das semanas

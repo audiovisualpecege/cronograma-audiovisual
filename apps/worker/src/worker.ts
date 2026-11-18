@@ -65,7 +65,16 @@ export class Worker {
     this.heartbeat = new Heartbeat(store, clock, log, deps.version);
 
     const handlers: Record<JobKind, JobHandler> = {
-      calendar_sync: () => this.calendar.run(),
+      // Depois de ler a agenda, os eventos ainda sem tipo passam pelas regras de novo (pedido do Raoni em 18/11/2026:
+      // os que chegaram antes da regra ficavam sem tipo até alguém clicar em "Identificar tipos").
+      calendar_sync: async () => {
+        const read = await this.calendar.run();
+        const typed = await this.classifier.classifyPending(clock.now()).catch((e: unknown) => {
+          log.warn({ error: errorMessage(e) }, 'tipos dos eventos sem tipo não identificados');
+          return null;
+        });
+        return typed ? { ...read, typed: typed.classified } : read;
+      },
       classify: () => this.classifier.classifyPending(clock.now()),
       propose: (job, progress) => this.proposals.run(job.id, job.payload, progress),
       test_ai_key: (job) => testAiKey(store, deps.providerFactory, job.payload, deps.aiLocal ?? null),

@@ -3,7 +3,7 @@
 // Aqui: palavra-chave na hora, pelo próprio aparelho; o resto vai para o job `classify` do serviço de fundo
 // (títulos parecidos do histórico e, se ligada, a IA). No fim, "Montar semana" de novo cria as vagas dos
 // eventos tipados pelo serviço de fundo numa semana já montada.
-import { classifyTitle } from '@cronograma/core';
+import { classifyEvent } from '@cronograma/core';
 import { useEffect, useRef, useState } from 'react';
 import { seriesTypesOf, type EventRow } from '../data/catalog';
 import { isFinished, useJob, useRefreshWhenFinished } from '../settings/jobs';
@@ -24,7 +24,7 @@ export function keywordTypes(rows: WeekRows): Map<string, string> {
   const series = seriesTypesOf(rows.seriesRules);
   const out = new Map<string, string>();
   for (const e of untyped(rows)) {
-    const c = classifyTitle(e.title, types, [], series);
+    const c = classifyEvent(e, types, [], series);
     if (c.typeId && (c.source === 'keyword' || c.source === 'series')) out.set(e.id, c.typeId);
   }
   return out;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { row } from '../../test/catalogRows';
 import type { AbsenceRow, EventRow, HistoryFactRow, JobRoleRow, PersonRoleRow, PersonRow } from '../data/catalog';
+import { timeOffAbsences } from './board';
 import { agoText, relativeWeekLabel, seriesBases, weekTimeOff, type WeekRows } from './model';
 
 const WEEK = '2026-10-26';
@@ -80,5 +81,29 @@ describe('textos da semana', () => {
       // Dois Brunos: sem o sobrenome, fica o título do evento.
       ['Férias Bruno', 'ferias', '2026-10-29', '2026-10-29', null],
     ]);
+  });
+
+  it('médico, exame e licença no começo do título viram ausência, só no horário do evento e de cada pessoa citada', () => {
+    const people = [person('p1', { name: 'Amanda Reis' }), person('p2', { name: 'Fernanda Dias' }), person('p3', { name: 'Pedro Melo' })];
+    const ev = (id: string, title: string, start: string, end: string, allDay = false) =>
+      row(id, { title, week_start: WEEK, starts_at: start, ends_at: end, all_day: allDay, status: 'active', ignored: false }) as unknown as EventRow;
+    const off = weekTimeOff(
+      rows({
+        people,
+        events: [
+          ev('e1', 'Médico Amanda e Fernanda (tarde)', '2026-10-27T13:00:00-03:00', '2026-10-27T18:00:00-03:00'),
+          ev('e2', 'Licença Pedro', '2026-10-28T00:00:00-03:00', '2026-10-29T00:00:00-03:00', true),
+          ev('e3', 'Gravação: Dia do Médico', '2026-10-29T09:00:00-03:00', '2026-10-29T12:00:00-03:00'),
+        ],
+      }),
+    );
+    expect(off.map((t) => [t.key, t.name, t.kind, t.startsAt ?? null])).toEqual([
+      ['e:e1', 'Amanda Reis', 'ausencia', '2026-10-27T13:00:00-03:00'],
+      ['e:e1:p2', 'Fernanda Dias', 'ausencia', '2026-10-27T13:00:00-03:00'],
+      ['e:e2', 'Pedro Melo', 'ausencia', null],
+    ]);
+    const blocked = timeOffAbsences(off, new Set());
+    expect(blocked[0]).toMatchObject({ personId: 'p1', startsAt: new Date('2026-10-27T13:00:00-03:00'), endsAt: new Date('2026-10-27T18:00:00-03:00') });
+    expect(blocked[2]).toMatchObject({ personId: 'p3', startsAt: new Date('2026-10-28T00:00:00-03:00'), endsAt: new Date('2026-10-29T00:00:00-03:00') });
   });
 });

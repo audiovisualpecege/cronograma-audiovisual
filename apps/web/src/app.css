@@ -817,6 +817,30 @@ body {
   text-transform: uppercase;
 }
 
+.crew-row.titular-row {
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.titular-role {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  .crew-row.titular-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .crew-row--head.titular-row {
+    display: none;
+  }
+
+  .titular-role {
+    grid-column: 1 / -1;
+  }
+}
+
 .crew-group > button {
   align-self: flex-start;
 }
@@ -3006,6 +3030,35 @@ button.board-off-item {
 }
 
 /* "pela série": as vagas ou o porte vieram do que a série aprendeu. */
+.board-size {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-pill, 999px);
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+  font: var(--weight-bold) 11px/1 var(--font-display);
+  cursor: default;
+}
+
+button.board-size {
+  cursor: pointer;
+}
+
+button.board-size:hover,
+button.board-size:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.board-size[data-auto] {
+  border-style: dashed;
+}
+
 .board-card-origin {
   color: var(--accent);
   text-transform: none;
