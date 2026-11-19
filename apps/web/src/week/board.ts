@@ -4,7 +4,7 @@
 import { addDays, eventSeries, nameTokens, withoutRequestId, zonedTime, type AbsenceLike } from '@cronograma/core';
 import { seriesRuleMap, type AssignmentRow, type EventRow, type HistoryFactRow, type ServiceTypeRow, type SlotRow } from '../data/catalog';
 import type { Draft } from './historyProposal';
-import { estimatedCrew, eventsByDay, isMarker, isMeetingEvent, needsTeam, slotState, weekDays, type AutoSize, type CrewOrigin, type TimeOff, type WeekRows } from './model';
+import { estimatedCrew, eventsByDay, isMarker, isMeetingEvent, needsTeam, slotState, timeOffEventIds, weekDays, type AutoSize, type CrewOrigin, type TimeOff, type WeekRows } from './model';
 import type { ScheduleModel } from './schedule';
 
 const PLAN = 'plan:';
@@ -113,9 +113,13 @@ export interface BoardDay {
   off: TimeOff[];
 }
 
-/** Os sete dias com as atividades e as folgas de cada um; os ignorados por duplicidade ficam de fora. */
+/**
+ * Os sete dias com as atividades e as folgas de cada um. Ficam de fora os ignorados por duplicidade e as folgas,
+ * férias e ausências da agenda, que já aparecem na faixa "Fora".
+ */
 export function boardDays(rows: WeekRows, timeOff: readonly TimeOff[]): BoardDay[] {
-  const byDay = eventsByDay(rows.weekStart, rows.events.filter((e) => !e.ignored));
+  const offEvents = timeOffEventIds(rows);
+  const byDay = eventsByDay(rows.weekStart, rows.events.filter((e) => !e.ignored && !offEvents.has(e.id)));
   return weekDays(rows.weekStart).map((d) => {
     const all = byDay.get(d.date) ?? [];
     return {

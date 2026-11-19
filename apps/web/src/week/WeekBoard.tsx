@@ -558,7 +558,7 @@ function DayColumn({
         <h3 className="board-day-title">{empty ? day.short : day.label}</h3>
         {day.date === today && <Seal kind="hoje">hoje</Seal>}
       </header>
-      {day.off.length > 0 && <OffStrip items={day.off} dropped={dropped} readOnly={readOnly} onToggle={onToggleOff} />}
+      {day.off.length > 0 && <OffStrip items={day.off} people={rows.people} dropped={dropped} readOnly={readOnly} onToggle={onToggleOff} />}
       {empty ? (
         <p className="board-day-empty">sem atividades</p>
       ) : (
@@ -700,7 +700,7 @@ function DayTimeline({ now, ...props }: Parameters<typeof DayColumn>[0] & { now:
           </button>
         </span>
       </header>
-      {day.off.length > 0 && <OffStrip items={day.off} dropped={dropped} readOnly={readOnly} onToggle={onToggleOff} />}
+      {day.off.length > 0 && <OffStrip items={day.off} people={rows.people} dropped={dropped} readOnly={readOnly} onToggle={onToggleOff} />}
       {layout.allDay.length > 0 && (
         <div className="board-timeline-allday" aria-label="Dia inteiro">
           {layout.allDay.map((e) => (
@@ -823,14 +823,31 @@ function TimelineCard({ event, rows, built, slots, chip, onOpen }: { event: Even
   );
 }
 
-/** "Fora: Ana (férias), Caio (folga)". A folga da agenda se desmarca com um clique (não vale para a sugestão). */
-function OffStrip({ items, dropped, readOnly, onToggle }: { items: TimeOff[]; dropped: ReadonlySet<string>; readOnly: boolean; onToggle: (t: TimeOff) => void }) {
+/**
+ * "Fora: Ana (férias), Caio (folga)". A folga da agenda se desmarca com um clique (não vale para a sugestão). Sem
+ * pessoa reconhecida no título ("Ausência Fe Gomes"), uma caixa pede a pessoa e grava a ausência dela no horário do
+ * evento (pedido do Raoni em 18/11/2026).
+ */
+function OffStrip({
+  items,
+  people,
+  dropped,
+  readOnly,
+  onToggle,
+}: {
+  items: TimeOff[];
+  people: WeekRows['people'];
+  dropped: ReadonlySet<string>;
+  readOnly: boolean;
+  onToggle: (t: TimeOff) => void;
+}) {
   return (
     <p className="board-off" aria-label="Fora no dia">
       <span className="board-off-label">Fora:</span>
       {items.map((t) => {
         const off = dropped.has(t.key);
         const text = `${t.personId ? t.name : shortTitle(t.name)} (${TIME_OFF[t.kind].label.toLowerCase()})`;
+        if (t.agenda && !readOnly) return <OffPersonPick key={t.key} item={t} text={text} people={people} />;
         const toggles = Boolean(t.agendaTitle && t.personId) && !readOnly;
         return toggles ? (
           <button
@@ -850,6 +867,33 @@ function OffStrip({ items, dropped, readOnly, onToggle }: { items: TimeOff[]; dr
         );
       })}
     </p>
+  );
+}
+
+/** Folga da agenda sem pessoa reconhecida: escolher quem grava a ausência cadastrada, com o título como nota. */
+function OffPersonPick({ item, text, people }: { item: TimeOff; text: string; people: WeekRows['people'] }) {
+  const engine = useSyncEngine();
+  const active = useMemo(() => people.filter((p) => p.active).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')), [people]);
+  const agenda = item.agenda;
+  if (!agenda) return null;
+  function choose(personId: string) {
+    if (!personId || !agenda) return;
+    const id = crypto.randomUUID();
+    const fields = { person_id: personId, kind: item.kind, starts_at: agenda.startsAt, ends_at: agenda.endsAt, all_day: agenda.allDay, note: item.name };
+    void engine.enqueue('absence.upsert', { id, ...fields }, { target: { table: 'absences', id, changes: { ...fields, archived_at: null } } });
+  }
+  return (
+    <span className="board-off-item board-off-pick" title="Pela agenda, sem pessoa reconhecida">
+      {text}
+      <select aria-label={`Quem: ${item.name}`} value="" onChange={(ev) => choose(ev.target.value)}>
+        <option value="">Quem?</option>
+        {active.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.name}
+          </option>
+        ))}
+      </select>
+    </span>
   );
 }
 
